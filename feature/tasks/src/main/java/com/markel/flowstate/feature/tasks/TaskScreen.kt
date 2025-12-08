@@ -1,7 +1,13 @@
 package com.markel.flowstate.feature.tasks
 
 import android.app.Application
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,22 +17,38 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.markel.flowstate.core.domain.Task
+import kotlinx.coroutines.delay
 
 /**
  * La pantalla (Composable) que muestra la lista de tareas.
@@ -75,9 +97,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
             modifier = Modifier.weight(1f)
         ) {
             items(tasks, key = { it.id }) { task ->
-                TaskItem(
+                AnimatableTaskItem(
                     task = task,
-                    onTaskClicked = { viewModel.toggleTaskDone(task) }
+                    onDelete = { viewModel.deleteTask(task) },
+                    onComplete = { viewModel.toggleTaskDone(task) }
                 )
             }
         }
@@ -87,33 +110,134 @@ fun TaskScreen(viewModel: TaskViewModel) {
 /**
  * Un Composable para un único item de la lista de tareas.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskItem(
+fun AnimatableTaskItem(
     task: Task,
-    onTaskClicked: () -> Unit
+    onDelete: () -> Unit,
+    onComplete: () -> Unit
 ) {
-    Row(
+    // Estado local: ¿Es visible este item?
+    var isVisible by remember { mutableStateOf(true) }
+
+    // Estado local: ¿Está marcado como hecho (para tacharlo visualmente antes de que desaparezca)?
+    var isChecked by remember { mutableStateOf(task.isDone) }
+
+    // Efecto secundario: Cuando 'isVisible' cambia a false...
+    LaunchedEffect(isVisible) {
+        if (!isVisible) {
+            // Esperamos a que termine la animación
+            delay(400)
+            // Llamamos al ViewModel para actualizar la DB
+            onComplete()
+        }
+    }
+
+    // AnimatedVisibility maneja el fadeOut (opacidad) y shrinkVertically (colapso de altura)
+    AnimatedVisibility(
+        visible = isVisible,  // cuando visible cambie a false, se aplicará la animación de salida definida (exit)
+        exit = fadeOut(animationSpec = tween(300)) + shrinkVertically(animationSpec = tween(400))
+    ) {
+        // Envolvemos en SwipeToDelete
+        SwipeToDeleteContainer(
+            item = task,
+            onDelete = onDelete
+        ) {
+            TaskItemContent(
+                title = task.title,
+                isDone = isChecked,
+                onClicked = {
+                    // Tachamos visualmente al instante
+                    isChecked = !isChecked
+                    // Iniciamos la animación de salida (esto dispara el LaunchedEffect de arriba)
+                    isVisible = false
+                }
+            )
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun <T> SwipeToDeleteContainer(
+    item: T,
+    onDelete: () -> Unit,
+    content: @Composable (T) -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                true
+            } else {
+                false
+            }
+        }
+    )
+
+    val shape = RoundedCornerShape(12.dp)
+
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                Color.Transparent
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(color)
+                    .padding(16.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Borrar",
+                    tint = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        },
+        content = { content(item) }
+    )
+}
+
+@Composable
+fun TaskItemContent(
+    title: String,
+    isDone: Boolean,
+    onClicked: () -> Unit
+) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onTaskClicked() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Checkbox(
-            checked = task.isDone,
-            onCheckedChange = { onTaskClicked() }
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = task.title,
-            style = if (task.isDone) {
-                androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(
-                    textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            } else {
-                androidx.compose.material3.MaterialTheme.typography.bodyLarge
-            }
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClicked() }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = isDone,
+                onCheckedChange = { onClicked() }
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = if (isDone) {
+                    MaterialTheme.typography.bodyLarge.copy(
+                        textDecoration = TextDecoration.LineThrough,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                } else {
+                    MaterialTheme.typography.bodyLarge
+                }
+            )
+        }
     }
 }
