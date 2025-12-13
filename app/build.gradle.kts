@@ -69,6 +69,7 @@ dependencies {
 
     // HILT (Inyección de Dependencias)
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.ui.text.google.fonts)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
