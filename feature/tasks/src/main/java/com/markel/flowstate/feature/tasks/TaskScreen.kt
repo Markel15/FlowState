@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -166,9 +167,13 @@ fun <T> SwipeToDeleteContainer(
     onDelete: () -> Unit,
     content: @Composable (T) -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState(
+    val threshold = 0.40f
+    lateinit var dismissState: SwipeToDismissBoxState
+    dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) {
+            if (value == SwipeToDismissBoxValue.EndToStart &&
+                dismissState.progress >= threshold  // Evita que un fling rápido cuente como eliminación
+            ) {
                 onDelete()
                 true
             } else {
