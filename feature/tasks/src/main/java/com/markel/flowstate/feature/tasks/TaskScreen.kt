@@ -167,7 +167,7 @@ fun <T> SwipeToDeleteContainer(
     onDelete: () -> Unit,
     content: @Composable (T) -> Unit
 ) {
-    val threshold = 0.40f
+    val threshold = 0.35f
     lateinit var dismissState: SwipeToDismissBoxState
     dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
