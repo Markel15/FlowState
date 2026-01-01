@@ -1,119 +1,373 @@
 package com.markel.flowstate.feature.tasks
 
-import android.app.Application
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.markel.flowstate.core.domain.Task
 import kotlinx.coroutines.delay
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-/**
- * La pantalla (Composable) que muestra la lista de tareas.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(viewModel: TaskViewModel) {
-
-    // Recolectamos el estado (la lista de tareas) del ViewModel
-    // de una forma segura para el ciclo de vida (Lifecycle)
     val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val listState = rememberLazyListState()
 
-    // Estado local para el campo de texto de nueva tarea
-    var newTaskTitle by remember { mutableStateOf("") }
+    // Este estado sobrevive a rotaciones de pantalla, pero se reinicia al cerrar la app
+    var hasScrolledOnce by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(text = "Mis Tareas", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
+    // Detectamos el scroll solo para activar el flag la primera vez
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 90 }
+            .collect { scrolled ->
+                if (scrolled && !hasScrolledOnce) {
+                    hasScrolledOnce = true
+                }
+            }
+    }
 
-        // --- Input para nuevas tareas ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = newTaskTitle,
-                onValueChange = { newTaskTitle = it },
-                label = { Text("Nueva tarea...") },
-                modifier = Modifier.weight(1f)
-            )
-            Spacer(Modifier.width(8.dp))
-            Button(onClick = {
-                viewModel.addTask(newTaskTitle)
-                newTaskTitle = "" // Limpia el campo
-            }) {
-                Text("Añadir")
+    var isFabExpanded by remember { mutableStateOf(false) }
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            floatingActionButton = {
+                AnimatedVisibility(
+                    visible = !showAddTaskDialog,
+                    enter = scaleIn(),
+                    exit = scaleOut()
+                ) {
+                    ExpandableFabMenu(
+                        expanded = isFabExpanded,
+                        onToggle = { isFabExpanded = !isFabExpanded },
+                        onTaskClick = { isFabExpanded = false; showAddTaskDialog = true },
+                        onIdeaClick = { isFabExpanded = false }
+                    )
+                }
+            }
+        ) { paddingValues ->
+            Column(modifier = Modifier.padding(paddingValues)) {
+
+                DynamicHeader(isMinimized = hasScrolledOnce)
+
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp),
+                    contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+                ) {
+                    if (tasks.isEmpty()) {
+                        item { EmptyStateView() }
+                    }
+                    items(tasks, key = { it.id }) { task ->
+                        AnimatableTaskItem(
+                            task = task,
+                            onDelete = { viewModel.deleteTask(task) },
+                            onComplete = { viewModel.toggleTaskDone(task) }
+                        )
+                    }
+                }
             }
         }
 
-        // --- Lista de tareas ---
-        LazyColumn(
-            modifier = Modifier.weight(1f)
+        AddTaskTransformDialog(
+            isVisible = showAddTaskDialog,
+            onDismiss = { showAddTaskDialog = false },
+            onSave = { title -> viewModel.addTask(title); showAddTaskDialog = false }
+        )
+    }
+}
+
+@Composable
+fun DynamicHeader(isMinimized: Boolean) {
+    val greeting = when (LocalTime.now().hour) {
+        in 5..12 -> "Buenos días"
+        in 13..20 -> "Buenas tardes"
+        else -> "Buenas noches"
+    }
+
+    val dateText = DateTimeFormatter.ofPattern("EEEE, d MMM", Locale("es", "ES"))
+        .format(java.time.LocalDate.now())
+        .uppercase()
+
+    val headerHeight by animateDpAsState(
+        targetValue = if (isMinimized) 40.dp else 80.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "height"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(top = 16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(headerHeight),
+            contentAlignment = Alignment.CenterStart
         ) {
-            items(tasks, key = { it.id }) { task ->
-                AnimatableTaskItem(
-                    task = task,
-                    onDelete = { viewModel.deleteTask(task) },
-                    onComplete = { viewModel.toggleTaskDone(task) }
+            // El mensaje solo se renderiza si no se ha minimizado
+            if (!isMinimized) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.5).sp
+                    )
+                )
+            }
+
+            // La fecha se desliza hacia la izquierda/arriba de forma fluida
+            Text(
+                text = dateText,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier
+                    .align(if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd)
+                    .animateContentSize() // Suaviza el cambio de alineación
+            )
+        }
+
+        if (isMinimized) {
+            HorizontalDivider(
+                modifier = Modifier.padding(top = 8.dp),
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+            )
+        }
+    }
+}
+
+/**
+ * Un diálogo personalizado que simula nacer desde el FAB (Esquina inferior derecha).
+ */
+@Composable
+fun AddTaskTransformDialog(
+    isVisible: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    // Usamos AnimatedVisibility para controlar la entrada/salida fluida
+    AnimatedVisibility(
+        visible = isVisible,
+        // La animación que escala desde la esquina inferior derecha (donde estaba el FAB)
+        enter = fadeIn(animationSpec = tween(200)) +
+                scaleIn(
+                    initialScale = 0.1f,
+                    transformOrigin = TransformOrigin(0.9f, 0.9f), // Origen: Abajo-Derecha
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ),
+        exit = fadeOut(animationSpec = tween(200)) +
+                scaleOut(
+                    targetScale = 0.1f,
+                    transformOrigin = TransformOrigin(0.9f, 0.9f),
+                    animationSpec = tween(250, easing = LinearOutSlowInEasing)
+                )
+    ) {
+        // Fondo semitransparente (Scrim) que cierra al pulsar
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Contenido de la tarjeta (evitamos que el click en la tarjeta cierre el diálogo)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f) // Ancho de la tarjeta
+                    .wrapContentHeight()
+                    .clickable(enabled = false) {}, // Absorbe clicks
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                elevation = CardDefaults.cardElevation(6.dp)
+            ) {
+                AddTaskContent(
+                    onCancel = onDismiss,
+                    onSave = onSave
                 )
             }
         }
     }
 }
 
-/**
- * Un Composable para un único item de la lista de tareas.
- */
+@Composable
+fun AddTaskContent(
+    onCancel: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    Column(modifier = Modifier.padding(24.dp)) {
+        Text(
+            text = "Nueva Tarea",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+            placeholder = { Text("¿Qué tienes en mente?") },
+            singleLine = false, // Permite multilínea si la idea es larga
+            maxLines = 3,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = {
+                if (text.isNotBlank()) onSave(text)
+            })
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onCancel) {
+                Text("Cancelar")
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = { if (text.isNotBlank()) onSave(text) },
+                enabled = text.isNotBlank()
+            ) {
+                Text("Guardar")
+            }
+        }
+    }
+
+    // Solicitar foco automáticamente
+    LaunchedEffect(Unit) {
+        delay(100)
+        focusRequester.requestFocus()
+    }
+}
+
+// ---------------------------------------------
+// Componentes Auxiliares
+// ---------------------------------------------
+
+@Composable
+fun ExpandableFabMenu(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onTaskClick: () -> Unit,
+    onIdeaClick: () -> Unit
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 135f else 0f, label = "rotation"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                FabOption("Idea", ImageVector.vectorResource(R.drawable.lightbulb_24px), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, onIdeaClick)
+                FabOption("Tarea", Icons.Default.Check, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, onTaskClick)
+            }
+        }
+
+        FloatingActionButton(
+            onClick = onToggle,
+            containerColor = MaterialTheme.colorScheme.primary,
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Add, "Menu", modifier = Modifier.rotate(rotation))
+        }
+    }
+}
+
+@Composable
+fun FabOption(text: String, icon: ImageVector, containerColor: Color, contentColor: Color, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.padding(end = 16.dp)
+        ) {
+            Text(text, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), style = MaterialTheme.typography.labelLarge)
+        }
+        SmallFloatingActionButton(onClick = onClick, containerColor = containerColor, contentColor = contentColor) {
+            Icon(icon, text)
+        }
+    }
+}
+
+@Composable
+fun EmptyStateView() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 60.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Default.Check, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.surfaceVariant)
+        Text("Todo limpio", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnimatableTaskItem(
@@ -121,45 +375,33 @@ fun AnimatableTaskItem(
     onDelete: () -> Unit,
     onComplete: () -> Unit
 ) {
-    // Estado local: ¿Es visible este item?
     var isVisible by remember { mutableStateOf(true) }
-
-    // Estado local: ¿Está marcado como hecho (para tacharlo visualmente antes de que desaparezca)?
     var isChecked by remember { mutableStateOf(task.isDone) }
 
-    // Efecto secundario: Cuando 'isVisible' cambia a false...
     LaunchedEffect(isVisible) {
         if (!isVisible) {
-            // Esperamos a que termine la animación
             delay(400)
-            // Llamamos al ViewModel para actualizar la DB
             onComplete()
         }
     }
 
-    // AnimatedVisibility maneja el fadeOut (opacidad) y shrinkVertically (colapso de altura)
     AnimatedVisibility(
-        visible = isVisible,  // cuando visible cambie a false, se aplicará la animación de salida definida (exit)
+        visible = isVisible,
         exit = fadeOut(animationSpec = tween(300)) + shrinkVertically(animationSpec = tween(400))
     ) {
-        // Envolvemos en SwipeToDelete
-        SwipeToDeleteContainer(
-            item = task,
-            onDelete = onDelete
-        ) {
+        SwipeToDeleteContainer(item = task, onDelete = onDelete) {
             TaskItemContent(
                 title = task.title,
                 isDone = isChecked,
                 onClicked = {
-                    // Tachamos visualmente al instante
                     isChecked = !isChecked
-                    // Iniciamos la animación de salida (esto dispara el LaunchedEffect de arriba)
                     isVisible = false
                 }
             )
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun <T> SwipeToDeleteContainer(
@@ -171,18 +413,12 @@ fun <T> SwipeToDeleteContainer(
     lateinit var dismissState: SwipeToDismissBoxState
     dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart &&
-                dismissState.progress >= threshold  // Evita que un fling rápido cuente como eliminación
-            ) {
+            if (value == SwipeToDismissBoxValue.EndToStart && dismissState.progress >= threshold) {
                 onDelete()
                 true
-            } else {
-                false
-            }
+            } else false
         }
     )
-
-    val shape = RoundedCornerShape(12.dp)
 
     SwipeToDismissBox(
         state = dismissState,
@@ -195,7 +431,7 @@ fun <T> SwipeToDeleteContainer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(shape)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(color)
                     .padding(16.dp),
                 contentAlignment = Alignment.CenterEnd
@@ -218,7 +454,7 @@ fun TaskItemContent(
     onClicked: () -> Unit
 ) {
     Card(
-        onClick = { onClicked() },
+        onClick = onClicked,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
