@@ -487,7 +487,9 @@ fun TaskItemContent(
                 } else {
                     MaterialTheme.typography.bodyLarge
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                maxLines = 4,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
     }
