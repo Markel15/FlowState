@@ -377,24 +377,51 @@ fun AnimatableTaskItem(
 ) {
     var isVisible by remember { mutableStateOf(true) }
     var isChecked by remember { mutableStateOf(task.isDone) }
+    var isDeleted by remember { mutableStateOf(false) }
 
     LaunchedEffect(isVisible) {
         if (!isVisible) {
-            delay(400)
-            onComplete()
+            delay(300)
+            if (isDeleted) {
+                onDelete()
+            } else {
+                onComplete()
+            }
         }
+    }
+
+    val exitTransition = if (isDeleted) {
+        // CASO BORRAR: Desplazamiento a la izquierda
+        slideOutHorizontally(
+            targetOffsetX = { -it },
+            animationSpec = tween(300)
+        )
+    } else {
+        // CASO COMPLETAR: Desvanecer + Contraer suave
+        fadeOut(
+            animationSpec = tween(300)
+        ) + shrinkVertically(
+            animationSpec = tween(400)
+        )
     }
 
     AnimatedVisibility(
         visible = isVisible,
-        exit = fadeOut(animationSpec = tween(300)) + shrinkVertically(animationSpec = tween(400))
+        exit = exitTransition
     ) {
-        SwipeToDeleteContainer(item = task, onDelete = onDelete) {
+        SwipeToDeleteContainer(
+            item = task,
+            onDelete = {
+                isDeleted = true
+                isVisible = false
+            })
+        {
             TaskItemContent(
                 title = task.title,
                 isDone = isChecked,
                 onClicked = {
-                    isChecked = !isChecked
+                    isChecked = true
+                    isDeleted = false
                     isVisible = false
                 }
             )
