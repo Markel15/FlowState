@@ -12,6 +12,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+
+// Definimos los estados posibles de la pantalla
+sealed interface TasksUiState {
+    data object Loading : TasksUiState
+    data class Success(val tasks: List<Task>) : TasksUiState
+}
 /**
  * ViewModel para la pantalla de Tareas.
  * Contiene la lógica de negocio y expone el estado a la UI.
@@ -23,12 +29,15 @@ class TaskViewModel  @Inject constructor(
 
     // Expone el Flow de tareas del repositorio como un StateFlow
     // que la UI puede consumir. Se mantiene vivo 5 segundos (SharingStarted.WhileSubscribed)
-    val tasks: StateFlow<List<Task>> = repository.getTasks()
-        .map { list -> list.filter { !it.isDone } }
+    val uiState: StateFlow<TasksUiState> = repository.getTasks()
+        .map { list ->
+            val filteredList = list.filter { !it.isDone }
+            TasksUiState.Success(filteredList)
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = emptyList() // Empieza con una lista vacía
+            initialValue = TasksUiState.Loading
         )
 
     // Función para añadir una nueva tarea

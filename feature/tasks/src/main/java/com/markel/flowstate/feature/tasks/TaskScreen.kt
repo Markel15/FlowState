@@ -51,7 +51,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskScreen(viewModel: TaskViewModel) {
-    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     // Este estado sobrevive a rotaciones de pantalla, pero se reinicia al cerrar la app
@@ -90,23 +90,31 @@ fun TaskScreen(viewModel: TaskViewModel) {
             Column(modifier = Modifier.padding(paddingValues)) {
 
                 DynamicHeader(isMinimized = hasScrolledOnce)
-
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp),
-                    contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
-                ) {
-                    if (tasks.isEmpty()) {
-                        item { EmptyStateView() }
+                when (val state = uiState) {
+                    is TasksUiState.Loading -> {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
                     }
-                    items(tasks, key = { it.id }) { task ->
-                        AnimatableTaskItem(
-                            task = task,
-                            onDelete = { viewModel.deleteTask(task) },
-                            onComplete = { viewModel.toggleTaskDone(task) }
-                        )
+                    is TasksUiState.Success -> {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 20.dp),
+                            contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+                        ) {
+                            if (state.tasks.isEmpty()) {
+                                item { EmptyStateView() }
+                            }
+                            items(state.tasks, key = { it.id }) { task ->
+                                AnimatableTaskItem(
+                                    task = task,
+                                    onDelete = { viewModel.deleteTask(task) },
+                                    onComplete = { viewModel.toggleTaskDone(task) }
+                                )
+                            }
+                        }
                     }
                 }
             }
