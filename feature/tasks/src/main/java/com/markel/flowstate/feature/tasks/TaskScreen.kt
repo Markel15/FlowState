@@ -93,7 +93,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 when (val state = uiState) {
                     is TasksUiState.Loading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            // Vacío porque tarda demasiado poco como para poner círculo de carga o una lista "fantasma"
                         }
                     }
                     is TasksUiState.Success -> {
