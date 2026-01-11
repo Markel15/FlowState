@@ -9,8 +9,8 @@ import androidx.room.RoomDatabase
  * y qué versión de la base de datos estamos usando.
  */
 @Database(
-    entities = [TaskEntity::class], // Aquí listamos todas nuestras tablas
-    version = 1
+    entities = [TaskEntity::class, SubTaskEntity::class], // Lista de todas las tablas
+    version = 2
 )
 abstract class FlowStateDatabase : RoomDatabase() {
 
@@ -18,8 +18,6 @@ abstract class FlowStateDatabase : RoomDatabase() {
     abstract val taskDao: TaskDao
 
     // Room usará esto para crear la instancia de la DB.
-    // Lo definiremos en el módulo :app con Dagger/Hilt
-    // o un simple Singleton por ahora.
     companion object {
         const val DATABASE_NAME = "flowstate_db"
     }

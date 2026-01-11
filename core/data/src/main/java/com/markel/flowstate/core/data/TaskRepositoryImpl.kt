@@ -1,7 +1,10 @@
 package com.markel.flowstate.core.data
 
+import com.markel.flowstate.core.data.local.SubTaskEntity
 import com.markel.flowstate.core.data.local.TaskDao
 import com.markel.flowstate.core.data.local.TaskEntity
+import com.markel.flowstate.core.data.local.TaskWithSubTasks
+import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.domain.TaskRepository
 import kotlinx.coroutines.flow.Flow
@@ -21,39 +24,44 @@ class TaskRepositoryImpl @Inject constructor(
 ) : TaskRepository {
 
     override fun getTasks(): Flow<List<Task>> {
-        // 1. Llama al DAO para obtener el Flow de TaskEntity
-        val tasksFromDb: Flow<List<TaskEntity>> = dao.getTasks()
-
-        // 2. Mapea el Flow<List<TaskEntity>> a Flow<List<Task>>
-        return tasksFromDb.map { entityList ->
-            entityList.map { entity ->
-                // Este es el mapeo de Entity -> Domain
-                entity.toDomain()
-            }
+        return dao.getTasks().map { list ->
+            list.map { it.toDomain() }
         }
     }
 
     override suspend fun getTaskById(id: Int): Task? {
-        val entity = dao.getTaskById(id)
-        // Mapeo de Entity? -> Domain?
-        return entity?.toDomain()
+        return dao.getTaskById(id)?.toDomain()
     }
 
     override suspend fun upsertTask(task: Task) {
-        // Mapeo de Domain -> Entity
-        dao.upsertTask(task.toEntity())
+        // Descomponemos el objeto de Dominio en Entidad Padre + Entidades Hijas
+        val taskEntity = task.toEntity()
+        val subTaskEntities = task.subTasks.map { it.toEntity(taskId = task.id) }
+
+        // Delegamos la transacción compleja al DAO
+        dao.upsertTaskWithSubTasks(taskEntity, subTaskEntities)
     }
 
     override suspend fun deleteTask(task: Task) {
-        // Mapeo de Domain -> Entity
-        dao.deleteTask(task.toEntity())
+        // Al borrar el padre, el CASCADE de la DB borrará los hijos automáticamente
+        dao.deleteTaskEntity(task.toEntity())
     }
 
     // --- FUNCIONES DE MAPEO ---
     // Estas funciones convierten entre el modelo de DB y el modelo de Dominio
 
-    private fun TaskEntity.toDomain(): Task {
+    private fun TaskWithSubTasks.toDomain(): Task {
         return Task(
+            id = this.task.id,
+            title = this.task.title,
+            description = this.task.description,
+            isDone = this.task.isDone,
+            subTasks = this.subTasks.map { it.toDomain() }
+        )
+    }
+
+    private fun SubTaskEntity.toDomain(): SubTask {
+        return SubTask(
             id = this.id,
             title = this.title,
             isDone = this.isDone
@@ -63,6 +71,16 @@ class TaskRepositoryImpl @Inject constructor(
     private fun Task.toEntity(): TaskEntity {
         return TaskEntity(
             id = this.id,
+            title = this.title,
+            description = this.description,
+            isDone = this.isDone
+        )
+    }
+
+    private fun SubTask.toEntity(taskId: Int): SubTaskEntity {
+        return SubTaskEntity(
+            id = this.id,
+            taskId = taskId,
             title = this.title,
             isDone = this.isDone
         )

@@ -2,7 +2,10 @@ package com.markel.flowstate.core.data.local
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -17,18 +20,43 @@ interface TaskDao {
     // "Upsert" = "Update" (actualizar) o "Insert" (insertar).
     // Si la tarea ya existe, la actualiza. Si es nueva, la crea.
     @Upsert
-    suspend fun upsertTask(task: TaskEntity)
+    suspend fun upsertTaskEntity(task: TaskEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubTasks(subTasks: List<SubTaskEntity>)
+
+    @Query("DELETE FROM subtasks WHERE taskId = :taskId")
+    suspend fun deleteSubTasksByTaskId(taskId: Int)
 
     @Delete
-    suspend fun deleteTask(task: TaskEntity)
+    suspend fun deleteTaskEntity(task: TaskEntity)
+
+    /**
+     * Esta función maneja la lógica completa de guardar una tarea con sus subtareas
+     * Al ser @Transaction, si algo falla, no se guarda nada (integridad total)
+     */
+    @Transaction
+    suspend fun upsertTaskWithSubTasks(task: TaskEntity, subTasks: List<SubTaskEntity>) {
+        // 1. Guardamos/Actualizamos el padre y obtenemos su ID definitivo
+        val taskId = upsertTaskEntity(task).toInt()
+
+        // 2. Borramos las subtareas antiguas para evitar duplicados o "fantasmas"
+        deleteSubTasksByTaskId(taskId)
+
+        // 3. Asignamos el ID de la tarea a las subtareas y las insertamos
+        val subTasksWithId = subTasks.map { it.copy(taskId = taskId) }
+        insertSubTasks(subTasksWithId)
+    }
 
     // Pide todas las tareas ordenadas (las no hechas primero)
     // y las devuelve como un "Flow".
     // "Flow" significa que si algo cambia en la tabla,
-    // nuestra UI se actualizará automáticamente.
+    // la UI se actualizará automáticamente.
+    @Transaction // Necesario porque Room hace 2 consultas internamente ya que el método devuelve una clase que contiene un campo con @Relation
     @Query("SELECT * FROM tasks ORDER BY isDone ASC, id DESC")
-    fun getTasks(): Flow<List<TaskEntity>>
+    fun getTasks(): Flow<List<TaskWithSubTasks>>
 
+    @Transaction
     @Query("SELECT * FROM tasks WHERE id = :id")
-    suspend fun getTaskById(id: Int): TaskEntity?
+    suspend fun getTaskById(id: Int): TaskWithSubTasks?
 }
