@@ -532,8 +532,9 @@ fun TaskItemContent(
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 val taskTitleStyle = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 17.sp
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    lineHeight = 19.sp
                 )
                 Text(
                     text = title,
@@ -549,7 +550,7 @@ fun TaskItemContent(
                 )
 
                 if (description.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(5.dp))
                     Text(
                         text = description,
                         style = if (isDone){
