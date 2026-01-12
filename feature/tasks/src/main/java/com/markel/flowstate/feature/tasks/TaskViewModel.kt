@@ -41,10 +41,10 @@ class TaskViewModel  @Inject constructor(
         )
 
     // Función para añadir una nueva tarea
-    fun addTask(title: String) {
+    fun addTask(title: String, description: String) {
         if (title.isBlank()) return // Evita tareas vacías
         viewModelScope.launch {
-            repository.upsertTask(Task(title = title, isDone = false))
+            repository.upsertTask(Task(title = title, description = description, isDone = false))
         }
     }
 

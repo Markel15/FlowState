@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -123,7 +124,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
         AddTaskTransformDialog(
             isVisible = showAddTaskDialog,
             onDismiss = { showAddTaskDialog = false },
-            onSave = { title -> viewModel.addTask(title); showAddTaskDialog = false }
+            onSave = { title, description -> viewModel.addTask(title, description); showAddTaskDialog = false }
         )
     }
 }
@@ -199,7 +200,7 @@ fun DynamicHeader(isMinimized: Boolean) {
 fun AddTaskTransformDialog(
     isVisible: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String, String) -> Unit
 ) {
     // Usamos AnimatedVisibility para controlar la entrada/salida fluida
     AnimatedVisibility(
@@ -252,9 +253,10 @@ fun AddTaskTransformDialog(
 @Composable
 fun AddTaskContent(
     onCancel: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String, String) -> Unit
 ) {
-    var text by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
     Column(modifier = Modifier.padding(24.dp)) {
@@ -265,8 +267,8 @@ fun AddTaskContent(
         )
 
         OutlinedTextField(
-            value = text,
-            onValueChange = { text = it },
+            value = title,
+            onValueChange = { title = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
@@ -276,15 +278,29 @@ fun AddTaskContent(
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Next
+            )
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Añadir detalles o descripción...") },
+            maxLines = 5,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
                 imeAction = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(onDone = {
-                if (text.isNotBlank()) onSave(text)
+                if (title.isNotBlank()) onSave(title, description)
             })
         )
 
         Spacer(modifier = Modifier.height(24.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
@@ -294,8 +310,8 @@ fun AddTaskContent(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Button(
-                onClick = { if (text.isNotBlank()) onSave(text) },
-                enabled = text.isNotBlank()
+                onClick = { if (title.isNotBlank()) onSave(title,description) },
+                enabled = title.isNotBlank()
             ) {
                 Text("Guardar")
             }
@@ -426,6 +442,7 @@ fun AnimatableTaskItem(
         {
             TaskItemContent(
                 title = task.title,
+                description = task.description,
                 isDone = isChecked,
                 onClicked = {
                     isChecked = true
@@ -485,6 +502,7 @@ fun <T> SwipeToDeleteContainer(
 @Composable
 fun TaskItemContent(
     title: String,
+    description: String = "",
     isDone: Boolean,
     onClicked: () -> Unit
 ) {
@@ -512,20 +530,42 @@ fun TaskItemContent(
                 modifier = Modifier.size(24.dp)
             )
             Spacer(Modifier.width(16.dp))
-            Text(
-                text = title,
-                style = if (isDone) {
-                    MaterialTheme.typography.bodyLarge.copy(
-                        textDecoration = TextDecoration.LineThrough,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            Column(modifier = Modifier.weight(1f)) {
+                val taskTitleStyle = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp
+                )
+                Text(
+                    text = title,
+                    style = taskTitleStyle.copy(
+                        textDecoration = if (isDone) TextDecoration.LineThrough else null,
+                        color = if (isDone)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (description.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = description,
+                        style = if (isDone){
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        } else{
+                            MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                            )
+                        },
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
                     )
-                } else {
-                    MaterialTheme.typography.bodyLarge
-                },
-                modifier = Modifier.weight(1f),
-                maxLines = 4,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
+                }
+            }
         }
     }
 }
