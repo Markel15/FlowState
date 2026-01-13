@@ -20,6 +20,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.sharp.Create
+import androidx.compose.material.icons.sharp.DateRange
+import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -75,20 +78,23 @@ fun TaskScreen(viewModel: TaskViewModel) {
     // ESTADO PARA LA EDICIÓN/CREACIÓN
     // Si es null, estamos creando. Si tiene una tarea, estamos editando.
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
-    var showDialog by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             floatingActionButton = {
                 AnimatedVisibility(
-                    visible = !showDialog,
+                    visible = !showSheet,
                     enter = scaleIn(),
                     exit = scaleOut()
                 ) {
                     ExpandableFabMenu(
                         expanded = isFabExpanded,
                         onToggle = { isFabExpanded = !isFabExpanded },
-                        onTaskClick = { isFabExpanded = false; taskToEdit=null; showDialog = true },
+                        onTaskClick = {
+                            isFabExpanded = false; taskToEdit = null; showSheet = true
+                        },
                         onIdeaClick = { isFabExpanded = false }
                     )
                 }
@@ -121,7 +127,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                     onComplete = { viewModel.toggleTaskDone(task) },
                                     onContentClick = {
                                         taskToEdit = task // Modo EDITAR
-                                        showDialog = true
+                                        showSheet = true
                                     }
                                 )
                             }
@@ -131,21 +137,25 @@ fun TaskScreen(viewModel: TaskViewModel) {
             }
         }
 
-        TaskFormDialog(
-            isVisible = showDialog,
-            taskToEdit = taskToEdit, // Pasamos la tarea si existe
-            onDismiss = { showDialog = false },
-            onSave = { title, description ->
-                if (taskToEdit == null) {
-                    // Crear nueva
-                    viewModel.addTask(title, description)
-                } else {
-                    // Actualizar existente
-                    viewModel.updateTask(taskToEdit!!, title, description)
-                }
-                showDialog = false
+        if (showSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSheet = false },
+                sheetState = sheetState,
+                dragHandle = { BottomSheetDefaults.DragHandle() },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
+                TaskEditorSheetContent(
+                    task = taskToEdit,
+                    onSave = { title, desc ->
+                        if (taskToEdit == null) viewModel.addTask(title, desc)
+                        else viewModel.updateTask(taskToEdit!!, title, desc)
+                        showSheet = false
+                    },
+                    onCancel = { showSheet = false }
+                )
             }
-        )
+        }
     }
 }
 
@@ -213,147 +223,100 @@ fun DynamicHeader(isMinimized: Boolean) {
     }
 }
 
-/**
- * Un diálogo personalizado que simula nacer desde el FAB (Esquina inferior derecha).
- */
 @Composable
-fun TaskFormDialog(
-    isVisible: Boolean,
-    taskToEdit: Task?,  // Null = Crear, Task = Editar
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
+fun TaskEditorSheetContent(
+    task: Task?,
+    onSave: (String, String) -> Unit,
+    onCancel: () -> Unit
 ) {
-    // Usamos AnimatedVisibility para controlar la entrada/salida fluida
-    AnimatedVisibility(
-        visible = isVisible,
-        // La animación que escala desde la esquina inferior derecha (donde estaba el FAB)
-        enter = fadeIn(animationSpec = tween(200)) +
-                scaleIn(
-                    initialScale = 0.1f,
-                    transformOrigin = TransformOrigin(0.9f, 0.9f), // Origen: Abajo-Derecha
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ),
-        exit = fadeOut(animationSpec = tween(200)) +
-                scaleOut(
-                    targetScale = 0.1f,
-                    transformOrigin = TransformOrigin(0.9f, 0.9f),
-                    animationSpec = tween(250, easing = LinearOutSlowInEasing)
-                )
-    ) {
-        // Fondo semitransparente (Scrim) que cierra al pulsar
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // Contenido de la tarjeta (evitamos que el click en la tarjeta cierre el diálogo)
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f) // Ancho de la tarjeta
-                    .wrapContentHeight()
-                    .clickable(enabled = false) {}, // Absorbe clicks
-                shape = RoundedCornerShape(28.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                elevation = CardDefaults.cardElevation(6.dp)
-            ) {
-                TaskFormContent(
-                    initialTitle = taskToEdit?.title ?: "",
-                    initialDescription = taskToEdit?.description ?: "",
-                    isEditing = taskToEdit != null,
-                    onCancel = onDismiss,
-                    onSave = onSave
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TaskFormContent(
-    initialTitle: String,
-    initialDescription: String,
-    isEditing: Boolean,
-    onCancel: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var title by remember { mutableStateOf(initialTitle) }
-    var description by remember { mutableStateOf(initialDescription) }
+    var title by remember { mutableStateOf(task?.title ?: "") }
+    var description by remember { mutableStateOf(task?.description ?: "") }
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(initialTitle, initialDescription) {
-        title = initialTitle
-        description = initialDescription
-    }
-
-    Column(modifier = Modifier.padding(24.dp)) {
-        Text(
-            text = if (isEditing) "Editar Tarea" else "Nueva Tarea",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        OutlinedTextField(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding() // Respeta la barra de navegación del sistema
+            .imePadding() // Sube el contenido cuando sale el teclado
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+    ) {
+        // Título
+        TextField(
             value = title,
             onValueChange = { title = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            placeholder = { Text("¿Qué tienes en mente?") },
-            singleLine = false, // Permite multilínea si la idea es larga
-            maxLines = 3,
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Next
-            )
+            placeholder = { Text("¿Qué hay que hacer?", style = MaterialTheme.typography.headlineSmall) },
+            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        OutlinedTextField(
+        // Descripción
+        TextField(
             value = description,
             onValueChange = { description = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Añadir detalles o descripción...") },
-            maxLines = 5,
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done
+            placeholder = { Text("Añadir detalles...", style = MaterialTheme.typography.bodyLarge) },
+            textStyle = MaterialTheme.typography.bodyLarge,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
             ),
-            keyboardActions = KeyboardActions(onDone = {
-                if (title.isNotBlank()) onSave(title, description)
-            })
+            minLines = 2,
+            maxLines = 10,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- BARRA DE ACCIONES ---
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = { /* TODO: Prioridad */ }) {
+                Icon(Icons.Sharp.MoreVert, "Prioridad", tint = MaterialTheme.colorScheme.primary)
+            }
+            IconButton(onClick = { /* TODO: Fecha */ }) {
+                Icon(Icons.Sharp.DateRange, "Fecha", tint = MaterialTheme.colorScheme.primary)
+            }
+            IconButton(onClick = { /* TODO: Formato de texto */ }) {
+                Icon(Icons.Sharp.Create, "Formato", tint = MaterialTheme.colorScheme.primary)
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
             TextButton(onClick = onCancel) {
                 Text("Cancelar")
             }
+
             Spacer(modifier = Modifier.width(8.dp))
+
             Button(
-                onClick = { if (title.isNotBlank()) onSave(title,description) },
-                enabled = title.isNotBlank()
+                onClick = { if (title.isNotBlank()) onSave(title, description) },
+                enabled = title.isNotBlank(),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp)
             ) {
-                Text("Guardar")
+                Text(if (task == null) "Crear" else "Listo")
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 
-    // Solicitar foco automáticamente
     LaunchedEffect(Unit) {
-        delay(100)
-        focusRequester.requestFocus()
+        delay(100) // Esperar a que el sheet suba un poco
+        if (task == null) focusRequester.requestFocus()
     }
 }
 
