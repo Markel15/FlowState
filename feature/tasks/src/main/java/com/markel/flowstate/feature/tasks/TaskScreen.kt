@@ -69,20 +69,23 @@ fun TaskScreen(viewModel: TaskViewModel) {
     }
 
     var isFabExpanded by remember { mutableStateOf(false) }
-    var showAddTaskDialog by remember { mutableStateOf(false) }
+    // ESTADO PARA LA EDICIÓN/CREACIÓN
+    // Si es null, estamos creando. Si tiene una tarea, estamos editando.
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
+    var showDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             floatingActionButton = {
                 AnimatedVisibility(
-                    visible = !showAddTaskDialog,
+                    visible = !showDialog,
                     enter = scaleIn(),
                     exit = scaleOut()
                 ) {
                     ExpandableFabMenu(
                         expanded = isFabExpanded,
                         onToggle = { isFabExpanded = !isFabExpanded },
-                        onTaskClick = { isFabExpanded = false; showAddTaskDialog = true },
+                        onTaskClick = { isFabExpanded = false; taskToEdit=null; showDialog = true },
                         onIdeaClick = { isFabExpanded = false }
                     )
                 }
@@ -112,7 +115,11 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                 AnimatableTaskItem(
                                     task = task,
                                     onDelete = { viewModel.deleteTask(task) },
-                                    onComplete = { viewModel.toggleTaskDone(task) }
+                                    onComplete = { viewModel.toggleTaskDone(task) },
+                                    onContentClick = {
+                                        taskToEdit = task // Modo EDITAR
+                                        showDialog = true
+                                    }
                                 )
                             }
                         }
@@ -121,10 +128,20 @@ fun TaskScreen(viewModel: TaskViewModel) {
             }
         }
 
-        AddTaskTransformDialog(
-            isVisible = showAddTaskDialog,
-            onDismiss = { showAddTaskDialog = false },
-            onSave = { title, description -> viewModel.addTask(title, description); showAddTaskDialog = false }
+        TaskFormDialog(
+            isVisible = showDialog,
+            taskToEdit = taskToEdit, // Pasamos la tarea si existe
+            onDismiss = { showDialog = false },
+            onSave = { title, description ->
+                if (taskToEdit == null) {
+                    // Crear nueva
+                    viewModel.addTask(title, description)
+                } else {
+                    // Actualizar existente
+                    viewModel.updateTask(taskToEdit!!, title, description)
+                }
+                showDialog = false
+            }
         )
     }
 }
@@ -197,8 +214,9 @@ fun DynamicHeader(isMinimized: Boolean) {
  * Un diálogo personalizado que simula nacer desde el FAB (Esquina inferior derecha).
  */
 @Composable
-fun AddTaskTransformDialog(
+fun TaskFormDialog(
     isVisible: Boolean,
+    taskToEdit: Task?,  // Null = Crear, Task = Editar
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit
 ) {
@@ -241,7 +259,10 @@ fun AddTaskTransformDialog(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 elevation = CardDefaults.cardElevation(6.dp)
             ) {
-                AddTaskContent(
+                TaskFormContent(
+                    initialTitle = taskToEdit?.title ?: "",
+                    initialDescription = taskToEdit?.description ?: "",
+                    isEditing = taskToEdit != null,
                     onCancel = onDismiss,
                     onSave = onSave
                 )
@@ -251,17 +272,25 @@ fun AddTaskTransformDialog(
 }
 
 @Composable
-fun AddTaskContent(
+fun TaskFormContent(
+    initialTitle: String,
+    initialDescription: String,
+    isEditing: Boolean,
     onCancel: () -> Unit,
     onSave: (String, String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(initialTitle) }
+    var description by remember { mutableStateOf(initialDescription) }
     val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(initialTitle, initialDescription) {
+        title = initialTitle
+        description = initialDescription
+    }
 
     Column(modifier = Modifier.padding(24.dp)) {
         Text(
-            text = "Nueva Tarea",
+            text = if (isEditing) "Editar Tarea" else "Nueva Tarea",
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(bottom = 16.dp)
         )
@@ -397,7 +426,8 @@ fun EmptyStateView() {
 fun AnimatableTaskItem(
     task: Task,
     onDelete: () -> Unit,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onContentClick: () -> Unit
 ) {
     var isVisible by remember { mutableStateOf(true) }
     var isChecked by remember { mutableStateOf(task.isDone) }
@@ -444,7 +474,8 @@ fun AnimatableTaskItem(
                 title = task.title,
                 description = task.description,
                 isDone = isChecked,
-                onClicked = {
+                onClicked = onContentClick,
+                onCheckClicked = {
                     isChecked = true
                     isDeleted = false
                     isVisible = false
@@ -504,7 +535,8 @@ fun TaskItemContent(
     title: String,
     description: String = "",
     isDone: Boolean,
-    onClicked: () -> Unit
+    onClicked: () -> Unit,
+    onCheckClicked: () -> Unit
 ) {
     Card(
         onClick = onClicked,
@@ -523,12 +555,18 @@ fun TaskItemContent(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (isDone) ImageVector.vectorResource(R.drawable.radio_button_checked_24px) else ImageVector.vectorResource(R.drawable.radio_button_unchecked_24px),
-                contentDescription = null,
-                tint = if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier.size(24.dp)
-            )
+            IconButton(onClick = onCheckClicked) {
+                Icon(
+                    imageVector = if (isDone) ImageVector.vectorResource(R.drawable.radio_button_checked_24px) else ImageVector.vectorResource(
+                        R.drawable.radio_button_unchecked_24px
+                    ),
+                    contentDescription = null,
+                    tint = if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.4f
+                    ),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 val taskTitleStyle = MaterialTheme.typography.bodyLarge.copy(

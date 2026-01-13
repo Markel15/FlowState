@@ -48,6 +48,19 @@ class TaskViewModel  @Inject constructor(
         }
     }
 
+    // Recibe la tarea original para mantener su ID, estado isDone y subtareas
+    fun updateTask(originalTask: Task, newTitle: String, newDescription: String) {
+        if (newTitle.isBlank()) return
+        viewModelScope.launch {
+            repository.upsertTask(
+                originalTask.copy(
+                    title = newTitle,
+                    description = newDescription
+                )
+            )
+        }
+    }
+
     // Función para eliminar una tarea
     fun deleteTask(task: Task) {
         viewModelScope.launch {
