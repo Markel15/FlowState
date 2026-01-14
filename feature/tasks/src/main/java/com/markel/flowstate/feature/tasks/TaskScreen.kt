@@ -75,8 +75,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
     }
 
     var isFabExpanded by remember { mutableStateOf(false) }
-    // ESTADO PARA LA EDICIÓN/CREACIÓN
-    // Si es null, estamos creando. Si tiene una tarea, estamos editando.
     var taskToEdit by remember { mutableStateOf<Task?>(null) }
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -255,7 +253,7 @@ fun TaskEditorSheetContent(
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
-            singleLine = true,
+            maxLines = 3,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
         )
 
@@ -272,7 +270,7 @@ fun TaskEditorSheetContent(
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
-            minLines = 2,
+            minLines = 4,
             maxLines = 10,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
         )
