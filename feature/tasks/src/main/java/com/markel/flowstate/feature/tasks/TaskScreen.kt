@@ -485,10 +485,11 @@ fun DeleteSwipeBackground(
     val direction = state.dismissDirection
     val isDeleteDirection = direction == SwipeToDismissBoxValue.EndToStart
 
-    val color by animateColorAsState(
-        targetValue = if (isDeleteDirection) MaterialTheme.colorScheme.errorContainer else Color.Transparent,
-        label = "bgColor"
-    )
+    val color = if (state.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        Color.Transparent
+    }
 
     val scaleAnimationSpec: AnimationSpec<Float> = if (state.progress >= 0.35 && isDeleteDirection) {
         spring(
