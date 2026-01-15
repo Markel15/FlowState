@@ -413,7 +413,10 @@ fun AnimatableTaskItem(
         slideOutHorizontally(
             targetOffsetX = { -it },
             animationSpec = tween(300)
-        )
+        ) + shrinkVertically(
+            animationSpec = tween(durationMillis = 280, delayMillis = 100),
+            shrinkTowards = Alignment.Top
+        ) + fadeOut(animationSpec = tween(200))
     } else {
         // CASO COMPLETAR: Desvanecer + Contraer suave
         fadeOut(
@@ -469,29 +472,59 @@ fun <T> SwipeToDeleteContainer(
 
     SwipeToDismissBox(
         state = dismissState,
-        backgroundContent = {
-            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                MaterialTheme.colorScheme.errorContainer
-            } else {
-                Color.Transparent
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color)
-                    .padding(16.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Borrar",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        },
+        backgroundContent = { DeleteSwipeBackground(dismissState) },
         content = { content(item) }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeleteSwipeBackground(
+    state: SwipeToDismissBoxState
+) {
+    val direction = state.dismissDirection
+    val isDeleteDirection = direction == SwipeToDismissBoxValue.EndToStart
+
+    val color by animateColorAsState(
+        targetValue = if (isDeleteDirection) MaterialTheme.colorScheme.errorContainer else Color.Transparent,
+        label = "bgColor"
+    )
+
+    val scaleAnimationSpec: AnimationSpec<Float> = if (state.progress >= 0.35 && isDeleteDirection) {
+        spring(
+            dampingRatio = Spring.DampingRatioHighBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    } else {
+        tween(durationMillis = 200, easing = LinearOutSlowInEasing)
+    }
+
+    val scale by animateFloatAsState(
+        targetValue = if (state.progress >= 0.35 && isDeleteDirection) 1.20f else 0f,
+        animationSpec = scaleAnimationSpec,
+        label = "iconScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(12.dp))
+            .background(color)
+            .padding(horizontal = 30.dp),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        if (isDeleteDirection) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Borrar",
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+            )
+        }
+    }
 }
 
 @Composable
