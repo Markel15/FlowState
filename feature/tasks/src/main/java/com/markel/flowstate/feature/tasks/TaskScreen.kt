@@ -81,6 +81,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            contentWindowInsets = WindowInsets(0.dp),
             floatingActionButton = {
                 AnimatedVisibility(
                     visible = !showSheet,
