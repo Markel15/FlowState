@@ -129,7 +129,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
                             }
                             items(state.tasks, key = { it.id }) { task ->
                                 ReorderableItem(reorderableState, key = task.id) { isDragging ->
-                                    val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp)
+                                    val scale by animateFloatAsState(
+                                        targetValue = if (isDragging) 1.05f else 1.0f,
+                                        label = "drag_scale"
+                                    )
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -137,9 +140,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                                 interactionSource = remember { MutableInteractionSource() }
                                             )
                                             .graphicsLayer {
-                                                shadowElevation = elevation.toPx()
-                                                scaleX = if (isDragging) 1.02f else 1.0f
-                                                scaleY = if (isDragging) 1.02f else 1.0f
+                                                scaleX = scale
+                                                scaleY = scale
                                             }
                                             .zIndex(if (isDragging) 1f else 0f)
                                     ) {

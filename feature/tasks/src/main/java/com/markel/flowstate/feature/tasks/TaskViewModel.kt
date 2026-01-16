@@ -49,7 +49,16 @@ class TaskViewModel  @Inject constructor(
     fun addTask(title: String, description: String) {
         if (title.isBlank()) return // Evita tareas vacías
         viewModelScope.launch {
-            repository.upsertTask(Task(title = title, description = description, isDone = false))
+            val currentTasks = (uiState.value as? TasksUiState.Success)?.tasks ?: emptyList()
+            val minPosition = currentTasks.minOfOrNull { it.position } ?: 0
+
+            val newTask = Task(
+                title = title,
+                description = description,
+                isDone = false,
+                position = minPosition - 1
+            )
+            repository.upsertTask(newTask)
         }
     }
 
