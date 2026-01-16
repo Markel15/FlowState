@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     // Recolectar Flows de forma segura en Compose
     implementation(libs.androidx.lifecycle.runtime.compose)
+    // Listas con elementos reordenables
+    implementation(libs.reorderable)
 
 
 }

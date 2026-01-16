@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.domain.TaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -27,18 +29,21 @@ class TaskViewModel  @Inject constructor(
     private val repository: TaskRepository
 ) : ViewModel() {
 
-    // Expone el Flow de tareas del repositorio como un StateFlow
-    // que la UI puede consumir. Se mantiene vivo 5 segundos (SharingStarted.WhileSubscribed)
-    val uiState: StateFlow<TasksUiState> = repository.getTasks()
-        .map { list ->
-            val filteredList = list.filter { !it.isDone }
-            TasksUiState.Success(filteredList)
+    private val _uiState = MutableStateFlow<TasksUiState>(TasksUiState.Loading)
+
+
+    val uiState: StateFlow<TasksUiState> = _uiState.asStateFlow()
+
+     // El bloque init actúa como un "suscriptor" permanente.
+     // Se conecta al Repositorio y actualiza el estado cada vez que la base de datos cambia.
+    init {
+        viewModelScope.launch {
+            repository.getTasks().collect { list ->
+                val filteredList = list.filter { !it.isDone }
+                _uiState.value = TasksUiState.Success(filteredList)
+            }
         }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = TasksUiState.Loading
-        )
+    }
 
     // Función para añadir una nueva tarea
     fun addTask(title: String, description: String) {
@@ -72,6 +77,27 @@ class TaskViewModel  @Inject constructor(
     fun toggleTaskDone(task: Task) {
         viewModelScope.launch {
             repository.upsertTask(task.copy(isDone = !task.isDone))
+        }
+    }
+
+    fun onReorder(fromIndex: Int, toIndex: Int) {
+        val currentList = (uiState.value as? TasksUiState.Success)?.tasks?.toMutableList() ?: return
+
+        // 1. Aplicar el movimiento en la lista temporal
+        val item = currentList.removeAt(fromIndex)
+        currentList.add(toIndex, item)
+
+        // 2. Recalcular las posiciones (índices 0, 1, 2...)
+        val updatedList = currentList.mapIndexed { index, task ->
+            task.copy(position = index)
+        }
+
+        // 3. Actualizar la interfaz YA
+        _uiState.value = TasksUiState.Success(updatedList)
+
+        // 4. Persistir en Base de Datos
+        viewModelScope.launch {
+            repository.updateTasksOrder(updatedList)
         }
     }
 }

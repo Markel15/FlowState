@@ -47,6 +47,11 @@ class TaskRepositoryImpl @Inject constructor(
         dao.deleteTaskEntity(task.toEntity())
     }
 
+    override suspend fun updateTasksOrder(tasks: List<Task>) {
+        val entities = tasks.map { it.toEntity() }
+        dao.updateTasks(entities)
+    }
+
     // --- FUNCIONES DE MAPEO ---
     // Estas funciones convierten entre el modelo de DB y el modelo de Dominio
 
@@ -56,6 +61,7 @@ class TaskRepositoryImpl @Inject constructor(
             title = this.task.title,
             description = this.task.description,
             isDone = this.task.isDone,
+            position = this.task.position,
             subTasks = this.subTasks.map { it.toDomain() }
         )
     }
@@ -73,7 +79,8 @@ class TaskRepositoryImpl @Inject constructor(
             id = this.id,
             title = this.title,
             description = this.description,
-            isDone = this.isDone
+            isDone = this.isDone,
+            position = this.position
         )
     }
 

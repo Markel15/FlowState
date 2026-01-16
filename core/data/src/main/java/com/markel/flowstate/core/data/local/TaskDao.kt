@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -53,10 +54,13 @@ interface TaskDao {
     // "Flow" significa que si algo cambia en la tabla,
     // la UI se actualizará automáticamente.
     @Transaction // Necesario porque Room hace 2 consultas internamente ya que el método devuelve una clase que contiene un campo con @Relation
-    @Query("SELECT * FROM tasks ORDER BY isDone ASC, id DESC")
+    @Query("SELECT * FROM tasks ORDER BY position ASC")
     fun getTasks(): Flow<List<TaskWithSubTasks>>
 
     @Transaction
     @Query("SELECT * FROM tasks WHERE id = :id")
     suspend fun getTaskById(id: Int): TaskWithSubTasks?
+
+    @Update
+    suspend fun updateTasks(tasks: List<TaskEntity>)
 }

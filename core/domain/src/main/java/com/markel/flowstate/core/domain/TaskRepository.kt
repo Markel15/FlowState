@@ -30,4 +30,9 @@ interface TaskRepository {
      * Borra una tarea.
      */
     suspend fun deleteTask(task: Task)
+
+    /**
+     * Actualiza el orden de las tareas.
+     */
+    suspend fun updateTasksOrder(tasks: List<Task>)
 }

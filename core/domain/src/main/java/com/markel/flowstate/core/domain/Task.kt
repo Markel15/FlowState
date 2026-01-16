@@ -18,6 +18,7 @@ data class Task(
     val title: String,
     val description: String = "",
     val isDone: Boolean,
+    val position: Int = 0,
     val subTasks: List<SubTask> = emptyList()
     // Aquí irían los demás campos del dominio como
     // priority: Priority,

@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.tasks
 
+import android.R.attr.translationZ
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -48,9 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.domain.Task
 import kotlinx.coroutines.delay
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -109,6 +113,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         }
                     }
                     is TasksUiState.Success -> {
+                        val listState = rememberLazyListState()
+                        val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+                            viewModel.onReorder(from.index, to.index)
+                        }
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
@@ -120,15 +128,32 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                 item { EmptyStateView() }
                             }
                             items(state.tasks, key = { it.id }) { task ->
-                                AnimatableTaskItem(
-                                    task = task,
-                                    onDelete = { viewModel.deleteTask(task) },
-                                    onComplete = { viewModel.toggleTaskDone(task) },
-                                    onContentClick = {
-                                        taskToEdit = task // Modo EDITAR
-                                        showSheet = true
+                                ReorderableItem(reorderableState, key = task.id) { isDragging ->
+                                    val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .draggableHandle(
+                                                interactionSource = remember { MutableInteractionSource() }
+                                            )
+                                            .graphicsLayer {
+                                                shadowElevation = elevation.toPx()
+                                                scaleX = if (isDragging) 1.02f else 1.0f
+                                                scaleY = if (isDragging) 1.02f else 1.0f
+                                            }
+                                            .zIndex(if (isDragging) 1f else 0f)
+                                    ) {
+                                        AnimatableTaskItem(
+                                            task = task,
+                                            onDelete = { viewModel.deleteTask(task) },
+                                            onComplete = { viewModel.toggleTaskDone(task) },
+                                            onContentClick = {
+                                                taskToEdit = task // Modo EDITAR
+                                                showSheet = true
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
                     }

@@ -13,7 +13,8 @@ data class TaskEntity(
     val id: Int = 0,
     val title: String,
     val description: String = "",
-    val isDone: Boolean = false
+    val isDone: Boolean = false,
+    val position: Int = 0
 
     // Más adelante, si "Prioridades" o "Fechas"
     // val priority: Int = 1,

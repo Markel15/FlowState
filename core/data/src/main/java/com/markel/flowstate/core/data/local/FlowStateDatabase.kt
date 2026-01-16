@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [TaskEntity::class, SubTaskEntity::class], // Lista de todas las tablas
-    version = 2
+    version = 3
 )
 abstract class FlowStateDatabase : RoomDatabase() {
 
