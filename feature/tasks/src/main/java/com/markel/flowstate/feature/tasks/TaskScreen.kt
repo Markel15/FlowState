@@ -175,10 +175,16 @@ fun TaskScreen(viewModel: TaskViewModel) {
             ) {
                 TaskEditorSheetContent(
                     task = taskToEdit,
-                    onSave = { title, desc, subTasks ->
-                        if (taskToEdit == null) viewModel.addTask(title, desc, subTasks)
-                        else viewModel.updateTask(taskToEdit!!, title, desc, subTasks)
-                        showSheet = false
+                    onManualCreate = { title, desc, subTasks ->
+                        // Acción manual solo para tareas nuevas
+                        viewModel.addTask(title, desc, subTasks)
+                        showSheet = false // Cerramos al crear
+                    },
+                    onAutoUpdate = { title, desc, subTasks ->
+                        // Autoguardado silencioso para tareas existentes
+                        if (taskToEdit != null) {
+                            viewModel.updateTask(taskToEdit!!, title, desc, subTasks)
+                        }
                     },
                     onCancel = { showSheet = false }
                 )
@@ -254,9 +260,11 @@ fun DynamicHeader(isMinimized: Boolean) {
 @Composable
 fun TaskEditorSheetContent(
     task: Task?,
-    onSave: (String, String, List<SubTask>) -> Unit,
+    onManualCreate: (String, String, List<SubTask>) -> Unit,
+    onAutoUpdate: (String, String, List<SubTask>) -> Unit,
     onCancel: () -> Unit
 ) {
+    val isNewTask = remember { task == null }
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
     val subTasks = remember {
@@ -264,16 +272,63 @@ fun TaskEditorSheetContent(
             addAll(task?.subTasks ?: emptyList())
         }
     }
+
+    // Checkpoints para saber qué es lo último que se guardó realmente
+    var lastSavedTitle by remember { mutableStateOf(title) }
+    var lastSavedDesc by remember { mutableStateOf(description) }
+    var lastSavedSubTasksHash by remember { mutableIntStateOf(subTasks.toList().hashCode()) }
+
     val focusRequester = remember { FocusRequester() }
+
+    // AUTOGUARDADO POR TIEMPO (DEBOUNCE)
+    if (!isNewTask) {
+        LaunchedEffect(title, description, subTasks.toList().hashCode()) {
+            val currentSubTasksHash = subTasks.toList().hashCode()
+
+            val hasChanges = title != lastSavedTitle ||
+                    description != lastSavedDesc ||
+                    currentSubTasksHash != lastSavedSubTasksHash
+
+            if (hasChanges && title.isNotBlank()) {
+                delay(600)
+
+                // Guardamos
+                onAutoUpdate(title, description, subTasks.toList())
+
+                // Actualizamos referencias
+                lastSavedTitle = title
+                lastSavedDesc = description
+                lastSavedSubTasksHash = currentSubTasksHash
+            }
+        }
+    }
+
+    // GUARDADO DE EMERGENCIA AL CERRAR (DISPOSE)
+    // Esto se ejecuta si el usuario cierra el sheet antes de que termine el delay
+    DisposableEffect(Unit) {
+        onDispose {
+            // Solo autoguardamos al salir si es una tarea YA EXISTENTE (Edición)
+            if (!isNewTask) {
+                val currentSubTasksHash = subTasks.toList().hashCode()
+                val hasPendingChanges = title != lastSavedTitle ||
+                        description != lastSavedDesc ||
+                        currentSubTasksHash != lastSavedSubTasksHash
+
+                if (hasPendingChanges && title.isNotBlank()) {
+                    onAutoUpdate(title, description, subTasks.toList())
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding() // Respeta la barra de navegación del sistema
-            .imePadding() // Sube el contenido cuando sale el teclado
+            .navigationBarsPadding()
+            .imePadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
-        // Título
+        // TAREA
         TextField(
             value = title,
             onValueChange = { title = it },
@@ -292,7 +347,6 @@ fun TaskEditorSheetContent(
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
         )
 
-        // Descripción
         TextField(
             value = description,
             onValueChange = { description = it },
@@ -311,82 +365,67 @@ fun TaskEditorSheetContent(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-        )
-
+        Box(modifier = Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh))
         Spacer(modifier = Modifier.height(16.dp))
 
+        // SUBTAREAS
         Text(
-            text = "SUBTAREAS",
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.5.sp
-            ),
+            "SUBTAREAS",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
             color = MaterialTheme.colorScheme.primary
         )
-
         Spacer(modifier = Modifier.height(8.dp))
 
         subTasks.forEachIndexed { index, subTask ->
             SubTaskRow(
                 subTask = subTask,
                 onRemove = { subTasks.removeAt(index) },
-                onTitleChange = { newTitle ->
-                    subTasks[index] = subTask.copy(title = newTitle)
+                onTitleChange = { newTitle -> subTasks[index] = subTask.copy(title = newTitle) },
+                onToggleDone = {
+                    subTasks[index] = subTask.copy(isDone = !subTask.isDone)
                 }
             )
         }
 
-        AddSubTaskRow(
-            onAdd = { newTitle ->
-                subTasks.add(SubTask(title = newTitle))
-            }
-        )
+        AddSubTaskRow(onAdd = { newTitle -> subTasks.add(SubTask(title = newTitle)) })
 
         Spacer(modifier = Modifier.height(16.dp))
-        // --- BARRA DE ACCIONES ---
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { /* TODO: Prioridad */ }) {
-                Icon(Icons.Sharp.MoreVert, "Prioridad", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = { /* TODO: Fecha */ }) {
-                Icon(Icons.Sharp.DateRange, "Fecha", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = { /* TODO: Formato de texto */ }) {
-                Icon(Icons.Sharp.Create, "Formato", tint = MaterialTheme.colorScheme.primary)
-            }
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            TextButton(onClick = onCancel) {
-                Text("Cancelar")
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Button(
-                onClick = { if (title.isNotBlank()) onSave(title, description, subTasks.toList()) },
-                enabled = title.isNotBlank(),
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp)
+        // --- BARRA INFERIOR ---
+        if (isNewTask) {
+            // MODO CREAR: Botones manuales
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(if (task == null) "Crear" else "Listo")
+                TextButton(onClick = onCancel) { Text("Cancelar") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { if (title.isNotBlank()) onManualCreate(title, description, subTasks.toList()) },
+                    enabled = title.isNotBlank(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("Crear Tarea")
+                }
+            }
+        } else {
+            // MODO EDITAR: Herramientas (Autoguardado activo, botones ocultos)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(Icons.Sharp.MoreVert, "Prioridad") }
+                IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
+                IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
     }
 
     LaunchedEffect(Unit) {
-        delay(100) // Esperar a que el sheet suba un poco
-        if (task == null) focusRequester.requestFocus()
+        delay(100)
+        if (isNewTask) focusRequester.requestFocus()
     }
 }
 
@@ -688,23 +727,30 @@ fun TaskItemContent(
 fun SubTaskRow(
     subTask: SubTask,
     onRemove: () -> Unit,
-    onTitleChange: (String) -> Unit
+    onTitleChange: (String) -> Unit,
+    onToggleDone: () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
-        // Icono visual
+        // Checkbox para completar subtarea
         Icon(
-            imageVector = ImageVector.vectorResource(R.drawable.radio_button_unchecked_24px),
+            imageVector = if (subTask.isDone)
+                ImageVector.vectorResource(R.drawable.radio_button_checked_24px)
+            else
+                ImageVector.vectorResource(R.drawable.radio_button_unchecked_24px),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(18.dp)
+            tint = if (subTask.isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .clickable { onToggleDone() }
+                .padding(2.dp)
         )
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Campo de texto simple
         TextField(
             value = subTask.title,
             onValueChange = onTitleChange,
@@ -715,11 +761,14 @@ fun SubTaskRow(
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                textDecoration = if (subTask.isDone) TextDecoration.LineThrough else null,
+                color = if (subTask.isDone) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurface
+            ),
             singleLine = true,
             placeholder = { Text("Subtarea...") }
         )
 
-        // Botón borrar
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
             Icon(
                 Icons.Default.Close,
@@ -731,9 +780,7 @@ fun SubTaskRow(
 }
 
 @Composable
-fun AddSubTaskRow(
-    onAdd: (String) -> Unit
-) {
+fun AddSubTaskRow(onAdd: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
 
     Row(
@@ -746,9 +793,7 @@ fun AddSubTaskRow(
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(20.dp)
         )
-
         Spacer(modifier = Modifier.width(10.dp))
-
         TextField(
             value = text,
             onValueChange = { text = it },
@@ -761,29 +806,14 @@ fun AddSubTaskRow(
                 unfocusedIndicatorColor = Color.Transparent
             ),
             singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    if (text.isNotBlank()) {
-                        onAdd(text)
-                        text = ""
-                    }
-                }
-            )
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = {
+                if (text.isNotBlank()) { onAdd(text); text = "" }
+            })
         )
-        // Botón opcional para confirmar clickando
         if (text.isNotBlank()) {
-            IconButton(
-                onClick = {
-                    onAdd(text)
-                    text = ""
-                },
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = "Añadir", tint = MaterialTheme.colorScheme.primary)
+            IconButton(onClick = { onAdd(text); text = "" }, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
