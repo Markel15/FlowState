@@ -138,12 +138,13 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .draggableHandle(
+                                            .longPressDraggableHandle(
                                                 interactionSource = remember { MutableInteractionSource() }
                                             )
                                             .graphicsLayer {
                                                 scaleX = scale
                                                 scaleY = scale
+                                                alpha = if (isDragging) 0.9f else 1.0f
                                             }
                                             .zIndex(if (isDragging) 1f else 0f)
                                     ) {
@@ -410,12 +411,12 @@ fun TaskEditorSheetContent(
                 }
             }
         } else {
-            // MODO EDITAR: Herramientas (Autoguardado activo, botones ocultos)
+            // MODO EDITAR
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(Icons.Sharp.MoreVert, "Prioridad") }
+                IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(ImageVector.vectorResource(R.drawable.flag_2_24px), "Prioridad") }
                 IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
                 IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
             }
