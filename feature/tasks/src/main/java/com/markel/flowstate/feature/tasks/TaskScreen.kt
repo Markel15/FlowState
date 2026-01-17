@@ -551,6 +551,7 @@ fun AnimatableTaskItem(
             TaskItemContent(
                 title = task.title,
                 description = task.description,
+                subTasks = task.subTasks,
                 isDone = isChecked,
                 onClicked = onContentClick,
                 onCheckClicked = {
@@ -643,6 +644,7 @@ fun DeleteSwipeBackground(
 fun TaskItemContent(
     title: String,
     description: String = "",
+    subTasks: List<SubTask> = emptyList(),
     isDone: Boolean,
     onClicked: () -> Unit,
     onCheckClicked: () -> Unit
@@ -717,6 +719,31 @@ fun TaskItemContent(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                val total = subTasks.size
+                val completed = subTasks.count { it.isDone }
+
+                if (total > 0 && completed < total) {
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.graphicsLayer { alpha = 0.72f }
+                    ) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(id = R.drawable.subtask_24px),
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$completed/$total",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
