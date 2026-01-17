@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.sharp.Create
 import androidx.compose.material.icons.sharp.DateRange
 import androidx.compose.material.icons.sharp.MoreVert
@@ -51,6 +52,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
@@ -173,9 +175,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
             ) {
                 TaskEditorSheetContent(
                     task = taskToEdit,
-                    onSave = { title, desc ->
-                        if (taskToEdit == null) viewModel.addTask(title, desc)
-                        else viewModel.updateTask(taskToEdit!!, title, desc)
+                    onSave = { title, desc, subTasks ->
+                        if (taskToEdit == null) viewModel.addTask(title, desc, subTasks)
+                        else viewModel.updateTask(taskToEdit!!, title, desc, subTasks)
                         showSheet = false
                     },
                     onCancel = { showSheet = false }
@@ -252,11 +254,16 @@ fun DynamicHeader(isMinimized: Boolean) {
 @Composable
 fun TaskEditorSheetContent(
     task: Task?,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, List<SubTask>) -> Unit,
     onCancel: () -> Unit
 ) {
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
+    val subTasks = remember {
+        mutableStateListOf<SubTask>().apply {
+            addAll(task?.subTasks ?: emptyList())
+        }
+    }
     val focusRequester = remember { FocusRequester() }
 
     Column(
@@ -305,6 +312,43 @@ fun TaskEditorSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "SUBTAREAS",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.5.sp
+            ),
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        subTasks.forEachIndexed { index, subTask ->
+            SubTaskRow(
+                subTask = subTask,
+                onRemove = { subTasks.removeAt(index) },
+                onTitleChange = { newTitle ->
+                    subTasks[index] = subTask.copy(title = newTitle)
+                }
+            )
+        }
+
+        AddSubTaskRow(
+            onAdd = { newTitle ->
+                subTasks.add(SubTask(title = newTitle))
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
         // --- BARRA DE ACCIONES ---
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -329,7 +373,7 @@ fun TaskEditorSheetContent(
             Spacer(modifier = Modifier.width(8.dp))
 
             Button(
-                onClick = { if (title.isNotBlank()) onSave(title, description) },
+                onClick = { if (title.isNotBlank()) onSave(title, description, subTasks.toList()) },
                 enabled = title.isNotBlank(),
                 shape = RoundedCornerShape(16.dp),
                 contentPadding = PaddingValues(horizontal = 20.dp)
@@ -635,6 +679,111 @@ fun TaskItemContent(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun SubTaskRow(
+    subTask: SubTask,
+    onRemove: () -> Unit,
+    onTitleChange: (String) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    ) {
+        // Icono visual
+        Icon(
+            imageVector = ImageVector.vectorResource(R.drawable.radio_button_unchecked_24px),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.size(18.dp)
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Campo de texto simple
+        TextField(
+            value = subTask.title,
+            onValueChange = onTitleChange,
+            modifier = Modifier.weight(1f),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
+            singleLine = true,
+            placeholder = { Text("Subtarea...") }
+        )
+
+        // Botón borrar
+        IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Borrar",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun AddSubTaskRow(
+    onAdd: (String) -> Unit
+) {
+    var text by remember { mutableStateOf("") }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    ) {
+        Icon(
+            Icons.Rounded.Add,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        TextField(
+            value = text,
+            onValueChange = { text = it },
+            modifier = Modifier.weight(1f),
+            placeholder = { Text("Añadir subtarea...", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    if (text.isNotBlank()) {
+                        onAdd(text)
+                        text = ""
+                    }
+                }
+            )
+        )
+        // Botón opcional para confirmar clickando
+        if (text.isNotBlank()) {
+            IconButton(
+                onClick = {
+                    onAdd(text)
+                    text = ""
+                },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = "Añadir", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }

@@ -38,8 +38,11 @@ interface TaskDao {
      */
     @Transaction
     suspend fun upsertTaskWithSubTasks(task: TaskEntity, subTasks: List<SubTaskEntity>) {
-        // 1. Guardamos/Actualizamos el padre y obtenemos su ID definitivo
-        val taskId = upsertTaskEntity(task).toInt()
+        // 1. Guardamos/Actualizamos el padre.
+        val rowId = upsertTaskEntity(task)
+
+        // Esta nueva lógica evita errores cuando upsertTaskEntity devuelve valores inesperados de FK (normalmente cuando no ha cambiado nada de la tarea principal)
+        val taskId = if (task.id == 0) rowId.toInt() else task.id
 
         // 2. Borramos las subtareas antiguas para evitar duplicados o "fantasmas"
         deleteSubTasksByTaskId(taskId)
@@ -49,10 +52,8 @@ interface TaskDao {
         insertSubTasks(subTasksWithId)
     }
 
-    // Pide todas las tareas ordenadas (las no hechas primero)
-    // y las devuelve como un "Flow".
-    // "Flow" significa que si algo cambia en la tabla,
-    // la UI se actualizará automáticamente.
+    // Pide todas las tareas ordenadas
+    // "Flow" significa que si algo cambia en la tabla, la UI se actualizará automáticamente.
     @Transaction // Necesario porque Room hace 2 consultas internamente ya que el método devuelve una clase que contiene un campo con @Relation
     @Query("SELECT * FROM tasks ORDER BY position ASC")
     fun getTasks(): Flow<List<TaskWithSubTasks>>
