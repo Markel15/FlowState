@@ -85,6 +85,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    var draftTitle by rememberSaveable { mutableStateOf("") }
+    var draftDescription by rememberSaveable { mutableStateOf("") }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),
@@ -177,8 +180,14 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 if (taskToEdit == null) {
                     // --- MODO CREACIÓN ---
                     TaskCreationSheetContent(
+                        title = draftTitle,
+                        onTitleChange = { draftTitle = it },
+                        description = draftDescription,
+                        onDescriptionChange = { draftDescription = it },
                         onSave = { title, desc ->
                             viewModel.addTask(title, desc, emptyList())
+                            draftTitle = ""
+                            draftDescription = ""
                             showSheet = false
                         }
                     )
@@ -263,10 +272,12 @@ fun DynamicHeader(isMinimized: Boolean) {
 
 @Composable
 fun TaskCreationSheetContent(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    description: String,
+    onDescriptionChange: (String) -> Unit,
     onSave: (String, String) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
     Column(
@@ -279,7 +290,7 @@ fun TaskCreationSheetContent(
         // Título
         TextField(
             value = title,
-            onValueChange = { title = it },
+            onValueChange = onTitleChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
@@ -298,7 +309,7 @@ fun TaskCreationSheetContent(
         // Descripción
         TextField(
             value = description,
-            onValueChange = { description = it },
+            onValueChange = onDescriptionChange,
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Descripción (opcional)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)) },
             textStyle = MaterialTheme.typography.bodyLarge,
