@@ -170,25 +170,28 @@ fun TaskScreen(viewModel: TaskViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showSheet = false },
                 sheetState = sheetState,
-                dragHandle = { BottomSheetDefaults.DragHandle() },
+                dragHandle = if (taskToEdit == null) null else { { BottomSheetDefaults.DragHandle() } },
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                shape = if (taskToEdit == null) RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
-                TaskEditorSheetContent(
-                    task = taskToEdit,
-                    onManualCreate = { title, desc, subTasks ->
-                        // Acción manual solo para tareas nuevas
-                        viewModel.addTask(title, desc, subTasks)
-                        showSheet = false // Cerramos al crear
-                    },
-                    onAutoUpdate = { title, desc, subTasks ->
-                        // Autoguardado silencioso para tareas existentes
-                        if (taskToEdit != null) {
+                if (taskToEdit == null) {
+                    // --- MODO CREACIÓN ---
+                    TaskCreationSheetContent(
+                        onSave = { title, desc ->
+                            viewModel.addTask(title, desc, emptyList())
+                            showSheet = false
+                        }
+                    )
+                }
+                else {
+                    // --- MODO EDICIÓN ---
+                    TaskEditorSheetContent(
+                        task = taskToEdit,
+                        onAutoUpdate = { title, desc, subTasks ->
                             viewModel.updateTask(taskToEdit!!, title, desc, subTasks)
                         }
-                    },
-                    onCancel = { showSheet = false }
-                )
+                    )
+                }
             }
         }
     }
@@ -259,11 +262,98 @@ fun DynamicHeader(isMinimized: Boolean) {
 }
 
 @Composable
+fun TaskCreationSheetContent(
+    onSave: (String, String) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 24.dp, vertical = 6.dp)
+    ) {
+        // Título
+        TextField(
+            value = title,
+            onValueChange = { title = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+            placeholder = { Text("Nueva tarea...", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))) },
+            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
+        )
+
+        // Descripción
+        TextField(
+            value = description,
+            onValueChange = { description = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Descripción (opcional)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)) },
+            textStyle = MaterialTheme.typography.bodyLarge,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            ),
+            minLines = 1,
+            maxLines = 5,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Barra de acciones
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Iconos de utilidad a la izquierda
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = { }) { Icon(Icons.Sharp.DateRange, "Fecha", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = { }) { Icon(Icons.Sharp.MoreVert, "Prioridad", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Botón de Enviar
+            FilledIconButton(
+                onClick = { if (title.isNotBlank()) onSave(title, description) },
+                enabled = title.isNotBlank(),
+                modifier = Modifier.size(44.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.send),
+                    contentDescription = "Crear tarea",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        focusRequester.requestFocus()
+    }
+}
+
+@Composable
 fun TaskEditorSheetContent(
     task: Task?,
-    onManualCreate: (String, String, List<SubTask>) -> Unit,
-    onAutoUpdate: (String, String, List<SubTask>) -> Unit,
-    onCancel: () -> Unit
+    onAutoUpdate: (String, String, List<SubTask>) -> Unit
 ) {
     val isNewTask = remember { task == null }
     var title by remember { mutableStateOf(task?.title ?: "") }
@@ -392,35 +482,15 @@ fun TaskEditorSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- BARRA INFERIOR ---
-        if (isNewTask) {
-            // MODO CREAR: Botones manuales
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onCancel) { Text("Cancelar") }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { if (title.isNotBlank()) onManualCreate(title, description, subTasks.toList()) },
-                    enabled = title.isNotBlank(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text("Crear Tarea")
-                }
-            }
-        } else {
-            // MODO EDITAR
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(ImageVector.vectorResource(R.drawable.flag_2_24px), "Prioridad") }
-                IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
-                IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(ImageVector.vectorResource(R.drawable.flag_2_24px), "Prioridad") }
+            IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
+            IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
         }
+
         Spacer(modifier = Modifier.height(16.dp))
     }
 
