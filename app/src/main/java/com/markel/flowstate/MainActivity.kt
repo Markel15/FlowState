@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -28,10 +30,10 @@ import com.markel.flowstate.core.designsystem.theme.FlowStateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 // Definimos nuestras rutas de navegación
-sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Tasks : Screen("tasks", "Tareas", Icons.Default.CheckCircle)
-    object Habits : Screen("habits", "Hábitos", Icons.Default.DateRange)
-    object Mood : Screen("mood", "Ánimo", Icons.Default.Face)
+sealed class Screen(val route: String, @StringRes val labelRes: Int, val icon: ImageVector) {
+    object Tasks : Screen("tasks", com.markel.flowstate.feature.tasks.R.string.tasks, Icons.Default.CheckCircle)
+    object Habits : Screen("habits", com.markel.flowstate.feature.tasks.R.string.habits, Icons.Default.DateRange)
+    object Mood : Screen("mood", com.markel.flowstate.feature.tasks.R.string.mood, Icons.Default.Face)
 }
 
 val bottomNavItems = listOf(
@@ -72,10 +74,10 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Habits.route) {
                             // Temporalmente un placeholder
-                            PlaceholderScreen("Módulo de Hábitos")
+                            PlaceholderScreen(stringResource(com.markel.flowstate.feature.tasks.R.string.habits))
                         }
                         composable(Screen.Mood.route) {
-                            PlaceholderScreen("Módulo de Ánimo")
+                            PlaceholderScreen(stringResource(com.markel.flowstate.feature.tasks.R.string.mood))
                         }
                     }
                 }
@@ -92,9 +94,10 @@ fun FlowBottomBar(navController: NavHostController) {
 
     NavigationBar {
         bottomNavItems.forEach { screen ->
+            val label = stringResource(screen.labelRes)
             NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = screen.label) },
-                label = { Text(screen.label) },
+                icon = { Icon(screen.icon, contentDescription = label) },
+                label = { Text(label) },
                 selected = currentRoute == screen.route,
                 onClick = {
                     // Navega a la nueva pantalla

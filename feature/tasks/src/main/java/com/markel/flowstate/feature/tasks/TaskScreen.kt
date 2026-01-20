@@ -1,6 +1,5 @@
 package com.markel.flowstate.feature.tasks
 
-import android.R.attr.translationZ
 import android.graphics.BlurMaskFilter
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -21,11 +20,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.sharp.Create
 import androidx.compose.material.icons.sharp.DateRange
-import androidx.compose.material.icons.sharp.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,13 +35,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -54,8 +50,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.domain.Priority
@@ -221,12 +215,12 @@ fun TaskScreen(viewModel: TaskViewModel) {
 @Composable
 fun DynamicHeader(isMinimized: Boolean) {
     val greeting = when (LocalTime.now().hour) {
-        in 5..12 -> "Buenos días"
-        in 13..20 -> "Buenas tardes"
-        else -> "Buenas noches"
+        in 5..12 -> R.string.good_morning
+        in 13..20 -> R.string.good_evening
+        else -> R.string.good_night
     }
 
-    val dateText = DateTimeFormatter.ofPattern("EEEE, d MMM", Locale("es", "ES"))
+    val dateText = DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.getDefault())
         .format(java.time.LocalDate.now())
         .uppercase()
 
@@ -251,7 +245,7 @@ fun DynamicHeader(isMinimized: Boolean) {
             // El mensaje solo se renderiza si no se ha minimizado
             if (!isMinimized) {
                 Text(
-                    text = greeting,
+                    text = stringResource(greeting),
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-0.5).sp
@@ -308,7 +302,7 @@ fun TaskCreationSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            placeholder = { Text("Nueva tarea...", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))) },
+            placeholder = { Text(stringResource(R.string.new_task_placeholder), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))) },
             textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -325,7 +319,7 @@ fun TaskCreationSheetContent(
             value = description,
             onValueChange = onDescriptionChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Descripción (opcional)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)) },
+            placeholder = { Text(stringResource(R.string.description_placeholder), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)) },
             textStyle = MaterialTheme.typography.bodyLarge,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -470,7 +464,7 @@ fun TaskEditorSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            placeholder = { Text("¿Qué hay que hacer?", style = MaterialTheme.typography.headlineSmall) },
+            placeholder = { Text(stringResource(R.string.edit_task_placeholder), style = MaterialTheme.typography.headlineSmall) },
             textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -486,7 +480,7 @@ fun TaskEditorSheetContent(
             value = description,
             onValueChange = { description = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Añadir detalles...", style = MaterialTheme.typography.bodyLarge) },
+            placeholder = { Text(stringResource(R.string.edit_task_desc_placeholder), style = MaterialTheme.typography.bodyLarge) },
             textStyle = MaterialTheme.typography.bodyLarge,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
@@ -505,7 +499,7 @@ fun TaskEditorSheetContent(
 
         // SUBTAREAS
         Text(
-            "SUBTAREAS",
+            stringResource(R.string.subtasks),
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
             color = MaterialTheme.colorScheme.primary
         )
@@ -583,8 +577,8 @@ fun ExpandableFabMenu(
             exit = fadeOut() + shrinkVertically()
         ) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                FabOption("Idea", ImageVector.vectorResource(R.drawable.lightbulb_24px), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, onIdeaClick)
-                FabOption("Tarea", Icons.Default.Check, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, onTaskClick)
+                FabOption(stringResource(R.string.idea), ImageVector.vectorResource(R.drawable.lightbulb_24px), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, onIdeaClick)
+                FabOption(stringResource(R.string.task), Icons.Default.Check, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, onTaskClick)
             }
         }
 
@@ -621,7 +615,7 @@ fun EmptyStateView() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(Icons.Default.Check, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.surfaceVariant)
-        Text("Todo limpio", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.clear), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -947,7 +941,7 @@ fun SubTaskRow(
                 color = if (subTask.isDone) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f) else MaterialTheme.colorScheme.onSurface
             ),
             singleLine = true,
-            placeholder = { Text("Subtarea...") }
+            placeholder = { Text(stringResource(R.string.subtask_placeholder)) }
         )
 
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
@@ -979,7 +973,7 @@ fun AddSubTaskRow(onAdd: (String) -> Unit) {
             value = text,
             onValueChange = { text = it },
             modifier = Modifier.weight(1f),
-            placeholder = { Text("Añadir subtarea...", color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
+            placeholder = { Text(stringResource(R.string.add_subtask_placeholder), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)) },
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,

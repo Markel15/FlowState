@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="good_morning">Good morning</string>
+    <string name="good_evening">Good evening</string>
+    <string name="good_night">Good night</string>
+    <string name="new_task_placeholder">New task...</string>
+    <string name="description_placeholder">Description (optional)</string>
+    <string name="edit_task_placeholder">What should be done?</string>
+    <string name="edit_task_desc_placeholder">Add details</string>
+    <string name="subtasks">SUBTASKS</string>
+    <string name="idea">Idea</string>
+    <string name="task">Task</string>
+    <string name="clear">Everything clear</string>
+    <string name="subtask_placeholder">Subtask...</string>
+    <string name="add_subtask_placeholder">Add subtask...</string>
+    <string name="tasks">Tasks</string>
+    <string name="habits">Habits</string>
+    <string name="mood">Mood</string>
+</resources>
