@@ -4,6 +4,7 @@ import com.markel.flowstate.core.data.local.SubTaskEntity
 import com.markel.flowstate.core.data.local.TaskDao
 import com.markel.flowstate.core.data.local.TaskEntity
 import com.markel.flowstate.core.data.local.TaskWithSubTasks
+import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.domain.TaskRepository
@@ -56,12 +57,15 @@ class TaskRepositoryImpl @Inject constructor(
     // Estas funciones convierten entre el modelo de DB y el modelo de Dominio
 
     private fun TaskWithSubTasks.toDomain(): Task {
+        val priorityEnum = Priority.entries.getOrElse(this.task.priority) { Priority.NOTHING }
+
         return Task(
             id = this.task.id,
             title = this.task.title,
             description = this.task.description,
             isDone = this.task.isDone,
             position = this.task.position,
+            priority = priorityEnum,
             subTasks = this.subTasks.map { it.toDomain() }
         )
     }
@@ -80,7 +84,8 @@ class TaskRepositoryImpl @Inject constructor(
             title = this.title,
             description = this.description,
             isDone = this.isDone,
-            position = this.position
+            position = this.position,
+            priority = this.priority.ordinal
         )
     }
 

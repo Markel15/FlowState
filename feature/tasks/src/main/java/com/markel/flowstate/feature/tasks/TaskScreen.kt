@@ -1,6 +1,7 @@
 package com.markel.flowstate.feature.tasks
 
 import android.R.attr.translationZ
+import android.graphics.BlurMaskFilter
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -31,12 +32,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.vectorResource
@@ -52,8 +58,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
+import com.markel.flowstate.core.designsystem.theme.priority
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -87,8 +95,9 @@ fun TaskScreen(viewModel: TaskViewModel) {
 
     var draftTitle by rememberSaveable { mutableStateOf("") }
     var draftDescription by rememberSaveable { mutableStateOf("") }
+    var draftPriority by rememberSaveable { mutableStateOf(Priority.NOTHING)}
 
-    Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),
             floatingActionButton = {
@@ -184,10 +193,13 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         onTitleChange = { draftTitle = it },
                         description = draftDescription,
                         onDescriptionChange = { draftDescription = it },
-                        onSave = { title, desc ->
-                            viewModel.addTask(title, desc, emptyList())
+                        priority = draftPriority,
+                        onPriorityChange = { draftPriority = it },
+                        onSave = { title, desc, prio ->
+                            viewModel.addTask(title, desc, prio, emptyList())
                             draftTitle = ""
                             draftDescription = ""
+                            draftPriority = Priority.NOTHING
                             showSheet = false
                         }
                     )
@@ -196,8 +208,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     // --- MODO EDICIÓN ---
                     TaskEditorSheetContent(
                         task = taskToEdit,
-                        onAutoUpdate = { title, desc, subTasks ->
-                            viewModel.updateTask(taskToEdit!!, title, desc, subTasks)
+                        onAutoUpdate = { title, desc, priority, subTasks ->
+                            viewModel.updateTask(taskToEdit!!, title, desc, priority, subTasks)
                         }
                     )
                 }
@@ -276,7 +288,9 @@ fun TaskCreationSheetContent(
     onTitleChange: (String) -> Unit,
     description: String,
     onDescriptionChange: (String) -> Unit,
-    onSave: (String, String) -> Unit
+    priority: Priority,
+    onPriorityChange: (Priority) -> Unit,
+    onSave: (String, String, Priority) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -334,14 +348,28 @@ fun TaskCreationSheetContent(
             // Iconos de utilidad a la izquierda
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 IconButton(onClick = { }) { Icon(Icons.Sharp.DateRange, "Fecha", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
-                IconButton(onClick = { }) { Icon(Icons.Sharp.MoreVert, "Prioridad", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = {
+                    val nextPriority = when(priority) {
+                        Priority.NOTHING -> Priority.LOW
+                        Priority.LOW -> Priority.MEDIUM
+                        Priority.MEDIUM -> Priority.HIGH
+                        Priority.HIGH -> Priority.NOTHING
+                    }
+                    onPriorityChange(nextPriority)
+                }) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
+                        contentDescription = "Prioridad",
+                        tint = getPriorityColor(priority)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             // Botón de Enviar
             FilledIconButton(
-                onClick = { if (title.isNotBlank()) onSave(title, description) },
+                onClick = { if (title.isNotBlank()) onSave(title, description, priority) },
                 enabled = title.isNotBlank(),
                 modifier = Modifier.size(44.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -364,11 +392,12 @@ fun TaskCreationSheetContent(
 @Composable
 fun TaskEditorSheetContent(
     task: Task?,
-    onAutoUpdate: (String, String, List<SubTask>) -> Unit
+    onAutoUpdate: (String, String, Priority, List<SubTask>) -> Unit
 ) {
     val isNewTask = remember { task == null }
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
+    var priority by remember { mutableStateOf(task?.priority ?: Priority.NOTHING) }
     val subTasks = remember {
         mutableStateListOf<SubTask>().apply {
             addAll(task?.subTasks ?: emptyList())
@@ -378,28 +407,31 @@ fun TaskEditorSheetContent(
     // Checkpoints para saber qué es lo último que se guardó realmente
     var lastSavedTitle by remember { mutableStateOf(title) }
     var lastSavedDesc by remember { mutableStateOf(description) }
+    var lastSavedPriority by remember { mutableStateOf(priority) }
     var lastSavedSubTasksHash by remember { mutableIntStateOf(subTasks.toList().hashCode()) }
 
     val focusRequester = remember { FocusRequester() }
 
     // AUTOGUARDADO POR TIEMPO (DEBOUNCE)
     if (!isNewTask) {
-        LaunchedEffect(title, description, subTasks.toList().hashCode()) {
+        LaunchedEffect(title, description, priority, subTasks.toList().hashCode()) {
             val currentSubTasksHash = subTasks.toList().hashCode()
 
             val hasChanges = title != lastSavedTitle ||
                     description != lastSavedDesc ||
+                    priority != lastSavedPriority ||
                     currentSubTasksHash != lastSavedSubTasksHash
 
             if (hasChanges && title.isNotBlank()) {
                 delay(600)
 
                 // Guardamos
-                onAutoUpdate(title, description, subTasks.toList())
+                onAutoUpdate(title, description, priority, subTasks.toList())
 
                 // Actualizamos referencias
                 lastSavedTitle = title
                 lastSavedDesc = description
+                lastSavedPriority = priority
                 lastSavedSubTasksHash = currentSubTasksHash
             }
         }
@@ -414,10 +446,11 @@ fun TaskEditorSheetContent(
                 val currentSubTasksHash = subTasks.toList().hashCode()
                 val hasPendingChanges = title != lastSavedTitle ||
                         description != lastSavedDesc ||
+                        priority != lastSavedPriority ||
                         currentSubTasksHash != lastSavedSubTasksHash
 
                 if (hasPendingChanges && title.isNotBlank()) {
-                    onAutoUpdate(title, description, subTasks.toList())
+                    onAutoUpdate(title, description, priority, subTasks.toList())
                 }
             }
         }
@@ -497,7 +530,21 @@ fun TaskEditorSheetContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(onClick = { /* TODO: Implementar Prioridad */ }) { Icon(ImageVector.vectorResource(R.drawable.flag_2_24px), "Prioridad") }
+            IconButton(onClick = {
+                val nextPriority = when(priority) {
+                    Priority.NOTHING -> Priority.LOW
+                    Priority.LOW -> Priority.MEDIUM
+                    Priority.MEDIUM -> Priority.HIGH
+                    Priority.HIGH -> Priority.NOTHING
+                }
+                priority = nextPriority
+            }) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
+                    contentDescription = "Prioridad",
+                    tint = getPriorityColor(priority)
+                )
+            }
             IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
             IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
         }
@@ -635,6 +682,7 @@ fun AnimatableTaskItem(
                 description = task.description,
                 subTasks = task.subTasks,
                 isDone = isChecked,
+                priority = task.priority,
                 onClicked = onContentClick,
                 onCheckClicked = {
                     isChecked = true
@@ -728,9 +776,11 @@ fun TaskItemContent(
     description: String = "",
     subTasks: List<SubTask> = emptyList(),
     isDone: Boolean,
+    priority: Priority = Priority.NOTHING,
     onClicked: () -> Unit,
     onCheckClicked: () -> Unit
 ) {
+    val priorityColor = getPriorityColor(priority)
     Card(
         onClick = onClicked,
         modifier = Modifier
@@ -748,23 +798,45 @@ fun TaskItemContent(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (isDone) ImageVector.vectorResource(R.drawable.radio_button_checked_24px) else ImageVector.vectorResource(
-                    R.drawable.radio_button_unchecked_24px
-                ),
-                contentDescription = null,
-                tint = if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(
-                    alpha = 0.4f
-                ),
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .toggleable(
-                        value = isDone,
-                        onValueChange = { onCheckClicked() },
-                        role = Role.Checkbox
-                    )
-            )
+                    .drawBehind {
+                        if (priority != Priority.NOTHING && !isDone) {
+                            drawIntoCanvas { canvas ->
+                                val paint = Paint().asFrameworkPaint()
+                                paint.color = priorityColor.copy(alpha = 0.25f).toArgb()
+                                paint.maskFilter = BlurMaskFilter(15f, BlurMaskFilter.Blur.INNER)
+                                canvas.nativeCanvas.drawCircle(
+                                    size.width / 2f,
+                                    size.height / 2f,
+                                    size.width / 2.2f,
+                                    paint
+                                )
+                            }
+                        }
+                    }
+            ) {
+                Icon(
+                    imageVector = if (isDone) ImageVector.vectorResource(R.drawable.radio_button_checked_24px) else ImageVector.vectorResource(
+                        R.drawable.radio_button_unchecked_24px
+                    ),
+                    contentDescription = null,
+                    tint = if (isDone) MaterialTheme.colorScheme.primary else if (priority == Priority.NOTHING) MaterialTheme.colorScheme.onSurface.copy(
+                        alpha = 0.4f
+                    ) else priorityColor,
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .toggleable(
+                            value = isDone,
+                            onValueChange = { onCheckClicked() },
+                            role = Role.Checkbox
+                        )
+                )
+            }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 val taskTitleStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -925,5 +997,15 @@ fun AddSubTaskRow(onAdd: (String) -> Unit) {
                 Icon(Icons.Default.Add, contentDescription = "Añadir", tint = MaterialTheme.colorScheme.primary)
             }
         }
+    }
+}
+
+@Composable
+fun getPriorityColor(priority: Priority): Color {
+    return when (priority) {
+        Priority.HIGH -> MaterialTheme.priority.highPriority
+        Priority.MEDIUM -> MaterialTheme.priority.mediumPriority
+        Priority.LOW -> MaterialTheme.priority.lowPriority
+        Priority.NOTHING -> MaterialTheme.priority.noPriority
     }
 }

@@ -1,4 +1,4 @@
-package com.markel.flowstate.ui.theme
+package com.markel.flowstate.core.designsystem.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -9,62 +9,65 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 
 private val lightScheme = lightColorScheme(
-    primary = _root_ide_package_.com.markel.flowstate.ui.theme.primaryLight,
-    onPrimary = _root_ide_package_.com.markel.flowstate.ui.theme.onPrimaryLight,
-    primaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.primaryContainerLight,
-    onPrimaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onPrimaryContainerLight,
-    secondary = _root_ide_package_.com.markel.flowstate.ui.theme.secondaryLight,
-    onSecondary = _root_ide_package_.com.markel.flowstate.ui.theme.onSecondaryLight,
-    secondaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.secondaryContainerLight,
-    onSecondaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onSecondaryContainerLight,
-    tertiary = _root_ide_package_.com.markel.flowstate.ui.theme.tertiaryLight,
-    onTertiary = _root_ide_package_.com.markel.flowstate.ui.theme.onTertiaryLight,
-    tertiaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.tertiaryContainerLight,
-    onTertiaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onTertiaryContainerLight,
-    error = _root_ide_package_.com.markel.flowstate.ui.theme.errorLight,
-    onError = _root_ide_package_.com.markel.flowstate.ui.theme.onErrorLight,
-    errorContainer = _root_ide_package_.com.markel.flowstate.ui.theme.errorContainerLight,
-    onErrorContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onErrorContainerLight,
-    background = _root_ide_package_.com.markel.flowstate.ui.theme.backgroundLight,
-    onBackground = _root_ide_package_.com.markel.flowstate.ui.theme.onBackgroundLight,
-    surface = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceLight,
-    onSurface = _root_ide_package_.com.markel.flowstate.ui.theme.onSurfaceLight,
-    surfaceVariant = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceVariantLight,
-    onSurfaceVariant = _root_ide_package_.com.markel.flowstate.ui.theme.onSurfaceVariantLight,
-    outline = _root_ide_package_.com.markel.flowstate.ui.theme.outlineLight,
-    outlineVariant = _root_ide_package_.com.markel.flowstate.ui.theme.outlineVariantLight,
-    scrim = _root_ide_package_.com.markel.flowstate.ui.theme.scrimLight,
-    inverseSurface = _root_ide_package_.com.markel.flowstate.ui.theme.inverseSurfaceLight,
-    inverseOnSurface = _root_ide_package_.com.markel.flowstate.ui.theme.inverseOnSurfaceLight,
-    inversePrimary = _root_ide_package_.com.markel.flowstate.ui.theme.inversePrimaryLight,
-    surfaceDim = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceDimLight,
-    surfaceBright = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceBrightLight,
-    surfaceContainerLowest = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceContainerLowestLight,
-    surfaceContainerLow = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceContainerLowLight,
-    surfaceContainer = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceContainerLight,
-    surfaceContainerHigh = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceContainerHighLight,
-    surfaceContainerHighest = _root_ide_package_.com.markel.flowstate.ui.theme.surfaceContainerHighestLight,
+    primary = primaryLight,
+    onPrimary = onPrimaryLight,
+    primaryContainer = primaryContainerLight,
+    onPrimaryContainer = onPrimaryContainerLight,
+    secondary = secondaryLight,
+    onSecondary = onSecondaryLight,
+    secondaryContainer = secondaryContainerLight,
+    onSecondaryContainer = onSecondaryContainerLight,
+    tertiary = tertiaryLight,
+    onTertiary = onTertiaryLight,
+    tertiaryContainer = tertiaryContainerLight,
+    onTertiaryContainer = onTertiaryContainerLight,
+    error = errorLight,
+    onError = onErrorLight,
+    errorContainer = errorContainerLight,
+    onErrorContainer = onErrorContainerLight,
+    background = backgroundLight,
+    onBackground = onBackgroundLight,
+    surface = surfaceLight,
+    onSurface = onSurfaceLight,
+    surfaceVariant = surfaceVariantLight,
+    onSurfaceVariant = onSurfaceVariantLight,
+    outline = outlineLight,
+    outlineVariant = outlineVariantLight,
+    scrim = scrimLight,
+    inverseSurface = inverseSurfaceLight,
+    inverseOnSurface = inverseOnSurfaceLight,
+    inversePrimary = inversePrimaryLight,
+    surfaceDim = surfaceDimLight,
+    surfaceBright = surfaceBrightLight,
+    surfaceContainerLowest = surfaceContainerLowestLight,
+    surfaceContainerLow = surfaceContainerLowLight,
+    surfaceContainer = surfaceContainerLight,
+    surfaceContainerHigh = surfaceContainerHighLight,
+    surfaceContainerHighest = surfaceContainerHighestLight,
 )
 
 private val darkScheme = darkColorScheme(
-    primary = _root_ide_package_.com.markel.flowstate.ui.theme.primaryDark,
-    onPrimary = _root_ide_package_.com.markel.flowstate.ui.theme.onPrimaryDark,
-    primaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.primaryContainerDark,
-    onPrimaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onPrimaryContainerDark,
-    secondary = _root_ide_package_.com.markel.flowstate.ui.theme.secondaryDark,
-    onSecondary = _root_ide_package_.com.markel.flowstate.ui.theme.onSecondaryDark,
-    secondaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.secondaryContainerDark,
-    onSecondaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onSecondaryContainerDark,
-    tertiary = _root_ide_package_.com.markel.flowstate.ui.theme.tertiaryDark,
-    onTertiary = _root_ide_package_.com.markel.flowstate.ui.theme.onTertiaryDark,
-    tertiaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.tertiaryContainerDark,
-    onTertiaryContainer = _root_ide_package_.com.markel.flowstate.ui.theme.onTertiaryContainerDark,
+    primary = primaryDark,
+    onPrimary = onPrimaryDark,
+    primaryContainer = primaryContainerDark,
+    onPrimaryContainer = onPrimaryContainerDark,
+    secondary = secondaryDark,
+    onSecondary = onSecondaryDark,
+    secondaryContainer = secondaryContainerDark,
+    onSecondaryContainer = onSecondaryContainerDark,
+    tertiary = tertiaryDark,
+    onTertiary = onTertiaryDark,
+    tertiaryContainer = tertiaryContainerDark,
+    onTertiaryContainer = onTertiaryContainerDark,
     error = errorDark,
     onError = onErrorDark,
     errorContainer = errorContainerDark,
@@ -242,6 +245,20 @@ private val highContrastDarkColorScheme = darkColorScheme(
     surfaceContainerHighest = surfaceContainerHighestDarkHighContrast,
 )
 
+val lightPriorityScheme = PriorityColorScheme(
+    noPriority = onSurfaceVariantLight,
+    lowPriority = lowPriorityLight,
+    mediumPriority = mediumPriorityLight,
+    highPriority = highPriorityLight
+)
+
+val darkPriorityScheme = PriorityColorScheme(
+    noPriority = onSurfaceVariantDark,
+    lowPriority = lowPriorityDark,
+    mediumPriority = mediumPriorityDark,
+    highPriority = highPriorityDark
+)
+
 @Immutable
 data class ColorFamily(
     val color: Color,
@@ -249,6 +266,22 @@ data class ColorFamily(
     val colorContainer: Color,
     val onColorContainer: Color
 )
+@Immutable
+data class PriorityColorScheme(
+    val noPriority: Color,
+    val lowPriority: Color,
+    val mediumPriority: Color,
+    val highPriority: Color
+)
+
+val LocalPriorityColors = staticCompositionLocalOf {
+    PriorityColorScheme(
+        noPriority = Color.Unspecified,
+        lowPriority = Color.Unspecified,
+        mediumPriority = Color.Unspecified,
+        highPriority = Color.Unspecified
+    )
+}
 
 val unspecified_scheme = ColorFamily(
     Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
@@ -261,20 +294,29 @@ fun FlowStateTheme(
     dynamicColor: Boolean = false,
     content: @Composable() () -> Unit
 ) {
-  val colorScheme = when {
+    val colorScheme = when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
           val context = LocalContext.current
           if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
-      
+
       darkTheme -> darkScheme
       else -> lightScheme
-  }
+    }
+    val priorityColorScheme = if (darkTheme) darkPriorityScheme else lightPriorityScheme
 
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = Typography,
-    content = content
-  )
+    CompositionLocalProvider(
+        values = arrayOf(LocalPriorityColors provides priorityColorScheme)
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 
+val MaterialTheme.priority: PriorityColorScheme
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalPriorityColors.current

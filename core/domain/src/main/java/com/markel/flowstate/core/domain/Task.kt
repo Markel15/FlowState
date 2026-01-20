@@ -8,6 +8,9 @@ import java.util.UUID
  * No sabe nada de la base de datos (@Entity, @PrimaryKey, etc.).
  */
 
+enum class Priority {
+    NOTHING, LOW, MEDIUM, HIGH
+}
 data class SubTask(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -19,6 +22,7 @@ data class Task(
     val description: String = "",
     val isDone: Boolean,
     val position: Int = 0,
+    val priority: Priority = Priority.NOTHING,
     val subTasks: List<SubTask> = emptyList()
     // Aquí irían los demás campos del dominio como
     // priority: Priority,

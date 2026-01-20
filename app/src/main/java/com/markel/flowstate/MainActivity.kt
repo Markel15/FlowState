@@ -24,7 +24,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.markel.flowstate.feature.tasks.TaskScreen
 import com.markel.flowstate.feature.tasks.TaskViewModel
-import com.markel.flowstate.ui.theme.FlowStateTheme
+import com.markel.flowstate.core.designsystem.theme.FlowStateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 // Definimos nuestras rutas de navegación

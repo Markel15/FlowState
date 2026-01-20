@@ -14,9 +14,6 @@ data class TaskEntity(
     val title: String,
     val description: String = "",
     val isDone: Boolean = false,
-    val position: Int = 0
-
-    // Más adelante, si "Prioridades" o "Fechas"
-    // val priority: Int = 1,
-    // val dueDate: Long? = null
+    val position: Int = 0,
+    val priority: Int = 0
 )

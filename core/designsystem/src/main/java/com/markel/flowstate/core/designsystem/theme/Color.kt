@@ -1,4 +1,4 @@
-package com.markel.flowstate.ui.theme
+package com.markel.flowstate.core.designsystem.theme
 import androidx.compose.ui.graphics.Color
 
 val primaryLight = Color(0xFF805611)
@@ -36,6 +36,9 @@ val surfaceContainerLowLight = Color(0xFFFFF1E5)
 val surfaceContainerLight = Color(0xFFF9ECDF)
 val surfaceContainerHighLight = Color(0xFFF3E6DA)
 val surfaceContainerHighestLight = Color(0xFFEDE0D4)
+val lowPriorityLight = Color(0xFF59A5D8)
+val mediumPriorityLight = Color(0xFFF49F0A)
+val highPriorityLight = Color(0xFFE83151)
 
 val primaryLightMediumContrast = Color(0xFF4D3000)
 val onPrimaryLightMediumContrast = Color(0xFFFFFFFF)
@@ -180,6 +183,9 @@ val surfaceContainerLowDarkMediumContrast = Color(0xFF231D15)
 val surfaceContainerDarkMediumContrast = Color(0xFF2D271F)
 val surfaceContainerHighDarkMediumContrast = Color(0xFF393129)
 val surfaceContainerHighestDarkMediumContrast = Color(0xFF443C34)
+val lowPriorityDark = Color(0xFF59A5D8)
+val mediumPriorityDark = Color(0xFFF49F0A)
+val highPriorityDark = Color(0xFFE83151)
 
 val primaryDarkHighContrast = Color(0xFFFFEDDB)
 val onPrimaryDarkHighContrast = Color(0xFF000000)

@@ -46,6 +46,7 @@ dependencies {
     implementation(project(":feature:tasks"))
     implementation(project(":core:data"))
     implementation(project(":core:domain"))
+    implementation(project(":core:designsystem"))
 
     // Android Core & Lifecycle
     implementation(libs.androidx.core.ktx)

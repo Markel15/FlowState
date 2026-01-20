@@ -2,6 +2,7 @@ package com.markel.flowstate.feature.tasks
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.domain.TaskRepository
@@ -47,7 +48,7 @@ class TaskViewModel  @Inject constructor(
     }
 
     // Función para añadir una nueva tarea
-    fun addTask(title: String, description: String, subTasks: List<SubTask>) {
+    fun addTask(title: String, description: String, priority: Priority, subTasks: List<SubTask>) {
         if (title.isBlank()) return // Evita tareas vacías
         viewModelScope.launch {
             val currentTasks = (uiState.value as? TasksUiState.Success)?.tasks ?: emptyList()
@@ -58,6 +59,7 @@ class TaskViewModel  @Inject constructor(
                 description = description,
                 isDone = false,
                 position = minPosition - 1,
+                priority = priority,
                 subTasks = subTasks
             )
             repository.upsertTask(newTask)
@@ -65,13 +67,14 @@ class TaskViewModel  @Inject constructor(
     }
 
     // Recibe la tarea original para mantener su ID, estado isDone y subtareas
-    fun updateTask(originalTask: Task, newTitle: String, newDescription: String, newSubTasks: List<SubTask>) {
+    fun updateTask(originalTask: Task, newTitle: String, newDescription: String, newPriority: Priority, newSubTasks: List<SubTask>) {
         if (newTitle.isBlank()) return
         viewModelScope.launch {
             repository.upsertTask(
                 originalTask.copy(
                     title = newTitle,
                     description = newDescription,
+                    priority = newPriority,
                     subTasks = newSubTasks
                 )
             )
