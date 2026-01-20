@@ -3,9 +3,9 @@ package com.markel.flowstate.core.domain
 import java.util.UUID
 
 /**
- * Este es el modelo de Tarea "limpio".
- * Es la representación de una Tarea para la UI y la lógica de negocio (ViewModels).
- * No sabe nada de la base de datos (@Entity, @PrimaryKey, etc.).
+ * This is the "clean" Task model.
+ * It is the representation of a Task for the UI and business logic (ViewModels).
+ * It knows nothing about the database (@Entity, @PrimaryKey, etc.).
  */
 
 enum class Priority {
@@ -24,7 +24,7 @@ data class Task(
     val position: Int = 0,
     val priority: Priority = Priority.NOTHING,
     val subTasks: List<SubTask> = emptyList()
-    // Aquí irían los demás campos del dominio como
+    // Other domain fields would go here, such as:
     // priority: Priority,
     // dueDate: LocalDate?
 )

@@ -4,10 +4,10 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Esta es la "tabla" de la base de datos.
- * Representa una única Tarea.
+ * This is the database "table".
+ * It represents a single Task.
  */
-@Entity(tableName = "tasks") // Así se llamará la tabla en la base de datos
+@Entity(tableName = "tasks") // This is what the table will be called in the database
 data class TaskEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

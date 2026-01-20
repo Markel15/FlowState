@@ -11,11 +11,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
-@InstallIn(SingletonComponent::class) // Vivirá mientras la app viva
+@InstallIn(SingletonComponent::class) // It will live as long as the app lives
 object DatabaseModule {
 
     @Provides
-    @Singleton // Queremos una sola instancia de la DB
+    @Singleton // We want a single instance of the DB
     fun provideFlowStateDatabase(app: Application): FlowStateDatabase {
         return Room.databaseBuilder(
             app,
@@ -25,7 +25,7 @@ object DatabaseModule {
     }
 
     @Provides
-    @Singleton // Una sola instancia del DAO
+    @Singleton // A single instance of the DAO
     fun provideTaskDao(db: FlowStateDatabase): TaskDao {
         return db.taskDao
     }

@@ -69,10 +69,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Este estado sobrevive a rotaciones de pantalla, pero se reinicia al cerrar la app
+    // This state survives screen rotations but resets when the app is closed
     var hasScrolledOnce by rememberSaveable { mutableStateOf(false) }
 
-    // Detectamos el scroll solo para activar el flag la primera vez
+    // Detect scroll only to activate the flag the first time
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 90 }
             .collect { scrolled ->
@@ -91,7 +91,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var draftDescription by rememberSaveable { mutableStateOf("") }
     var draftPriority by rememberSaveable { mutableStateOf(Priority.NOTHING)}
 
-        Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),
             floatingActionButton = {
@@ -117,7 +117,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 when (val state = uiState) {
                     is TasksUiState.Loading -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            // Vacío porque tarda demasiado poco como para poner círculo de carga o una lista "fantasma"
+                            // Empty because it loads too fast to show a loading spinner or skeleton list
                         }
                     }
                     is TasksUiState.Success -> {
@@ -159,7 +159,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                                             onDelete = { viewModel.deleteTask(task) },
                                             onComplete = { viewModel.toggleTaskDone(task) },
                                             onContentClick = {
-                                                taskToEdit = task // Modo EDITAR
+                                                taskToEdit = task // EDIT Mode
                                                 showSheet = true
                                             }
                                         )
@@ -181,7 +181,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 shape = if (taskToEdit == null) RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
                 if (taskToEdit == null) {
-                    // --- MODO CREACIÓN ---
+                    // --- CREATION MODE ---
                     TaskCreationSheetContent(
                         title = draftTitle,
                         onTitleChange = { draftTitle = it },
@@ -199,7 +199,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     )
                 }
                 else {
-                    // --- MODO EDICIÓN ---
+                    // --- EDITION MODE ---
                     TaskEditorSheetContent(
                         task = taskToEdit,
                         onAutoUpdate = { title, desc, priority, subTasks ->
@@ -242,7 +242,7 @@ fun DynamicHeader(isMinimized: Boolean) {
                 .height(headerHeight),
             contentAlignment = Alignment.CenterStart
         ) {
-            // El mensaje solo se renderiza si no se ha minimizado
+            // The message is only rendered if it hasn't been minimized
             if (!isMinimized) {
                 Text(
                     text = stringResource(greeting),
@@ -253,7 +253,7 @@ fun DynamicHeader(isMinimized: Boolean) {
                 )
             }
 
-            // La fecha se desliza hacia la izquierda/arriba de forma fluida
+            // The date slides to the left/top smoothly
             Text(
                 text = dateText,
                 style = MaterialTheme.typography.labelLarge.copy(
@@ -262,7 +262,7 @@ fun DynamicHeader(isMinimized: Boolean) {
                 ),
                 modifier = Modifier
                     .align(if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd)
-                    .animateContentSize() // Suaviza el cambio de alineación
+                    .animateContentSize() // Smooths the alignment change
             )
         }
 
@@ -295,7 +295,7 @@ fun TaskCreationSheetContent(
             .imePadding()
             .padding(horizontal = 24.dp, vertical = 6.dp)
     ) {
-        // Título
+        // Title
         TextField(
             value = title,
             onValueChange = onTitleChange,
@@ -314,7 +314,7 @@ fun TaskCreationSheetContent(
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
         )
 
-        // Descripción
+        // Description
         TextField(
             value = description,
             onValueChange = onDescriptionChange,
@@ -334,14 +334,14 @@ fun TaskCreationSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Barra de acciones
+        // Action Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Iconos de utilidad a la izquierda
+            // Utility icons on the left
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { }) { Icon(Icons.Sharp.DateRange, "Fecha", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = { }) { Icon(Icons.Sharp.DateRange, "Date", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = {
                     val nextPriority = when(priority) {
                         Priority.NOTHING -> Priority.LOW
@@ -353,7 +353,7 @@ fun TaskCreationSheetContent(
                 }) {
                     Icon(
                         imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
-                        contentDescription = "Prioridad",
+                        contentDescription = "Priority",
                         tint = getPriorityColor(priority)
                     )
                 }
@@ -361,7 +361,7 @@ fun TaskCreationSheetContent(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Botón de Enviar
+            // Send Button
             FilledIconButton(
                 onClick = { if (title.isNotBlank()) onSave(title, description, priority) },
                 enabled = title.isNotBlank(),
@@ -370,7 +370,7 @@ fun TaskCreationSheetContent(
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.send),
-                    contentDescription = "Crear tarea",
+                    contentDescription = "Create task",
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -398,7 +398,7 @@ fun TaskEditorSheetContent(
         }
     }
 
-    // Checkpoints para saber qué es lo último que se guardó realmente
+    // Checkpoints to track what was actually last saved
     var lastSavedTitle by remember { mutableStateOf(title) }
     var lastSavedDesc by remember { mutableStateOf(description) }
     var lastSavedPriority by remember { mutableStateOf(priority) }
@@ -406,7 +406,7 @@ fun TaskEditorSheetContent(
 
     val focusRequester = remember { FocusRequester() }
 
-    // AUTOGUARDADO POR TIEMPO (DEBOUNCE)
+    // TIME-BASED AUTOSAVE (DEBOUNCE)
     if (!isNewTask) {
         LaunchedEffect(title, description, priority, subTasks.toList().hashCode()) {
             val currentSubTasksHash = subTasks.toList().hashCode()
@@ -419,10 +419,10 @@ fun TaskEditorSheetContent(
             if (hasChanges && title.isNotBlank()) {
                 delay(600)
 
-                // Guardamos
+                // Save
                 onAutoUpdate(title, description, priority, subTasks.toList())
 
-                // Actualizamos referencias
+                // Update references
                 lastSavedTitle = title
                 lastSavedDesc = description
                 lastSavedPriority = priority
@@ -431,11 +431,11 @@ fun TaskEditorSheetContent(
         }
     }
 
-    // GUARDADO DE EMERGENCIA AL CERRAR (DISPOSE)
-    // Esto se ejecuta si el usuario cierra el sheet antes de que termine el delay
+    // EMERGENCY SAVE ON CLOSE (DISPOSE)
+    // This runs if the user closes the sheet before the delay finishes
     DisposableEffect(Unit) {
         onDispose {
-            // Solo autoguardamos al salir si es una tarea YA EXISTENTE (Edición)
+            // Only autosave on exit if it's an ALREADY EXISTING task (Editing)
             if (!isNewTask) {
                 val currentSubTasksHash = subTasks.toList().hashCode()
                 val hasPendingChanges = title != lastSavedTitle ||
@@ -457,7 +457,7 @@ fun TaskEditorSheetContent(
             .imePadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
-        // TAREA
+        // TASK
         TextField(
             value = title,
             onValueChange = { title = it },
@@ -497,7 +497,7 @@ fun TaskEditorSheetContent(
         Box(modifier = Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh))
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SUBTAREAS
+        // SUBTASKS
         Text(
             stringResource(R.string.subtasks),
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
@@ -535,12 +535,12 @@ fun TaskEditorSheetContent(
             }) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
-                    contentDescription = "Prioridad",
+                    contentDescription = "Priority",
                     tint = getPriorityColor(priority)
                 )
             }
-            IconButton(onClick = { /* TODO: Implementar Fecha */ }) { Icon(Icons.Sharp.DateRange, "Fecha") }
-            IconButton(onClick = { /* TODO: Implementar Formato */ }) { Icon(Icons.Sharp.Create, "Formato") }
+            IconButton(onClick = { /* TODO: Implement Date */ }) { Icon(Icons.Sharp.DateRange, "Date") }
+            IconButton(onClick = { /* TODO: Implement Formatting */ }) { Icon(Icons.Sharp.Create, "Format") }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -643,7 +643,7 @@ fun AnimatableTaskItem(
     }
 
     val exitTransition = if (isDeleted) {
-        // CASO BORRAR: Desplazamiento a la izquierda
+        // DELETE CASE: Slide to the left
         slideOutHorizontally(
             targetOffsetX = { -it },
             animationSpec = tween(300)
@@ -652,7 +652,7 @@ fun AnimatableTaskItem(
             shrinkTowards = Alignment.Top
         ) + fadeOut(animationSpec = tween(200))
     } else {
-        // CASO COMPLETAR: Desvanecer + Contraer suave
+        // COMPLETE CASE: Fade out + Smooth shrink
         fadeOut(
             animationSpec = tween(300)
         ) + shrinkVertically(
@@ -753,7 +753,7 @@ fun DeleteSwipeBackground(
         if (isDeleteDirection) {
             Icon(
                 imageVector = Icons.Default.Delete,
-                contentDescription = "Borrar",
+                contentDescription = "Delete",
                 tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.graphicsLayer {
                     scaleX = scale
@@ -909,7 +909,7 @@ fun SubTaskRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
-        // Checkbox para completar subtarea
+        // Checkbox to complete subtask
         Icon(
             imageVector = if (subTask.isDone)
                 ImageVector.vectorResource(R.drawable.radio_button_checked_24px)
@@ -947,7 +947,7 @@ fun SubTaskRow(
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
             Icon(
                 Icons.Default.Close,
-                contentDescription = "Borrar",
+                contentDescription = "Delete",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -988,7 +988,7 @@ fun AddSubTaskRow(onAdd: (String) -> Unit) {
         )
         if (text.isNotBlank()) {
             IconButton(onClick = { onAdd(text); text = "" }, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir", tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary)
             }
         }
     }

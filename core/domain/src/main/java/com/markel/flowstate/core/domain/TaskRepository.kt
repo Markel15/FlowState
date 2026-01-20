@@ -3,36 +3,36 @@ package com.markel.flowstate.core.domain
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Define las operaciones de datos para las Tareas.
- * Esta interfaz vive en :core:domain y no sabe nada de Room o APIs.
- * Es el contrato que los ViewModels usarán.
+ * Defines the data operations for Tasks.
+ * This interface lives in :core:domain and knows nothing about Room or APIs.
+ * It is the contract that ViewModels will use.
  */
 interface TaskRepository {
 
     /**
-     * Obtiene un Flow de todas las tareas.
-     * La UI se actualizará automáticamente cuando esto cambie.
+     * Gets a Flow of all tasks.
+     * The UI will automatically update when this changes.
      */
     fun getTasks(): Flow<List<Task>>
 
     /**
-     * Obtiene una única tarea por su ID.
-     * Devuelve null si no la encuentra.
+     * Gets a single task by its ID.
+     * Returns null if not found.
      */
     suspend fun getTaskById(id: Int): Task?
 
     /**
-     * Inserta o actualiza una tarea.
+     * Inserts or updates a task.
      */
     suspend fun upsertTask(task: Task)
 
     /**
-     * Borra una tarea.
+     * Deletes a task.
      */
     suspend fun deleteTask(task: Task)
 
     /**
-     * Actualiza el orden de las tareas.
+     * Updates the order of the tasks.
      */
     suspend fun updateTasksOrder(tasks: List<Task>)
 }

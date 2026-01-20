@@ -4,15 +4,15 @@ import androidx.room.Embedded
 import androidx.room.Relation
 
 /**
- * Esta clase no es una tabla. Es un resultado de una consulta (JOIN implicito).
- * Room rellenará esto automáticamente.
+ * This class is not a table. It is the result of a query (implicit JOIN).
+ * Room will fill this automatically.
  */
 data class TaskWithSubTasks(
     @Embedded val task: TaskEntity,
 
     @Relation(
-        parentColumn = "id", // ID en TaskEntity
-        entityColumn = "taskId" // ID en SubTaskEntity
+        parentColumn = "id", // ID in TaskEntity
+        entityColumn = "taskId" // ID in SubTaskEntity
     )
     val subTasks: List<SubTaskEntity>
 )

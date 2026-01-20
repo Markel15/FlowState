@@ -14,8 +14,8 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    // Hilt, cuando alguien pida un "TaskRepository" (interfaz),
-    // entrégale una instancia de "TaskRepositoryImpl" (clase)
+    // Hilt, when someone asks for a "TaskRepository" (interface),
+    // provide an instance of "TaskRepositoryImpl" (class)
     abstract fun bindTaskRepository(
         taskRepositoryImpl: TaskRepositoryImpl
     ): TaskRepository

@@ -4,20 +4,20 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 /**
- * Esta es la clase principal de la base de datos.
- * Le dice a Room qué "Entidades" (tablas) debe conocer
- * y qué versión de la base de datos estamos usando.
+ * This is the main database class.
+ * It tells Room which "Entities" (tables) it should be aware of
+ * and which version of the database we are using.
  */
 @Database(
-    entities = [TaskEntity::class, SubTaskEntity::class], // Lista de todas las tablas
+    entities = [TaskEntity::class, SubTaskEntity::class], // List of all tables
     version = 4
 )
 abstract class FlowStateDatabase : RoomDatabase() {
 
-    // Expone nuestro DAO para que el resto de la app pueda usarlo
+    // Exposes our DAO so the rest of the app can use it
     abstract val taskDao: TaskDao
 
-    // Room usará esto para crear la instancia de la DB.
+    // Room will use this to create the DB instance.
     companion object {
         const val DATABASE_NAME = "flowstate_db"
     }

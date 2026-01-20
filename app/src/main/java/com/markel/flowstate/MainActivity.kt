@@ -29,7 +29,7 @@ import com.markel.flowstate.feature.tasks.TaskViewModel
 import com.markel.flowstate.core.designsystem.theme.FlowStateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
-// Definimos nuestras rutas de navegación
+// We define our navigation routes
 sealed class Screen(val route: String, @StringRes val labelRes: Int, val icon: ImageVector) {
     object Tasks : Screen("tasks", com.markel.flowstate.feature.tasks.R.string.tasks, Icons.Default.CheckCircle)
     object Habits : Screen("habits", com.markel.flowstate.feature.tasks.R.string.habits, Icons.Default.DateRange)
@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FlowStateTheme {
-                // Controlador de navegación de Compose
+                // Compose navigation controller
                 val navController = rememberNavController()
 
                 Scaffold(
@@ -59,21 +59,21 @@ class MainActivity : ComponentActivity() {
                         FlowBottomBar(navController = navController)
                     }
                 ) { innerPadding ->
-                    // Host de navegación: decide qué pantalla mostrar
-                    // basado en la ruta (route)
+                    // Navigation host: decides which screen to show
+                    // based on the route
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Tasks.route, // Empezamos en Tareas
+                        startDestination = Screen.Tasks.route, // Starting in Tasks
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        // --- Aquí definimos cada pantalla ---
+                        // --- Here we define each screen ---
                         composable(Screen.Tasks.route) {
                             val taskViewModel: TaskViewModel = hiltViewModel()
-                            // Pasamos el ViewModel a la pantalla de tareas
+                            // We pass the ViewModel to the tasks screen
                             TaskScreen(viewModel = taskViewModel)
                         }
                         composable(Screen.Habits.route) {
-                            // Temporalmente un placeholder
+                            // Temporarily a placeholder
                             PlaceholderScreen(stringResource(com.markel.flowstate.feature.tasks.R.string.habits))
                         }
                         composable(Screen.Mood.route) {
@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun FlowBottomBar(navController: NavHostController) {
-    // Obtenemos la ruta actual para saber qué item seleccionar
+    // We get the current route to know which item to select
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -100,9 +100,9 @@ fun FlowBottomBar(navController: NavHostController) {
                 label = { Text(label) },
                 selected = currentRoute == screen.route,
                 onClick = {
-                    // Navega a la nueva pantalla
+                    // Navigate to the new screen
                     navController.navigate(screen.route) {
-                        // Evita acumular pantallas en el back stack
+                        // Avoid accumulating screens in the back stack
                         popUpTo(navController.graph.startDestinationId) {
                             saveState = true
                         }
@@ -115,7 +115,7 @@ fun FlowBottomBar(navController: NavHostController) {
     }
 }
 
-// Composable simple para las pantallas que aún no hemos hecho
+// Simple Composable for screens we haven't made yet
 @Composable
 fun PlaceholderScreen(text: String) {
     Column(

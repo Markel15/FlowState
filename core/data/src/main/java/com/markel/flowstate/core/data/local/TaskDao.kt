@@ -12,14 +12,14 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * DAO (Data Access Object)
- * Esta interfaz define CÓMO hablamos con la base de datos.
- * Room escribirá el código por nosotros gracias a estas anotaciones.
+ * This interface defines HOW we talk to the database.
+ * Room will write the code for us thanks to these annotations.
  */
 @Dao
 interface TaskDao {
 
-    // "Upsert" = "Update" (actualizar) o "Insert" (insertar).
-    // Si la tarea ya existe, la actualiza. Si es nueva, la crea.
+    // "Upsert" = "Update" or "Insert".
+    // If the task already exists, it updates it. If it's new, it creates it.
     @Upsert
     suspend fun upsertTaskEntity(task: TaskEntity): Long
 
@@ -33,28 +33,28 @@ interface TaskDao {
     suspend fun deleteTaskEntity(task: TaskEntity)
 
     /**
-     * Esta función maneja la lógica completa de guardar una tarea con sus subtareas
-     * Al ser @Transaction, si algo falla, no se guarda nada (integridad total)
+     * This function handles the complete logic of saving a task with its subtasks
+     * Being @Transaction, if something fails, nothing is saved (total integrity)
      */
     @Transaction
     suspend fun upsertTaskWithSubTasks(task: TaskEntity, subTasks: List<SubTaskEntity>) {
-        // 1. Guardamos/Actualizamos el padre.
+        // 1. We save/update the parent.
         val rowId = upsertTaskEntity(task)
 
-        // Esta nueva lógica evita errores cuando upsertTaskEntity devuelve valores inesperados de FK (normalmente cuando no ha cambiado nada de la tarea principal)
+        // This new logic avoids errors when upsertTaskEntity returns unexpected FK values (normally when nothing has changed in the main task)
         val taskId = if (task.id == 0) rowId.toInt() else task.id
 
-        // 2. Borramos las subtareas antiguas para evitar duplicados o "fantasmas"
+        // 2. We delete the old subtasks to avoid duplicates or "ghosts"
         deleteSubTasksByTaskId(taskId)
 
-        // 3. Asignamos el ID de la tarea a las subtareas y las insertamos
+        // 3. We assign the task ID to the subtasks and insert them
         val subTasksWithId = subTasks.map { it.copy(taskId = taskId) }
         insertSubTasks(subTasksWithId)
     }
 
-    // Pide todas las tareas ordenadas
-    // "Flow" significa que si algo cambia en la tabla, la UI se actualizará automáticamente.
-    @Transaction // Necesario porque Room hace 2 consultas internamente ya que el método devuelve una clase que contiene un campo con @Relation
+    // Requests all ordered tasks
+    // "Flow" means that if something changes in the table, the UI will automatically update.
+    @Transaction // Necessary because Room makes 2 internal queries since the method returns a class that contains a field with @Relation
     @Query("SELECT * FROM tasks ORDER BY position ASC")
     fun getTasks(): Flow<List<TaskWithSubTasks>>
 

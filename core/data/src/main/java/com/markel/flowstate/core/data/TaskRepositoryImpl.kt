@@ -13,15 +13,15 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /**
- * Esta es la implementación REAL del repositorio.
- * Vive en :core:data porque CONOCE la capa de datos (el DAO).
- * Su trabajo es:
- * 1. Recibir órdenes del ViewModel (a través de la interfaz TaskRepository).
- * 2. Hablar con el DAO (TaskDao).
- * 3. Mapear (convertir) los modelos de datos (TaskEntity) a modelos de dominio (Task) y viceversa.
+ * This is the REAL implementation of the repository.
+ * It lives in :core:data because it KNOWS the data layer (the DAO).
+ * Its job is to:
+ * 1. Receive orders from the ViewModel (through the TaskRepository interface).
+ * 2. Talk to the DAO (TaskDao).
+ * 3. Map (convert) data models (TaskEntity) to domain models (Task) and vice versa.
  */
 class TaskRepositoryImpl @Inject constructor(
-    private val dao: TaskDao // Recibirá el DAO por inyección de dependencias
+    private val dao: TaskDao // It will receive the DAO through dependency injection
 ) : TaskRepository {
 
     override fun getTasks(): Flow<List<Task>> {
@@ -35,16 +35,16 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     override suspend fun upsertTask(task: Task) {
-        // Descomponemos el objeto de Dominio en Entidad Padre + Entidades Hijas
+        // We break down the Domain object into Parent Entity + Child Entities
         val taskEntity = task.toEntity()
         val subTaskEntities = task.subTasks.map { it.toEntity(taskId = task.id) }
 
-        // Delegamos la transacción compleja al DAO
+        // We delegate the complex transaction to the DAO
         dao.upsertTaskWithSubTasks(taskEntity, subTaskEntities)
     }
 
     override suspend fun deleteTask(task: Task) {
-        // Al borrar el padre, el CASCADE de la DB borrará los hijos automáticamente
+        // When deleting the parent, the DB's CASCADE will automatically delete the children
         dao.deleteTaskEntity(task.toEntity())
     }
 
@@ -53,8 +53,8 @@ class TaskRepositoryImpl @Inject constructor(
         dao.updateTasks(entities)
     }
 
-    // --- FUNCIONES DE MAPEO ---
-    // Estas funciones convierten entre el modelo de DB y el modelo de Dominio
+    // --- MAPPING FUNCTIONS ---
+    // These functions convert between the DB model and the Domain model
 
     private fun TaskWithSubTasks.toDomain(): Task {
         val priorityEnum = Priority.entries.getOrElse(this.task.priority) { Priority.NOTHING }
