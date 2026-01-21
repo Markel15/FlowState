@@ -39,7 +39,7 @@
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/flowstate.git
+   git clone https://github.com/Markel15/flowstate.git
    cd flowstate
   
 2. **Open in Android Studio**
