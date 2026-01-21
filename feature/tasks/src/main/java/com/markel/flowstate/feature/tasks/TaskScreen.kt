@@ -5,16 +5,19 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
@@ -176,7 +180,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
             ModalBottomSheet(
                 onDismissRequest = { showSheet = false },
                 sheetState = sheetState,
-                dragHandle = if (taskToEdit == null) null else { { BottomSheetDefaults.DragHandle() } },
+                dragHandle = { if (taskToEdit == null) null else Spacer(modifier = Modifier.height(28.dp)) },
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = if (taskToEdit == null) RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
@@ -450,100 +454,130 @@ fun TaskEditorSheetContent(
         }
     }
 
-    Column(
+    LazyColumn (
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
-        // TASK
-        TextField(
-            value = title,
-            onValueChange = { title = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            placeholder = { Text(stringResource(R.string.edit_task_placeholder), style = MaterialTheme.typography.headlineSmall) },
-            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            maxLines = 3,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
-        )
-
-        TextField(
-            value = description,
-            onValueChange = { description = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.edit_task_desc_placeholder), style = MaterialTheme.typography.bodyLarge) },
-            textStyle = MaterialTheme.typography.bodyLarge,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            minLines = 4,
-            maxLines = 10,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Box(modifier = Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh))
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // SUBTASKS
-        Text(
-            stringResource(R.string.subtasks),
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp),
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        subTasks.forEachIndexed { index, subTask ->
-            SubTaskRow(
-                subTask = subTask,
-                onRemove = { subTasks.removeAt(index) },
-                onTitleChange = { newTitle -> subTasks[index] = subTask.copy(title = newTitle) },
-                onToggleDone = {
-                    subTasks[index] = subTask.copy(isDone = !subTask.isDone)
-                }
+        item{
+            // TASK
+            TextField(
+                value = title,
+                onValueChange = { title = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                placeholder = {
+                    Text(
+                        stringResource(R.string.edit_task_placeholder),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                },
+                textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Next
+                )
             )
-        }
 
-        AddSubTaskRow(onAdd = { newTitle -> subTasks.add(SubTask(title = newTitle)) })
+            TextField(
+                value = description,
+                onValueChange = { description = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        stringResource(R.string.edit_task_desc_placeholder),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                },
+                textStyle = MaterialTheme.typography.bodyLarge,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().height(8.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            IconButton(onClick = {
-                val nextPriority = when(priority) {
-                    Priority.NOTHING -> Priority.LOW
-                    Priority.LOW -> Priority.MEDIUM
-                    Priority.MEDIUM -> Priority.HIGH
-                    Priority.HIGH -> Priority.NOTHING
-                }
-                priority = nextPriority
-            }) {
-                Icon(
-                    imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
-                    contentDescription = "Priority",
-                    tint = getPriorityColor(priority)
+            // SUBTASKS
+            Text(
+                stringResource(R.string.subtasks),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            subTasks.forEachIndexed { index, subTask ->
+                SubTaskRow(
+                    subTask = subTask,
+                    onRemove = { subTasks.removeAt(index) },
+                    onTitleChange = { newTitle ->
+                        subTasks[index] = subTask.copy(title = newTitle)
+                    },
+                    onToggleDone = {
+                        subTasks[index] = subTask.copy(isDone = !subTask.isDone)
+                    }
                 )
             }
-            IconButton(onClick = { /* TODO: Implement Date */ }) { Icon(Icons.Sharp.DateRange, "Date") }
-            IconButton(onClick = { /* TODO: Implement Formatting */ }) { Icon(Icons.Sharp.Create, "Format") }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            AddSubTaskRow(onAdd = { newTitle -> subTasks.add(SubTask(title = newTitle)) })
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = {
+                    val nextPriority = when (priority) {
+                        Priority.NOTHING -> Priority.LOW
+                        Priority.LOW -> Priority.MEDIUM
+                        Priority.MEDIUM -> Priority.HIGH
+                        Priority.HIGH -> Priority.NOTHING
+                    }
+                    priority = nextPriority
+                }) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
+                        contentDescription = "Priority",
+                        tint = getPriorityColor(priority)
+                    )
+                }
+                IconButton(onClick = { /* TODO: Implement Date */ }) {
+                    Icon(
+                        Icons.Sharp.DateRange,
+                        "Date"
+                    )
+                }
+                IconButton(onClick = { /* TODO: Implement Formatting */ }) {
+                    Icon(
+                        Icons.Sharp.Create,
+                        "Format"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
     }
 
     LaunchedEffect(Unit) {
