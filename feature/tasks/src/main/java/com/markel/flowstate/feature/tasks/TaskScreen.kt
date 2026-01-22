@@ -306,8 +306,8 @@ fun TaskCreationSheetContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester),
-            placeholder = { Text(stringResource(R.string.new_task_placeholder), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))) },
-            textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            placeholder = { Text(stringResource(R.string.new_task_placeholder), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))) },
+            textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
@@ -454,14 +454,21 @@ fun TaskEditorSheetContent(
         }
     }
 
-    LazyColumn (
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
             .imePadding()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .navigationBarsPadding()
     ) {
-        item{
+        val scrollState = rememberScrollState()
+        Column (
+            modifier = Modifier
+                .weight(1f, fill = false)  // fill = false allows it to shrink if content is small
+                .fillMaxWidth()
+                .imePadding()
+                .padding(horizontal = 24.dp)
+                .verticalScroll(scrollState)
+        ) {
+
             // TASK
             TextField(
                 value = title,
@@ -472,10 +479,10 @@ fun TaskEditorSheetContent(
                 placeholder = {
                     Text(
                         stringResource(R.string.edit_task_placeholder),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
-                textStyle = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Medium),
+                textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -541,11 +548,17 @@ fun TaskEditorSheetContent(
 
             AddSubTaskRow(onAdd = { newTitle -> subTasks.add(SubTask(title = newTitle)) })
 
-            Spacer(modifier = Modifier.height(16.dp))
-
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        Surface(
+            tonalElevation = 2.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerLow
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 IconButton(onClick = {
                     val nextPriority = when (priority) {
@@ -559,27 +572,27 @@ fun TaskEditorSheetContent(
                     Icon(
                         imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
                         contentDescription = "Priority",
-                        tint = getPriorityColor(priority)
+                        tint = getPriorityColor(priority),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 IconButton(onClick = { /* TODO: Implement Date */ }) {
                     Icon(
                         Icons.Sharp.DateRange,
-                        "Date"
+                        "Date",
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 IconButton(onClick = { /* TODO: Implement Formatting */ }) {
                     Icon(
                         Icons.Sharp.Create,
-                        "Format"
+                        "Format",
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
-
     LaunchedEffect(Unit) {
         delay(100)
         if (isNewTask) focusRequester.requestFocus()
