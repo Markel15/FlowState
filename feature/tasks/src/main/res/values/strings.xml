@@ -18,4 +18,8 @@
     <string name="mood">Mood</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="today">Today</string>
+    <string name="clear_cal">Clear</string>
 </resources>

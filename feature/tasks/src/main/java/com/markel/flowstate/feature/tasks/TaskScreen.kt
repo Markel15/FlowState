@@ -301,7 +301,6 @@ fun TaskCreationSheetContent(
     onSave: (String, String, Priority, Long?) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    var showDatePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -349,20 +348,6 @@ fun TaskCreationSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (dueDate != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SuggestionChip(
-                onClick = { showDatePicker = true },
-                label = { Text(formatDate(dueDate)) },
-                icon = { Icon(Icons.Sharp.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = SuggestionChipDefaults.suggestionChipColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            )
-        }
-
         // Action Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -370,7 +355,11 @@ fun TaskCreationSheetContent(
         ) {
             // Utility icons on the left
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { showDatePicker = true }) { Icon(Icons.Sharp.DateRange, "Date", tint = if(dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                DateSelector(
+                    dueDate = dueDate,
+                    onDueDateChange = onDueDateChange,
+                    showLabel = true
+                )
                 IconButton(onClick = {
                     val nextPriority = when(priority) {
                         Priority.NOTHING -> Priority.LOW
@@ -406,30 +395,6 @@ fun TaskCreationSheetContent(
         }
     }
 
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueDate ?: System.currentTimeMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDatePicker = false
-                        onDueDateChange(datePickerState.selectedDateMillis)
-                    }
-                ) {
-                    Text(stringResource(R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
     LaunchedEffect(Unit) {
         delay(100)
         focusRequester.requestFocus()
@@ -452,7 +417,6 @@ fun TaskEditorSheetContent(
             addAll(task?.subTasks ?: emptyList())
         }
     }
-    var showDatePicker by remember { mutableStateOf(false) }
 
     // Checkpoints to track what was actually last saved
     var lastSavedTitle by remember { mutableStateOf(title) }
@@ -570,15 +534,6 @@ fun TaskEditorSheetContent(
                 ),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
             )
-            if (dueDate != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                SuggestionChip(
-                    onClick = { showDatePicker = true },
-                    label = { Text(formatDate(dueDate)) },
-                    icon = { Icon(Icons.Sharp.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    modifier = Modifier.padding(start = 12.dp)
-                )
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
             Box(
@@ -641,14 +596,12 @@ fun TaskEditorSheetContent(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                IconButton(onClick = { showDatePicker = true }) {
-                    Icon(
-                        Icons.Sharp.DateRange,
-                        "Date",
-                        modifier = Modifier.size(20.dp),
-                        tint = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                DateSelector(
+                    dueDate = dueDate,
+                    onDueDateChange = { dueDate = it },
+                    modifier = Modifier,
+                    showLabel = true
+                )
                 IconButton(onClick = { /* TODO: Implement Formatting */ }) {
                     Icon(
                         Icons.Sharp.Create,
@@ -657,29 +610,6 @@ fun TaskEditorSheetContent(
                     )
                 }
             }
-        }
-    }
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueDate ?: System.currentTimeMillis())
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDatePicker = false
-                        dueDate = datePickerState.selectedDateMillis
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
     LaunchedEffect(Unit) {
@@ -1040,19 +970,30 @@ fun TaskItemContent(
                         if (hasDate) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.graphicsLayer { alpha = 0.72f }
                             ) {
                                 Icon(
                                     imageVector = Icons.Sharp.DateRange,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = dueDate.let { date ->
+                                        if (isDateOverdue(date)) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        }
+                                    }
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = formatDate(dueDate),
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = dueDate.let { date ->
+                                        if (isDateOverdue(date)) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -1169,14 +1110,123 @@ fun getPriorityColor(priority: Priority): Color {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DateSelector(
+    dueDate: Long?,
+    onDueDateChange: (Long?) -> Unit,
+    modifier: Modifier = Modifier,
+    showLabel: Boolean = true
+) {
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = dueDate ?: System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (dueDate != null) {
+                        TextButton(
+                            onClick = {
+                                showDatePicker = false
+                                onDueDateChange(null)
+                            }
+                        ) {
+                            Text(stringResource(R.string.clear_cal))
+                        }
+                    }
+
+                    TextButton(onClick = { showDatePicker = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+
+                    TextButton(
+                        onClick = {
+                            showDatePicker = false
+                            onDueDateChange(datePickerState.selectedDateMillis)
+                        }
+                    ) {
+                        Text(stringResource(R.string.ok))
+                    }
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (dueDate != null && showLabel) {
+        AssistChip(
+            onClick = { showDatePicker = true },
+            label = {
+                Text(
+                    formatDate(dueDate),
+                    color = if (isDateOverdue(dueDate)) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    Icons.Sharp.DateRange,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (isDateOverdue(dueDate)) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
+            },
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = if (isDateOverdue(dueDate)) {
+                    MaterialTheme.colorScheme.errorContainer
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                }
+            ),
+            modifier = modifier
+        )
+    } else {
+        IconButton(
+            onClick = { showDatePicker = true },
+            modifier = modifier
+        ) {
+            Icon(
+                Icons.Sharp.DateRange,
+                "Date",
+                tint = if (dueDate != null) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+fun isDateOverdue(timestamp: Long): Boolean {
+    val date = Instant.ofEpochMilli(timestamp)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+    val today = LocalDate.now()
+    return date.isBefore(today)
+}
+@Composable
 fun formatDate(timestamp: Long?): String {
     if (timestamp == null) return ""
     val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
     val today = LocalDate.now()
 
     return when(date) {
-        today -> "Today"
-        today.plusDays(1) -> "Tomorrow"
+        today -> stringResource(R.string.today)
+        today.plusDays(1) -> stringResource(R.string.tomorrow)
+        today.minusDays(1) -> stringResource(R.string.yesterday)
         else -> DateTimeFormatter.ofPattern("d MMM").format(date)
     }
 }

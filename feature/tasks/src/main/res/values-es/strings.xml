@@ -18,4 +18,8 @@
     <string name="mood">Ánimo</string>
     <string name="ok">Listo</string>
     <string name="cancel">Cancelar</string>
+    <string name="tomorrow">Mañana</string>
+    <string name="yesterday">Ayer</string>
+    <string name="today">Hoy</string>
+    <string name="clear_cal">Limpiar</string>
 </resources>
