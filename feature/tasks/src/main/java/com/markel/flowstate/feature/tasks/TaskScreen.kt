@@ -63,7 +63,10 @@ import com.markel.flowstate.core.designsystem.theme.priority
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -94,6 +97,7 @@ fun TaskScreen(viewModel: TaskViewModel) {
     var draftTitle by rememberSaveable { mutableStateOf("") }
     var draftDescription by rememberSaveable { mutableStateOf("") }
     var draftPriority by rememberSaveable { mutableStateOf(Priority.NOTHING)}
+    var draftDueDate by rememberSaveable { mutableStateOf<Long?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -193,11 +197,14 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         onDescriptionChange = { draftDescription = it },
                         priority = draftPriority,
                         onPriorityChange = { draftPriority = it },
-                        onSave = { title, desc, prio ->
-                            viewModel.addTask(title, desc, prio, emptyList())
+                        dueDate = draftDueDate,
+                        onDueDateChange = { draftDueDate = it },
+                        onSave = { title, desc, prio, date ->
+                            viewModel.addTask(title, desc, prio, date, emptyList())
                             draftTitle = ""
                             draftDescription = ""
                             draftPriority = Priority.NOTHING
+                            draftDueDate = null
                             showSheet = false
                         }
                     )
@@ -206,8 +213,8 @@ fun TaskScreen(viewModel: TaskViewModel) {
                     // --- EDITION MODE ---
                     TaskEditorSheetContent(
                         task = taskToEdit,
-                        onAutoUpdate = { title, desc, priority, subTasks ->
-                            viewModel.updateTask(taskToEdit!!, title, desc, priority, subTasks)
+                        onAutoUpdate = { title, desc, priority, dueDate, subTasks ->
+                            viewModel.updateTask(taskToEdit!!, title, desc, priority, dueDate, subTasks)
                         }
                     )
                 }
@@ -225,7 +232,7 @@ fun DynamicHeader(isMinimized: Boolean) {
     }
 
     val dateText = DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.getDefault())
-        .format(java.time.LocalDate.now())
+        .format(LocalDate.now())
         .uppercase()
 
     val headerHeight by animateDpAsState(
@@ -280,6 +287,7 @@ fun DynamicHeader(isMinimized: Boolean) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskCreationSheetContent(
     title: String,
@@ -288,9 +296,12 @@ fun TaskCreationSheetContent(
     onDescriptionChange: (String) -> Unit,
     priority: Priority,
     onPriorityChange: (Priority) -> Unit,
-    onSave: (String, String, Priority) -> Unit
+    dueDate: Long?,
+    onDueDateChange: (Long?) -> Unit,
+    onSave: (String, String, Priority, Long?) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -338,6 +349,20 @@ fun TaskCreationSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (dueDate != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            SuggestionChip(
+                onClick = { showDatePicker = true },
+                label = { Text(formatDate(dueDate)) },
+                icon = { Icon(Icons.Sharp.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                colors = SuggestionChipDefaults.suggestionChipColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    iconContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            )
+        }
+
         // Action Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -345,7 +370,7 @@ fun TaskCreationSheetContent(
         ) {
             // Utility icons on the left
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                IconButton(onClick = { }) { Icon(Icons.Sharp.DateRange, "Date", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                IconButton(onClick = { showDatePicker = true }) { Icon(Icons.Sharp.DateRange, "Date", tint = if(dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                 IconButton(onClick = {
                     val nextPriority = when(priority) {
                         Priority.NOTHING -> Priority.LOW
@@ -367,7 +392,7 @@ fun TaskCreationSheetContent(
 
             // Send Button
             FilledIconButton(
-                onClick = { if (title.isNotBlank()) onSave(title, description, priority) },
+                onClick = { if (title.isNotBlank()) onSave(title, description, priority, dueDate) },
                 enabled = title.isNotBlank(),
                 modifier = Modifier.size(44.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -381,55 +406,85 @@ fun TaskCreationSheetContent(
         }
     }
 
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueDate ?: System.currentTimeMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                        onDueDateChange(datePickerState.selectedDateMillis)
+                    }
+                ) {
+                    Text(stringResource(R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     LaunchedEffect(Unit) {
         delay(100)
         focusRequester.requestFocus()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskEditorSheetContent(
     task: Task?,
-    onAutoUpdate: (String, String, Priority, List<SubTask>) -> Unit
+    onAutoUpdate: (String, String, Priority, Long?, List<SubTask>) -> Unit
 ) {
     val isNewTask = remember { task == null }
     var title by remember { mutableStateOf(task?.title ?: "") }
     var description by remember { mutableStateOf(task?.description ?: "") }
     var priority by remember { mutableStateOf(task?.priority ?: Priority.NOTHING) }
+    var dueDate by remember { mutableStateOf(task?.dueDate) }
     val subTasks = remember {
         mutableStateListOf<SubTask>().apply {
             addAll(task?.subTasks ?: emptyList())
         }
     }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     // Checkpoints to track what was actually last saved
     var lastSavedTitle by remember { mutableStateOf(title) }
     var lastSavedDesc by remember { mutableStateOf(description) }
     var lastSavedPriority by remember { mutableStateOf(priority) }
+    var lastSavedDueDate by remember { mutableStateOf(dueDate) }
     var lastSavedSubTasksHash by remember { mutableIntStateOf(subTasks.toList().hashCode()) }
 
     val focusRequester = remember { FocusRequester() }
 
     // TIME-BASED AUTOSAVE (DEBOUNCE)
     if (!isNewTask) {
-        LaunchedEffect(title, description, priority, subTasks.toList().hashCode()) {
+        LaunchedEffect(title, description, priority, dueDate, subTasks.toList().hashCode()) {
             val currentSubTasksHash = subTasks.toList().hashCode()
 
             val hasChanges = title != lastSavedTitle ||
                     description != lastSavedDesc ||
                     priority != lastSavedPriority ||
+                    dueDate != lastSavedDueDate ||
                     currentSubTasksHash != lastSavedSubTasksHash
 
             if (hasChanges && title.isNotBlank()) {
                 delay(600)
 
                 // Save
-                onAutoUpdate(title, description, priority, subTasks.toList())
+                onAutoUpdate(title, description, priority, dueDate, subTasks.toList())
 
                 // Update references
                 lastSavedTitle = title
                 lastSavedDesc = description
                 lastSavedPriority = priority
+                lastSavedDueDate = dueDate
                 lastSavedSubTasksHash = currentSubTasksHash
             }
         }
@@ -445,10 +500,11 @@ fun TaskEditorSheetContent(
                 val hasPendingChanges = title != lastSavedTitle ||
                         description != lastSavedDesc ||
                         priority != lastSavedPriority ||
+                        dueDate != lastSavedDueDate ||
                         currentSubTasksHash != lastSavedSubTasksHash
 
                 if (hasPendingChanges && title.isNotBlank()) {
-                    onAutoUpdate(title, description, priority, subTasks.toList())
+                    onAutoUpdate(title, description, priority,  dueDate, subTasks.toList())
                 }
             }
         }
@@ -514,6 +570,15 @@ fun TaskEditorSheetContent(
                 ),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
             )
+            if (dueDate != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                SuggestionChip(
+                    onClick = { showDatePicker = true },
+                    label = { Text(formatDate(dueDate)) },
+                    icon = { Icon(Icons.Sharp.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    modifier = Modifier.padding(start = 12.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
             Box(
@@ -576,11 +641,12 @@ fun TaskEditorSheetContent(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                IconButton(onClick = { /* TODO: Implement Date */ }) {
+                IconButton(onClick = { showDatePicker = true }) {
                     Icon(
                         Icons.Sharp.DateRange,
                         "Date",
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp),
+                        tint = if (dueDate != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = { /* TODO: Implement Formatting */ }) {
@@ -591,6 +657,29 @@ fun TaskEditorSheetContent(
                     )
                 }
             }
+        }
+    }
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueDate ?: System.currentTimeMillis())
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDatePicker = false
+                        dueDate = datePickerState.selectedDateMillis
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
     LaunchedEffect(Unit) {
@@ -724,6 +813,7 @@ fun AnimatableTaskItem(
                 subTasks = task.subTasks,
                 isDone = isChecked,
                 priority = task.priority,
+                dueDate = task.dueDate,
                 onClicked = onContentClick,
                 onCheckClicked = {
                     isChecked = true
@@ -818,6 +908,7 @@ fun TaskItemContent(
     subTasks: List<SubTask> = emptyList(),
     isDone: Boolean,
     priority: Priority = Priority.NOTHING,
+    dueDate: Long? = null,
     onClicked: () -> Unit,
     onCheckClicked: () -> Unit
 ) {
@@ -917,8 +1008,10 @@ fun TaskItemContent(
                 }
                 val total = subTasks.size
                 val completed = subTasks.count { it.isDone }
+                val hasSubtasks = total > 0 && completed < total
+                val hasDate = dueDate != null
 
-                if (total > 0 && completed < total) {
+                if (hasSubtasks || hasDate) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -926,18 +1019,43 @@ fun TaskItemContent(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.graphicsLayer { alpha = 0.72f }
                     ) {
-                        Icon(
-                            imageVector = ImageVector.vectorResource(id = R.drawable.subtask_24px),
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "$completed/$total",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (hasSubtasks) {
+                            Icon(
+                                imageVector = ImageVector.vectorResource(id = R.drawable.subtask_24px),
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "$completed/$total",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (hasSubtasks && hasDate) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                        }
+
+                        if (hasDate) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.graphicsLayer { alpha = 0.72f }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Sharp.DateRange,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatDate(dueDate),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1048,5 +1166,17 @@ fun getPriorityColor(priority: Priority): Color {
         Priority.MEDIUM -> MaterialTheme.priority.mediumPriority
         Priority.LOW -> MaterialTheme.priority.lowPriority
         Priority.NOTHING -> MaterialTheme.priority.noPriority
+    }
+}
+
+fun formatDate(timestamp: Long?): String {
+    if (timestamp == null) return ""
+    val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+    val today = LocalDate.now()
+
+    return when(date) {
+        today -> "Today"
+        today.plusDays(1) -> "Tomorrow"
+        else -> DateTimeFormatter.ofPattern("d MMM").format(date)
     }
 }

@@ -47,7 +47,7 @@ class TaskViewModel  @Inject constructor(
     }
 
     // Function to add a new task
-    fun addTask(title: String, description: String, priority: Priority, subTasks: List<SubTask>) {
+    fun addTask(title: String, description: String, priority: Priority, dueDate: Long?, subTasks: List<SubTask>) {
         if (title.isBlank()) return
         viewModelScope.launch {
             val currentTasks = (uiState.value as? TasksUiState.Success)?.tasks ?: emptyList()
@@ -59,6 +59,7 @@ class TaskViewModel  @Inject constructor(
                 isDone = false,
                 position = minPosition - 1,
                 priority = priority,
+                dueDate = dueDate,
                 subTasks = subTasks
             )
             repository.upsertTask(newTask)
@@ -66,7 +67,7 @@ class TaskViewModel  @Inject constructor(
     }
 
     // Function to edit an existing task
-    fun updateTask(originalTask: Task, newTitle: String, newDescription: String, newPriority: Priority, newSubTasks: List<SubTask>) {
+    fun updateTask(originalTask: Task, newTitle: String, newDescription: String, newPriority: Priority, newDueDate: Long?, newSubTasks: List<SubTask>) {
         if (newTitle.isBlank()) return
         viewModelScope.launch {
             repository.upsertTask(
@@ -74,6 +75,7 @@ class TaskViewModel  @Inject constructor(
                     title = newTitle,
                     description = newDescription,
                     priority = newPriority,
+                    dueDate = newDueDate,
                     subTasks = newSubTasks
                 )
             )

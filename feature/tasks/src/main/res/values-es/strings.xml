@@ -16,4 +16,6 @@
     <string name="tasks">Tareas</string>
     <string name="habits">Hábitos</string>
     <string name="mood">Ánimo</string>
+    <string name="ok">Listo</string>
+    <string name="cancel">Cancelar</string>
 </resources>

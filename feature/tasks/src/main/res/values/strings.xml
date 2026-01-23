@@ -16,4 +16,6 @@
     <string name="tasks">Tasks</string>
     <string name="habits">Habits</string>
     <string name="mood">Mood</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
 </resources>

@@ -23,6 +23,7 @@ data class Task(
     val isDone: Boolean,
     val position: Int = 0,
     val priority: Priority = Priority.NOTHING,
+    val dueDate: Long? = null,
     val subTasks: List<SubTask> = emptyList()
     // Other domain fields would go here, such as:
     // priority: Priority,
