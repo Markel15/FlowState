@@ -947,20 +947,19 @@ fun TaskItemContent(
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.graphicsLayer { alpha = 0.72f }
                     ) {
                         if (hasSubtasks) {
                             Icon(
                                 imageVector = ImageVector.vectorResource(id = R.drawable.subtask_24px),
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "$completed/$total",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
                             )
                         }
                         if (hasSubtasks && hasDate) {
