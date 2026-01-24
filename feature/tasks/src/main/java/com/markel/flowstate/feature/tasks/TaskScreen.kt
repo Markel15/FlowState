@@ -269,7 +269,7 @@ fun DynamicHeader(isMinimized: Boolean) {
                 text = dateText,
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
                 ),
                 modifier = Modifier
                     .align(if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd)
@@ -384,7 +384,7 @@ fun TaskCreationSheetContent(
                 onClick = { if (title.isNotBlank()) onSave(title, description, priority, dueDate) },
                 enabled = title.isNotBlank(),
                 modifier = Modifier.size(44.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.tertiary)
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(R.drawable.send),
@@ -549,7 +549,7 @@ fun TaskEditorSheetContent(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.sp
                 ),
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.tertiary
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -643,14 +643,14 @@ fun ExpandableFabMenu(
             exit = fadeOut() + shrinkVertically()
         ) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                FabOption(stringResource(R.string.idea), ImageVector.vectorResource(R.drawable.lightbulb_24px), MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, onIdeaClick)
+                FabOption(stringResource(R.string.idea), ImageVector.vectorResource(R.drawable.lightbulb_24px), MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer, onIdeaClick)
                 FabOption(stringResource(R.string.task), Icons.Default.Check, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, onTaskClick)
             }
         }
 
         FloatingActionButton(
             onClick = onToggle,
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.tertiary,
             shape = RoundedCornerShape(16.dp)
         ) {
             Icon(Icons.Default.Add, "Menu", modifier = Modifier.rotate(rotation))
@@ -886,7 +886,7 @@ fun TaskItemContent(
                         R.drawable.radio_button_unchecked_24px
                     ),
                     contentDescription = null,
-                    tint = if (isDone) MaterialTheme.colorScheme.primary else if (priority == Priority.NOTHING) MaterialTheme.colorScheme.onSurface.copy(
+                    tint = if (isDone) MaterialTheme.colorScheme.tertiary else if (priority == Priority.NOTHING) MaterialTheme.colorScheme.onSurface.copy(
                         alpha = 0.4f
                     ) else priorityColor,
                     modifier = Modifier
@@ -979,7 +979,7 @@ fun TaskItemContent(
                                         if (isDateOverdue(date)) {
                                             MaterialTheme.colorScheme.error
                                         } else {
-                                            MaterialTheme.colorScheme.primary
+                                            MaterialTheme.colorScheme.tertiary
                                         }
                                     }
                                 )
@@ -991,7 +991,7 @@ fun TaskItemContent(
                                         if (isDateOverdue(date)) {
                                             MaterialTheme.colorScheme.error
                                         } else {
-                                            MaterialTheme.colorScheme.primary
+                                            MaterialTheme.colorScheme.tertiary
                                         }
                                     }
                                 )
@@ -1022,7 +1022,7 @@ fun SubTaskRow(
             else
                 ImageVector.vectorResource(R.drawable.radio_button_unchecked_24px),
             contentDescription = null,
-            tint = if (subTask.isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            tint = if (subTask.isDone) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outline,
             modifier = Modifier
                 .size(24.dp)
                 .clip(CircleShape)
@@ -1071,7 +1071,7 @@ fun AddSubTaskRow(onAdd: (String) -> Unit) {
         Icon(
             Icons.Rounded.Add,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.tertiary,
             modifier = Modifier.size(20.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -1170,7 +1170,7 @@ fun DateSelector(
                     color = if (isDateOverdue(dueDate)) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onTertiary
                     }
                 )
             },
@@ -1182,7 +1182,7 @@ fun DateSelector(
                     tint = if (isDateOverdue(dueDate)) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onTertiary
                     }
                 )
             },
@@ -1190,9 +1190,10 @@ fun DateSelector(
                 containerColor = if (isDateOverdue(dueDate)) {
                     MaterialTheme.colorScheme.errorContainer
                 } else {
-                    MaterialTheme.colorScheme.primaryContainer
+                    MaterialTheme.colorScheme.tertiary
                 }
             ),
+            border = null,
             modifier = modifier
         )
     } else {
@@ -1203,7 +1204,7 @@ fun DateSelector(
             Icon(
                 Icons.Sharp.DateRange,
                 "Date",
-                tint = if (dueDate != null) MaterialTheme.colorScheme.primary
+                tint = if (dueDate != null) MaterialTheme.colorScheme.tertiary
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
