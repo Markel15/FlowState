@@ -129,7 +129,6 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         }
                     }
                     is TasksUiState.Success -> {
-                        val listState = rememberLazyListState()
                         val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
                             viewModel.onReorder(from.index, to.index)
                         }
@@ -254,7 +253,11 @@ fun DynamicHeader(isMinimized: Boolean) {
             contentAlignment = Alignment.CenterStart
         ) {
             // The message is only rendered if it hasn't been minimized
-            if (!isMinimized) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isMinimized,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
                 Text(
                     text = stringResource(greeting),
                     style = MaterialTheme.typography.headlineMedium.copy(
@@ -264,20 +267,24 @@ fun DynamicHeader(isMinimized: Boolean) {
                 )
             }
 
-            // The date slides to the left/top smoothly
-            Text(
-                text = dateText,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier
-                    .align(if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd)
-                    .animateContentSize() // Smooths the alignment change
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd
+            ) {
+                Text(
+                    text = dateText,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .align(if (isMinimized) Alignment.CenterStart else Alignment.BottomEnd)
+                        .animateContentSize() // Smooths the alignment change
+                )
+            }
         }
 
-        if (isMinimized) {
+        AnimatedVisibility(visible = isMinimized) {
             HorizontalDivider(
                 modifier = Modifier.padding(top = 8.dp),
                 thickness = 0.5.dp,
