@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -92,25 +95,40 @@ fun FlowBottomBar(navController: NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    NavigationBar {
-        bottomNavItems.forEach { screen ->
-            val label = stringResource(screen.labelRes)
-            NavigationBarItem(
-                icon = { Icon(screen.icon, contentDescription = label) },
-                label = { Text(label) },
-                selected = currentRoute == screen.route,
-                onClick = {
-                    // Navigate to the new screen
-                    navController.navigate(screen.route) {
-                        // Avoid accumulating screens in the back stack
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Divider to separate bottom bar from content, both have the same surface color
+        HorizontalDivider(
+            thickness = 0.3.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+        NavigationBar(
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.height(110.dp)
+        ) {
+            bottomNavItems.forEach { screen ->
+                val label = stringResource(screen.labelRes)
+                NavigationBarItem(
+                    icon = { Icon(screen.icon, contentDescription = label) },
+                    label = { Text(label) },
+                    selected = currentRoute == screen.route,
+                    onClick = {
+                        // Navigate to the new screen
+                        navController.navigate(screen.route) {
+                            // Avoid accumulating screens in the back stack
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                }
-            )
+                    },
+                    colors = NavigationBarItemDefaults.colors(
+                        indicatorColor = Color.Transparent,
+                        selectedIconColor = MaterialTheme.colorScheme.tertiary,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                )
+            }
         }
     }
 }

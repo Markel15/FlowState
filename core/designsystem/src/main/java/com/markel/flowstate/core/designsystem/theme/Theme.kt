@@ -12,10 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 private val lightScheme = lightColorScheme(
     primary = primaryLight,
@@ -304,6 +307,15 @@ fun FlowStateTheme(
       else -> lightScheme
     }
     val priorityColorScheme = if (darkTheme) darkPriorityScheme else lightPriorityScheme
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        val darkMode = isSystemInDarkTheme()
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.navigationBarColor = colorScheme.surface.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkMode
+        }
+    }
 
     CompositionLocalProvider(
         values = arrayOf(LocalPriorityColors provides priorityColorScheme)
