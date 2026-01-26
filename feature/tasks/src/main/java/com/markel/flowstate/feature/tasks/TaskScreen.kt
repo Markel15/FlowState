@@ -5,7 +5,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,7 +42,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
@@ -60,6 +58,7 @@ import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.designsystem.theme.priority
+import com.markel.flowstate.feature.tasks.components.EmptyStateView
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -129,47 +128,50 @@ fun TaskScreen(viewModel: TaskViewModel) {
                         }
                     }
                     is TasksUiState.Success -> {
-                        val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
-                            viewModel.onReorder(from.index, to.index)
+                        if (state.tasks.isEmpty()) {
+                            EmptyStateView()
                         }
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 20.dp),
-                            contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
-                        ) {
-                            if (state.tasks.isEmpty()) {
-                                item { EmptyStateView() }
-                            }
-                            items(state.tasks, key = { it.id }) { task ->
-                                ReorderableItem(reorderableState, key = task.id) { isDragging ->
-                                    val scale by animateFloatAsState(
-                                        targetValue = if (isDragging) 1.05f else 1.0f,
-                                        label = "drag_scale"
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .longPressDraggableHandle(
-                                                interactionSource = remember { MutableInteractionSource() }
-                                            )
-                                            .graphicsLayer {
-                                                scaleX = scale
-                                                scaleY = scale
-                                                alpha = if (isDragging) 0.9f else 1.0f
-                                            }
-                                            .zIndex(if (isDragging) 1f else 0f)
-                                    ) {
-                                        AnimatableTaskItem(
-                                            task = task,
-                                            onDelete = { viewModel.deleteTask(task) },
-                                            onComplete = { viewModel.toggleTaskDone(task) },
-                                            onContentClick = {
-                                                taskToEdit = task // EDIT Mode
-                                                showSheet = true
-                                            }
+                        else {
+                            val reorderableState =
+                                rememberReorderableLazyListState(listState) { from, to ->
+                                    viewModel.onReorder(from.index, to.index)
+                                }
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 20.dp),
+                                contentPadding = PaddingValues(bottom = 100.dp, top = 8.dp)
+                            ) {
+                                items(state.tasks, key = { it.id }) { task ->
+                                    ReorderableItem(reorderableState, key = task.id) { isDragging ->
+                                        val scale by animateFloatAsState(
+                                            targetValue = if (isDragging) 1.05f else 1.0f,
+                                            label = "drag_scale"
                                         )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .longPressDraggableHandle(
+                                                    interactionSource = remember { MutableInteractionSource() }
+                                                )
+                                                .graphicsLayer {
+                                                    scaleX = scale
+                                                    scaleY = scale
+                                                    alpha = if (isDragging) 0.9f else 1.0f
+                                                }
+                                                .zIndex(if (isDragging) 1f else 0f)
+                                        ) {
+                                            AnimatableTaskItem(
+                                                task = task,
+                                                onDelete = { viewModel.deleteTask(task) },
+                                                onComplete = { viewModel.toggleTaskDone(task) },
+                                                onContentClick = {
+                                                    taskToEdit = task // EDIT Mode
+                                                    showSheet = true
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -678,17 +680,6 @@ fun FabOption(text: String, icon: ImageVector, containerColor: Color, contentCol
         SmallFloatingActionButton(onClick = onClick, containerColor = containerColor, contentColor = contentColor) {
             Icon(icon, text)
         }
-    }
-}
-
-@Composable
-fun EmptyStateView() {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 60.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(Icons.Default.Check, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.surfaceVariant)
-        Text(stringResource(R.string.clear), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
