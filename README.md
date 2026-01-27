@@ -26,8 +26,10 @@
 - **Habit Tracking**: Build daily routines and track streaks
 - **Mood Tracking**: Log daily emotions and view trends
 - **Task Scheduling**: Add due dates and reminders
+- **Calendar** view
 - **Widgets**: Home screen widgets for quick access
 - **Themes**: More customization options
+- Any new **suggestion**
 
 ## Getting Started
 
