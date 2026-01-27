@@ -58,7 +58,10 @@ import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.core.designsystem.theme.priority
+import com.markel.flowstate.feature.tasks.components.DateSelector
 import com.markel.flowstate.feature.tasks.components.EmptyStateView
+import com.markel.flowstate.feature.tasks.components.formatDate
+import com.markel.flowstate.feature.tasks.components.isDateOverdue
 import kotlinx.coroutines.delay
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -1104,127 +1107,5 @@ fun getPriorityColor(priority: Priority): Color {
         Priority.MEDIUM -> MaterialTheme.priority.mediumPriority
         Priority.LOW -> MaterialTheme.priority.lowPriority
         Priority.NOTHING -> MaterialTheme.priority.noPriority
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DateSelector(
-    dueDate: Long?,
-    onDueDateChange: (Long?) -> Unit,
-    modifier: Modifier = Modifier,
-    showLabel: Boolean = true
-) {
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = dueDate ?: System.currentTimeMillis()
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (dueDate != null) {
-                        TextButton(
-                            onClick = {
-                                showDatePicker = false
-                                onDueDateChange(null)
-                            }
-                        ) {
-                            Text(stringResource(R.string.clear_cal))
-                        }
-                    }
-
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text(stringResource(R.string.cancel))
-                    }
-
-                    TextButton(
-                        onClick = {
-                            showDatePicker = false
-                            onDueDateChange(datePickerState.selectedDateMillis)
-                        }
-                    ) {
-                        Text(stringResource(R.string.ok))
-                    }
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    if (dueDate != null && showLabel) {
-        AssistChip(
-            onClick = { showDatePicker = true },
-            label = {
-                Text(
-                    formatDate(dueDate),
-                    color = if (isDateOverdue(dueDate)) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onTertiary
-                    }
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    Icons.Sharp.DateRange,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (isDateOverdue(dueDate)) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onTertiary
-                    }
-                )
-            },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = if (isDateOverdue(dueDate)) {
-                    MaterialTheme.colorScheme.errorContainer
-                } else {
-                    MaterialTheme.colorScheme.tertiary
-                }
-            ),
-            border = null,
-            modifier = modifier
-        )
-    } else {
-        IconButton(
-            onClick = { showDatePicker = true },
-            modifier = modifier
-        ) {
-            Icon(
-                Icons.Sharp.DateRange,
-                "Date",
-                tint = if (dueDate != null) MaterialTheme.colorScheme.tertiary
-                else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-fun isDateOverdue(timestamp: Long): Boolean {
-    val date = Instant.ofEpochMilli(timestamp)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-    val today = LocalDate.now()
-    return date.isBefore(today)
-}
-@Composable
-fun formatDate(timestamp: Long?): String {
-    if (timestamp == null) return ""
-    val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-    val today = LocalDate.now()
-
-    return when(date) {
-        today -> stringResource(R.string.today)
-        today.plusDays(1) -> stringResource(R.string.tomorrow)
-        today.minusDays(1) -> stringResource(R.string.yesterday)
-        else -> DateTimeFormatter.ofPattern("d MMM").format(date)
     }
 }
