@@ -3,8 +3,6 @@ package com.markel.flowstate.feature.tasks.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.sharp.DateRange
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.ButtonDefaults
@@ -25,7 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import com.markel.flowstate.feature.tasks.R
 import java.time.Instant
@@ -118,7 +118,7 @@ fun DateSelector(
             },
             leadingIcon = {
                 Icon(
-                    Icons.Sharp.DateRange,
+                    imageVector = ImageVector.vectorResource(R.drawable.event_24px),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = if (isDateOverdue(dueDate)) {
@@ -144,7 +144,7 @@ fun DateSelector(
             modifier = modifier
         ) {
             Icon(
-                Icons.Sharp.DateRange,
+                imageVector = ImageVector.vectorResource(R.drawable.calendar_today_24px),
                 "Date",
                 tint = if (dueDate != null) MaterialTheme.colorScheme.tertiary
                 else MaterialTheme.colorScheme.onSurfaceVariant

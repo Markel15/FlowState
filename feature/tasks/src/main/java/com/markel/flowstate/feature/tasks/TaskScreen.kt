@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.sharp.Create
-import androidx.compose.material.icons.sharp.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -616,9 +615,10 @@ fun TaskEditorSheetContent(
                 )
                 IconButton(onClick = { /* TODO: Implement Formatting */ }) {
                     Icon(
-                        Icons.Sharp.Create,
+                        imageVector = ImageVector.vectorResource(R.drawable.format_color_text_24px),
                         "Format",
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.95f)
                     )
                 }
             }
@@ -972,7 +972,7 @@ fun TaskItemContent(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Sharp.DateRange,
+                                    imageVector = ImageVector.vectorResource(R.drawable.event_24px),
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
                                     tint = dueDate.let { date ->

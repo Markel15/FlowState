@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -33,10 +34,10 @@ import com.markel.flowstate.core.designsystem.theme.FlowStateTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 // We define our navigation routes
-sealed class Screen(val route: String, @StringRes val labelRes: Int, val icon: ImageVector) {
-    object Tasks : Screen("tasks", com.markel.flowstate.feature.tasks.R.string.tasks, Icons.Default.CheckCircle)
-    object Habits : Screen("habits", com.markel.flowstate.feature.tasks.R.string.habits, Icons.Default.DateRange)
-    object Mood : Screen("mood", com.markel.flowstate.feature.tasks.R.string.mood, Icons.Default.Face)
+sealed class Screen(val route: String, @StringRes val labelRes: Int, val iconRes: Int) {
+    object Tasks : Screen("tasks", com.markel.flowstate.feature.tasks.R.string.tasks, R.drawable.task_alt_24px)
+    object Habits : Screen("habits", com.markel.flowstate.feature.tasks.R.string.habits, R.drawable.calendar_month_24px)
+    object Mood : Screen("mood", com.markel.flowstate.feature.tasks.R.string.mood, R.drawable.self_improvement_24px)
 }
 
 val bottomNavItems = listOf(
@@ -108,7 +109,7 @@ fun FlowBottomBar(navController: NavHostController) {
             bottomNavItems.forEach { screen ->
                 val label = stringResource(screen.labelRes)
                 NavigationBarItem(
-                    icon = { Icon(screen.icon, contentDescription = label) },
+                    icon = { Icon(imageVector = ImageVector.vectorResource(screen.iconRes), contentDescription = label) },
                     label = { Text(label) },
                     selected = currentRoute == screen.route,
                     onClick = {
