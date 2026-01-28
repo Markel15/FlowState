@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
@@ -226,43 +228,23 @@ fun TaskItemContent(
     onCheckClicked: () -> Unit
 ) {
     val priorityColor = priority.asColor()
-    Card(
-        onClick = onClicked,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable { onClicked() }
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(8.dp, vertical = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(26.dp)
                     .clip(CircleShape)
-                    .drawBehind {
-                        if (priority != Priority.NOTHING && !isDone) {
-                            drawIntoCanvas { canvas ->
-                                val paint = Paint().asFrameworkPaint()
-                                paint.color = priorityColor.copy(alpha = 0.25f).toArgb()
-                                paint.maskFilter = BlurMaskFilter(15f, BlurMaskFilter.Blur.INNER)
-                                canvas.nativeCanvas.drawCircle(
-                                    size.width / 2f,
-                                    size.height / 2f,
-                                    size.width / 2.2f,
-                                    paint
-                                )
-                            }
-                        }
-                    }
             ) {
                 Icon(
                     imageVector = if (isDone) ImageVector.vectorResource(R.drawable.radio_button_checked_24px) else ImageVector.vectorResource(
@@ -273,7 +255,7 @@ fun TaskItemContent(
                         alpha = 0.4f
                     ) else priorityColor,
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
                         .toggleable(
                             value = isDone,
@@ -286,8 +268,8 @@ fun TaskItemContent(
             Column(modifier = Modifier.weight(1f)) {
                 val taskTitleStyle = MaterialTheme.typography.bodyLarge.copy(
                     fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp,
-                    lineHeight = 19.sp
+                    fontSize = 16.sp,
+                    lineHeight = 20.sp
                 )
                 Text(
                     text = title,
@@ -383,5 +365,10 @@ fun TaskItemContent(
                 }
             }
         }
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            thickness = 0.4.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     }
 }
