@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -96,16 +97,20 @@ fun AnimatableTaskItem(
     val exitTransition = if (isDeleted) {
         // DELETE CASE: Slide to the left
         slideOutHorizontally(
-            targetOffsetX = { -it },
-            animationSpec = tween(300)
-        ) + shrinkVertically(
-            animationSpec = tween(durationMillis = 280, delayMillis = 100),
-            shrinkTowards = Alignment.Top
-        ) + fadeOut(animationSpec = tween(200))
+            targetOffsetX = { -it / 2 },
+            animationSpec = tween(300, easing = LinearOutSlowInEasing)
+        ) + fadeOut(animationSpec = tween(200)) +
+                shrinkVertically(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow
+                    ),
+                    shrinkTowards = Alignment.Top
+                )
     } else {
         // COMPLETE CASE: Fade out + Smooth shrink
         fadeOut(
-            animationSpec = tween(300)
+            animationSpec = tween(350)
         ) + shrinkVertically(
             animationSpec = tween(400)
         )
@@ -170,11 +175,12 @@ fun <T> SwipeToDeleteContainer(
 fun DeleteSwipeBackground(
     state: SwipeToDismissBoxState
 ) {
-    val direction = state.dismissDirection
-    val isDeleteDirection = direction == SwipeToDismissBoxValue.EndToStart
+    val isDeleteDirection = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
 
-    val color = if (state.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-        MaterialTheme.colorScheme.errorContainer
+    val color = if (isDeleteDirection) {
+        MaterialTheme.colorScheme.errorContainer.copy(
+            alpha = (state.progress * 1.5f).coerceIn(0f, 1f)
+        )
     } else {
         Color.Transparent
     }
@@ -193,13 +199,23 @@ fun DeleteSwipeBackground(
         animationSpec = scaleAnimationSpec,
         label = "iconScale"
     )
+    val cornerAnim by animateDpAsState(
+        targetValue = if (isDeleteDirection)
+            (16.dp * state.progress.coerceIn(0f, 1f))
+        else 0.dp,
+        animationSpec = tween(
+            durationMillis = 180,
+            easing = LinearOutSlowInEasing
+        ),
+        label = "corners"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(topEnd = cornerAnim, bottomEnd = cornerAnim))
             .background(color)
-            .padding(horizontal = 30.dp),
+            .padding(horizontal = 24.dp),
         contentAlignment = Alignment.CenterEnd
     ) {
         if (isDeleteDirection) {
