@@ -10,7 +10,11 @@
 > **⚠️ Early Development Stage**  
 > This project is actively being developed and may have bugs. We welcome contributions from the community!
 
-## ✨ Features
+## Screenshots
+| ![Image 1](screenshots/home_light.png) | ![Image 2](screenshots/home_dark.png) |
+|:--------------------------------------:|:-------------------------------------:|
+
+## Features
 
 ### Implemented
 - **Task Management**: Create, edit and delete tasks
