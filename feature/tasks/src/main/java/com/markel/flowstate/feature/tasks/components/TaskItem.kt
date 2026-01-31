@@ -14,6 +14,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -247,7 +248,10 @@ fun TaskItemContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClicked() }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClicked() }
             .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
