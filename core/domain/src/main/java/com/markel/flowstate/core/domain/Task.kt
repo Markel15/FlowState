@@ -14,7 +14,11 @@ enum class Priority {
 data class SubTask(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
-    val isDone: Boolean = false
+    val description: String = "",
+    val isDone: Boolean = false,
+    val priority: Priority = Priority.NOTHING,
+    val dueDate: Long? = null,
+    val position: Int = 0
 )
 data class Task(
     val id: Int = 0,

@@ -23,5 +23,9 @@ data class SubTaskEntity(
     val id: String, // We use String (UUID) for subtasks
     val taskId: Int, // The reference to the parent
     val title: String,
-    val isDone: Boolean
+    val description: String,
+    val isDone: Boolean,
+    val priority: Int,
+    val dueDate: Long?,
+    val position: Int
 )

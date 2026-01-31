@@ -75,7 +75,11 @@ class TaskRepositoryImpl @Inject constructor(
         return SubTask(
             id = this.id,
             title = this.title,
-            isDone = this.isDone
+            description = this.description,
+            isDone = this.isDone,
+            priority = Priority.entries.getOrElse(this.priority) { Priority.NOTHING },
+            dueDate = this.dueDate,
+            position = this.position
         )
     }
 
@@ -96,7 +100,11 @@ class TaskRepositoryImpl @Inject constructor(
             id = this.id,
             taskId = taskId,
             title = this.title,
-            isDone = this.isDone
+            description = this.description,
+            isDone = this.isDone,
+            priority = this.priority.ordinal,
+            dueDate = this.dueDate,
+            position = this.position
         )
     }
 }

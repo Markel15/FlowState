@@ -1,37 +1,15 @@
 package com.markel.flowstate.feature.tasks.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -67,6 +45,9 @@ fun TaskEditorSheetContent(
             addAll(task?.subTasks ?: emptyList())
         }
     }
+    // Information about the subtasks
+    var showSubTaskDialog by remember { mutableStateOf(false) }
+    var subTaskToEdit by remember { mutableStateOf<SubTask?>(null) }
 
     // Checkpoints to track what was actually last saved
     var lastSavedTitle by remember { mutableStateOf(title) }
@@ -90,10 +71,8 @@ fun TaskEditorSheetContent(
 
             if (hasChanges && title.isNotBlank()) {
                 delay(600)
-
                 // Save
                 onAutoUpdate(title, description, priority, dueDate, subTasks.toList())
-
                 // Update references
                 lastSavedTitle = title
                 lastSavedDesc = description
@@ -134,7 +113,6 @@ fun TaskEditorSheetContent(
             modifier = Modifier
                 .weight(1f, fill = false)  // fill = false allows it to shrink if content is small
                 .fillMaxWidth()
-                .imePadding()
                 .padding(horizontal = 24.dp)
                 .verticalScroll(scrollState)
         ) {
@@ -193,6 +171,12 @@ fun TaskEditorSheetContent(
             Spacer(modifier = Modifier.height(16.dp))
 
             // SUBTASKS
+            val visibleSubTasks = remember(subTasks.toList()) {
+
+                subTasks.filter { !it.isDone }
+
+            }
+
             Text(
                 stringResource(R.string.subtasks),
                 style = MaterialTheme.typography.labelMedium.copy(
@@ -203,20 +187,62 @@ fun TaskEditorSheetContent(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            subTasks.forEachIndexed { index, subTask ->
-                SubTaskRow(
-                    subTask = subTask,
-                    onRemove = { subTasks.removeAt(index) },
-                    onTitleChange = { newTitle ->
-                        subTasks[index] = subTask.copy(title = newTitle)
-                    },
-                    onToggleDone = {
-                        subTasks[index] = subTask.copy(isDone = !subTask.isDone)
+            // list of subtasks
+            if (visibleSubTasks.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        visibleSubTasks.forEachIndexed { index, subTask ->
+                            RichSubTaskItem(
+                                subTask = subTask,
+                                onCheckedChange = {
+                                    // We need to find the index in the REAL list, not the visible list
+                                    val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
+                                    if (realIndex != -1) {
+                                        subTasks[realIndex] = subTask.copy(isDone = !subTask.isDone)
+                                    }
+
+                                },
+                                onClick = {
+                                    subTaskToEdit = subTask
+                                    showSubTaskDialog = true
+                                },
+                                onDelete = {
+                                    val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
+                                    if (realIndex != -1) {
+                                        subTasks.removeAt(realIndex)
+                                    }
+
+                                }
+                            )
+                            if (index < visibleSubTasks.lastIndex) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            }
+                        }
                     }
-                )
+                }
             }
 
-            AddSubTaskRow(onAdd = { newTitle -> subTasks.add(SubTask(title = newTitle)) })
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Button to create a new subtask
+            TextButton(
+                onClick = {
+                    subTaskToEdit = null
+                    showSubTaskDialog = true
+                },
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.tertiary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Añadir subtarea", fontWeight = FontWeight.SemiBold)
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -263,6 +289,23 @@ fun TaskEditorSheetContent(
             }
         }
     }
+    // POPUP DIALOG
+    if (showSubTaskDialog) {
+        SubTaskDialog(
+            subTask = subTaskToEdit,
+            onDismiss = { showSubTaskDialog = false },
+            onSave = { resultSubTask ->
+                val index = subTasks.indexOfFirst { it.id == resultSubTask.id }
+                if (index != -1) {
+                    subTasks[index] = resultSubTask // Update existing one
+                } else {
+                    subTasks.add(resultSubTask) // Create a new subtask
+                }
+                showSubTaskDialog = false
+            }
+        )
+    }
+
     LaunchedEffect(Unit) {
         delay(100)
         if (isNewTask) focusRequester.requestFocus()
