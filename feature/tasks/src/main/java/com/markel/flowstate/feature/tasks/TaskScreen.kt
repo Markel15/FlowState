@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.tasks
 
+import android.content.res.Configuration
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,6 +27,7 @@ import com.markel.flowstate.feature.tasks.components.EmptyStateView
 import com.markel.flowstate.feature.tasks.components.ExpandableFabMenu
 import com.markel.flowstate.feature.tasks.components.TaskCreationSheetContent
 import com.markel.flowstate.feature.tasks.components.TaskEditorSheetContent
+import com.markel.flowstate.feature.tasks.util.HandleSystemBars
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -148,6 +151,10 @@ fun TaskScreen(viewModel: TaskViewModel) {
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = if (taskToEdit == null) RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp) else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
+                val configuration = LocalConfiguration.current
+                val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                HandleSystemBars(isLandscape)
+
                 if (taskToEdit == null) {
                     // --- CREATION MODE ---
                     TaskCreationSheetContent(

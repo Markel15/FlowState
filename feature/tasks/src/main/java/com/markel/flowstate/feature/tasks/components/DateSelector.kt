@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.tasks.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
@@ -24,10 +25,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import com.markel.flowstate.feature.tasks.R
+import com.markel.flowstate.feature.tasks.util.HandleSystemBars
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -42,6 +45,8 @@ fun DateSelector(
     showLabel: Boolean = true
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val mainColor = MaterialTheme.colorScheme.tertiary
     val datePickerColors = DatePickerDefaults.colors(
         selectedDayContainerColor = mainColor,
@@ -96,6 +101,7 @@ fun DateSelector(
                 }
             }
         ) {
+            HandleSystemBars(isLandscape)
             DatePicker(
                 state = datePickerState,
                 colors = datePickerColors

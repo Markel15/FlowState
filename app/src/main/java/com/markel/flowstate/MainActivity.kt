@@ -1,14 +1,17 @@
 package com.markel.flowstate
 
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -19,10 +22,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -32,6 +40,7 @@ import androidx.navigation.compose.rememberNavController
 import com.markel.flowstate.feature.tasks.TaskScreen
 import com.markel.flowstate.feature.tasks.TaskViewModel
 import com.markel.flowstate.core.designsystem.theme.FlowStateTheme
+import com.markel.flowstate.feature.tasks.util.HandleSystemBars
 import dagger.hilt.android.AndroidEntryPoint
 
 // We define our navigation routes
@@ -56,14 +65,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             FlowStateTheme {
+                // Check Orientation
+                val configuration = LocalConfiguration.current
+                val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+                HandleSystemBars(isLandscape)
                 // Compose navigation controller
                 val navController = rememberNavController()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        FlowBottomBar(navController = navController)
-                    }
+                        FlowBottomBar(
+                            navController = navController,
+                            isLandscape = isLandscape
+                        )
+                    },
+                    // Adjusting insets if we hide native navigation bar
+                    contentWindowInsets = if (isLandscape) WindowInsets(0.dp) else WindowInsets.navigationBars
                 ) { innerPadding ->
                     // Navigation host: decides which screen to show
                     // based on the route
@@ -93,10 +112,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun FlowBottomBar(navController: NavHostController) {
+fun FlowBottomBar(navController: NavHostController, isLandscape: Boolean) {
     // We get the current route to know which item to select
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val barHeight = if (isLandscape) 56.dp else 110.dp  // Reduce height in landscape mode
 
     Column(modifier = Modifier.fillMaxWidth()) {
         // Divider to separate bottom bar from content, both have the same surface color
@@ -106,13 +126,13 @@ fun FlowBottomBar(navController: NavHostController) {
         )
         NavigationBar(
             containerColor = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.height(110.dp)
+            modifier = Modifier.height(barHeight)
         ) {
             bottomNavItems.forEach { screen ->
                 val label = stringResource(screen.labelRes)
                 NavigationBarItem(
                     icon = { Icon(imageVector = ImageVector.vectorResource(screen.iconRes), contentDescription = label) },
-                    label = { Text(label) },
+                    label = if (!isLandscape) { { Text(label) } } else null,  // Hide labels in landscape mode
                     selected = currentRoute == screen.route,
                     onClick = {
                         // Navigate to the new screen
