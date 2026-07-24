@@ -21,7 +21,7 @@ reorderable = "3.0.0"
 calendar = "2.10.0"  # 1.10.x compose version-> 2.10.x calendar version
 mockk = "1.13.8"
 coroutines-test = "1.9.0"
-turbine = "1.0.0"
+turbine = "1.2.0"
 datastore = "1.2.0"
 material3ExpressiveAlpha = "1.5.0-alpha15"  # Keep the alpha until the FAB menu is stable (BOM update would be necessary)
 foundation = "1.10.4"
@@ -30,7 +30,6 @@ glance = "1.1.1"
 kotlinxSerialization = "1.7.3"
 foundationVersion = "1.11.2"
 material3 = "1.4.0"
-savedstateKtx = "1.5.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -68,7 +67,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
-androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core", version.ref = "animationCore" }
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
