@@ -26,6 +26,7 @@ import com.markel.flowstate.feature.flow.tasks.TaskViewModel
 import com.markel.flowstate.feature.flow.tasks.components.TaskCreationSheetContent
 import com.markel.flowstate.feature.flow.tasks.util.HandleSystemBars
 import com.markel.flowstate.feature.flow.components.SectionedFlowView
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +75,7 @@ fun FlowScreen(
     val selectedCategoryId = (flowUiState as? FlowUiState.Success)?.selectedCategoryId
     val generalCategoryName by flowViewModel.generalCategoryName.collectAsStateWithLifecycle()
     val pendingTaskCounts = (flowUiState as? FlowUiState.Success)?.pendingTaskCounts ?: emptyMap()
+    val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -88,7 +90,10 @@ fun FlowScreen(
                     CategoryTabRow(
                         categories = categories,
                         selectedCategoryId = selectedCategoryId,
-                        onCategorySelected = { flowViewModel.selectCategory(it) },
+                        onCategorySelected = { id ->
+                            scope.launch { flowListState.animateScrollToItem(0) }  // Reset scroll position before switching category
+                            flowViewModel.selectCategory(id)
+                        },
                         onAddCategoryClick = { showCreateCategoryDialog = true },
                         onCategoryLongPress = { showReorderCategoriesSheet = true },
                         pendingTaskCounts = pendingTaskCounts,

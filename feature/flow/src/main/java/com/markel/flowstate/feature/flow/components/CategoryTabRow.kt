@@ -91,7 +91,7 @@ fun CategoryTabRow(
 
     PrimaryScrollableTabRow(
         selectedTabIndex = selectedIndex,
-        containerColor = Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.surface,  // Opaque surface so the scrolling LazyColumn content underneath never bleeds through the tab bar while the category changes.
         contentColor = MaterialTheme.colorScheme.onSurface,
         edgePadding = 8.dp,
         minTabWidth = 52.dp,
