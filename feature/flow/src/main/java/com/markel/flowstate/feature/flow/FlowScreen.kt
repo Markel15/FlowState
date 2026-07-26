@@ -2,11 +2,13 @@ package com.markel.flowstate.feature.flow
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -26,7 +28,6 @@ import com.markel.flowstate.feature.flow.tasks.TaskViewModel
 import com.markel.flowstate.feature.flow.tasks.components.TaskCreationSheetContent
 import com.markel.flowstate.feature.flow.tasks.util.HandleSystemBars
 import com.markel.flowstate.feature.flow.components.SectionedFlowView
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,21 +52,9 @@ fun FlowScreen(
     // Only source of truth for the header
     var isHeaderMinimized by rememberSaveable { mutableStateOf(false) }
 
-    // ── Scroll-aware FAB visibility ────────────────────────
-    val flowListState = rememberLazyListState()
     val allEmpty = (flowUiState as? FlowUiState.Success)?.let {
         it.tasks.isEmpty() && it.checkLists.isEmpty() && it.ideas.isEmpty()
     } ?: true
-
-    val fabVisible by rememberFabVisibilityState(
-        lazyListState = flowListState,
-        forceVisible = allEmpty
-    )
-
-    // Close the menu if the FAB is hidden
-    LaunchedEffect(fabVisible) {
-        if (!fabVisible && isFabExpanded) isFabExpanded = false
-    }
 
     val draft by taskViewModel.draft.collectAsStateWithLifecycle()  // State with all the info for the new task
 
@@ -75,25 +64,41 @@ fun FlowScreen(
     val selectedCategoryId = (flowUiState as? FlowUiState.Success)?.selectedCategoryId
     val generalCategoryName by flowViewModel.generalCategoryName.collectAsStateWithLifecycle()
     val pendingTaskCounts = (flowUiState as? FlowUiState.Success)?.pendingTaskCounts ?: emptyMap()
-    val scope = rememberCoroutineScope()
+
+    // ── Tab state ──────────────────────────────────────────────────
+    // Saveable state independent for each tabId.
+    // Everything inside SaveableStateProvider(currentTabId) — including the
+    // list state is preserved per tab and restored when the user comes back
+    val saveableStateHolder = rememberSaveableStateHolder()
+    val currentTabId = selectedCategoryId ?: Category.GENERAL_ID
+
+    // Registry of each tab's LazyListState so the FAB can read the active list state from a single variable
+    val tabListStates = remember { mutableStateMapOf<Int, LazyListState>() }
+
+    // ── FAB ──────────
+    val activeListState = tabListStates[currentTabId] ?: rememberLazyListState()
+    val fabVisible by rememberFabVisibilityState(
+        lazyListState = activeListState,
+        forceVisible = allEmpty
+    )
+
+    LaunchedEffect(fabVisible) {
+        if (!fabVisible && isFabExpanded) isFabExpanded = false
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             contentWindowInsets = WindowInsets(0.dp),  // To avoid big gaps of surface at the top & bottom
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues)) {
-                DynamicHeader(
-                    isMinimized = isHeaderMinimized
-                )
+                DynamicHeader(isMinimized = isHeaderMinimized)
+
                 // ── Category tabs (only when enabled) ───────────────
                 if (categoriesEnabled && categories.isNotEmpty()) {
                     CategoryTabRow(
                         categories = categories,
                         selectedCategoryId = selectedCategoryId,
-                        onCategorySelected = { id ->
-                            scope.launch { flowListState.animateScrollToItem(0) }  // Reset scroll position before switching category
-                            flowViewModel.selectCategory(id)
-                        },
+                        onCategorySelected = { id -> flowViewModel.selectCategory(id) },
                         onAddCategoryClick = { showCreateCategoryDialog = true },
                         onCategoryLongPress = { showReorderCategoriesSheet = true },
                         pendingTaskCounts = pendingTaskCounts,
@@ -101,24 +106,33 @@ fun FlowScreen(
                     )
                 }
 
-                SectionedFlowView(
-                    uiState = flowUiState,
-                    onScrolled = { isHeaderMinimized = true },
-                    onTaskClick = { onNavigateToTaskEditor(it.id) },
-                    onTaskDelete = { task -> flowViewModel.onTaskSwiped(task) },
-                    onTaskToggle = { taskViewModel.toggleTaskDone(it) },
-                    onTaskReorder = { from, to -> flowViewModel.onTaskReorder(from, to) },
-                    onIdeaClick = { onNavigateToIdeaEditor(it.id) },
-                    onIdeaReorder = { from, to -> flowViewModel.onIdeaReorder(from, to) },
-                    onCheckListClick = { onNavigateToCheckListEditor(it.id, it.categoryId) },
-                    onCheckListReorder = { from, to -> flowViewModel.onCheckListReorder(from, to) },
-                    showPermissionBanner = showPermissionBanner,
-                    taskDeleteVersions = taskDeleteVersions,
-                    categoriesEnabled = categoriesEnabled,
-                    outerListState = flowListState,
-                )
+                saveableStateHolder.SaveableStateProvider(currentTabId) {
+                    val tabListState = rememberLazyListState()
+
+                    // Publish this tab's LazyListState to the shared registry
+                    // so the FAB (outside SaveableStateProvider) can read it.
+                    SideEffect { tabListStates[currentTabId] = tabListState }
+
+                    SectionedFlowView(
+                        uiState = flowUiState,
+                        onScrolled = { isHeaderMinimized = true },
+                        onTaskClick = { onNavigateToTaskEditor(it.id) },
+                        onTaskDelete = { task -> flowViewModel.onTaskSwiped(task) },
+                        onTaskToggle = { taskViewModel.toggleTaskDone(it) },
+                        onTaskReorder = { from, to -> flowViewModel.onTaskReorder(from, to) },
+                        onIdeaClick = { onNavigateToIdeaEditor(it.id) },
+                        onIdeaReorder = { from, to -> flowViewModel.onIdeaReorder(from, to) },
+                        onCheckListClick = { onNavigateToCheckListEditor(it.id, it.categoryId) },
+                        onCheckListReorder = { from, to -> flowViewModel.onCheckListReorder(from, to) },
+                        showPermissionBanner = showPermissionBanner,
+                        taskDeleteVersions = taskDeleteVersions,
+                        categoriesEnabled = categoriesEnabled,
+                        outerListState = tabListState,
+                    )
+                }
             }
         }
+
         // ── FAB ───────────────────────────────────────────────────────
         ExpandableFabMenu(
             expanded = isFabExpanded,
@@ -126,9 +140,7 @@ fun FlowScreen(
             onTaskClick = { isFabExpanded = false; showCreationSheet = true },
             onIdeaClick = { isFabExpanded = false; onNavigateToNewIdea(selectedCategoryId ?: Category.GENERAL_ID) },
             onCheckListClick = { isFabExpanded = false; onNavigateToCheckListEditor(null, selectedCategoryId ?: Category.GENERAL_ID) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .zIndex(1f),
+            modifier = Modifier.align(Alignment.BottomEnd).zIndex(1f),
             visible = fabVisible,
         )
         if (showCreationSheet) {
@@ -164,8 +176,7 @@ fun FlowScreen(
         AnimatedUndoFab(
             visible = showUndoButton,
             onUndoClick = { flowViewModel.undoPendingDeletions() },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
+            modifier = Modifier.align(Alignment.BottomStart)
         )
 
         // ── Create category dialog (opened from the trailing "+ New category" tab) ──
