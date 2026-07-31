@@ -2,6 +2,7 @@ package com.markel.flowstate.feature.flow.components
 
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -102,6 +104,14 @@ fun SectionedFlowView(
         }.collect { scrolled -> if (scrolled) onScrolled() }
     }
 
+    val itemPlacementSpec = spring<IntOffset>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = 520f,
+        visibilityThreshold = IntOffset.VisibilityThreshold
+    )
+    val itemFadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
+    val itemFadeOutSpec = tween<Float>(durationMillis = 130, easing = FastOutLinearInEasing)
+
     LazyColumn(
         state = outerListState,
         modifier = modifier.fillMaxSize(),
@@ -112,7 +122,13 @@ fun SectionedFlowView(
             item(key = "tasks_header") {
                 SectionHeader(
                     title = stringResource(R.string.tasks_m),
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    modifier = Modifier
+                        .animateItem(
+                            fadeInSpec = itemFadeInSpec,
+                            placementSpec = itemPlacementSpec,
+                            fadeOutSpec = itemFadeOutSpec
+                        )
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
                 )
             }
             item {
@@ -136,11 +152,9 @@ fun SectionedFlowView(
                     reorderableState,
                     key = itemKey,
                     animateItemModifier = Modifier.animateItem(
-                        placementSpec = spring(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = 520f
-                        ),
-                        fadeOutSpec = tween(durationMillis = 130, easing = FastOutLinearInEasing)
+                        fadeInSpec = itemFadeInSpec,
+                        placementSpec = itemPlacementSpec,
+                        fadeOutSpec = itemFadeOutSpec
                     )
                 ) { isDragging ->
                     val scale by animateFloatAsState(
@@ -177,20 +191,28 @@ fun SectionedFlowView(
             item(key = "checklists_header") {
                 SectionHeader(
                     title = stringResource(R.string.checklists_m),
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+                    modifier = Modifier
+                        .animateItem(
+                            fadeInSpec = itemFadeInSpec,
+                            placementSpec = itemPlacementSpec,
+                            fadeOutSpec = itemFadeOutSpec
+                        )
+                        .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
                 )
             }
             item(key = "checklists_carousel") {
-                ReorderableCarousel(
-                    items = uiState.checkLists,
-                    key = { it.id },
-                    onReorder = onCheckListReorder
-                ) { checkList ->
-                    CheckListGridCard(
-                        checkList = checkList,
-                        onClick = { onCheckListClick(checkList) },
-                        modifier = Modifier.width(160.dp)
-                    )
+                Box(Modifier.animateItem(fadeInSpec = itemFadeInSpec, placementSpec = itemPlacementSpec, fadeOutSpec = itemFadeOutSpec).fillMaxWidth()) {
+                    ReorderableCarousel(
+                        items = uiState.checkLists,
+                        key = { it.id },
+                        onReorder = onCheckListReorder
+                    ) { checkList ->
+                        CheckListGridCard(
+                            checkList = checkList,
+                            onClick = { onCheckListClick(checkList) },
+                            modifier = Modifier.width(160.dp)
+                        )
+                    }
                 }
             }
         }
@@ -200,23 +222,31 @@ fun SectionedFlowView(
             item(key = "ideas_header") {
                 SectionHeader(
                     title = stringResource(R.string.ideas_notes_m),
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+                    modifier = Modifier
+                        .animateItem(
+                            fadeInSpec = itemFadeInSpec,
+                            placementSpec = itemPlacementSpec,
+                            fadeOutSpec = itemFadeOutSpec
+                        )
+                        .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
                 )
             }
             item(key = "ideas_carousel") {
-                ReorderableCarousel(
-                    items = uiState.ideas,
-                    key = { it.id },
-                    onReorder = onIdeaReorder
-                ) { idea ->
-                    // Taller modifier to visually differentiate from checklist cards
-                    IdeaGridCard(
-                        idea = idea,
-                        onClick = { onIdeaClick(idea) },
-                        modifier = Modifier
-                            .width(200.dp)
-                            .height(160.dp)
-                    )
+                Box(Modifier.animateItem(fadeInSpec = itemFadeInSpec, placementSpec = itemPlacementSpec, fadeOutSpec = itemFadeOutSpec).fillMaxWidth()) {
+                    ReorderableCarousel(
+                        items = uiState.ideas,
+                        key = { it.id },
+                        onReorder = onIdeaReorder
+                    ) { idea ->
+                        // Taller modifier to visually differentiate from checklist cards
+                        IdeaGridCard(
+                            idea = idea,
+                            onClick = { onIdeaClick(idea) },
+                            modifier = Modifier
+                                .width(200.dp)
+                                .height(160.dp)
+                        )
+                    }
                 }
             }
         }
