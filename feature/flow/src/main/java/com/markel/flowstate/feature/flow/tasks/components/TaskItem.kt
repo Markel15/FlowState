@@ -76,71 +76,35 @@ fun AnimatableTaskItem(
     onComplete: () -> Unit,
     onContentClick: () -> Unit
 ) {
-    var isVisible by remember { mutableStateOf(true) }
-    var isChecked by remember { mutableStateOf(task.isDone) }
-    var isDeleted by remember { mutableStateOf(false) }
+    var isCheckedLocally by remember { mutableStateOf(task.isDone) }
 
-    LaunchedEffect(isVisible) {
-        if (!isVisible) {
-            delay(300)
-            if (isDeleted) {
-                onDelete()
-            } else {
-                onComplete()
-            }
+    LaunchedEffect(isCheckedLocally) {
+        if (isCheckedLocally && !task.isDone) {
+            delay(250)  // Animation purpose only, the completion is delayed only to animate the checkbox giving feedback that the task was completed
+            onComplete()
         }
     }
 
-    val exitTransition = if (isDeleted) {
-        // DELETE CASE: Slide to the left
-        slideOutHorizontally(
-            targetOffsetX = { -it / 2 },
-            animationSpec = tween(300, easing = LinearOutSlowInEasing)
-        ) + fadeOut(animationSpec = tween(200)) +
-                shrinkVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioLowBouncy,
-                        stiffness = Spring.StiffnessLow
-                    ),
-                    shrinkTowards = Alignment.Top
-                )
-    } else {
-        // COMPLETE CASE: Fade out + Smooth shrink
-        fadeOut(
-            animationSpec = tween(350)
-        ) + shrinkVertically(
-            animationSpec = tween(400)
-        )
-    }
-
-    AnimatedVisibility(
-        visible = isVisible,
-        exit = exitTransition
+    SwipeToDeleteContainer(
+        item = task,
+        onDelete = {
+            onDelete()
+        }
     ) {
-        SwipeToDeleteContainer(
-            item = task,
-            onDelete = {
-                isDeleted = true
-                isVisible = false
-            })
-        {
-            TaskItemContent(
-                title = task.title,
-                description = task.description,
-                subTasks = task.subTasks,
-                isDone = isChecked,
-                priority = task.priority,
-                dueDate = task.dueDate,
-                reminderTime = task.reminderTime,
-                shape = shape,
-                onClicked = onContentClick,
-                onCheckClicked = {
-                    isChecked = true
-                    isDeleted = false
-                    isVisible = false
-                }
-            )
-        }
+        TaskItemContent(
+            title = task.title,
+            description = task.description,
+            subTasks = task.subTasks,
+            isDone = isCheckedLocally,
+            priority = task.priority,
+            dueDate = task.dueDate,
+            reminderTime = task.reminderTime,
+            shape = shape,
+            onClicked = onContentClick,
+            onCheckClicked = {
+                isCheckedLocally = true
+            }
+        )
     }
 }
 
@@ -319,7 +283,7 @@ fun TaskItemContent(
                     style = taskTitleStyle.copy(
                         textDecoration = if (isDone) TextDecoration.LineThrough else null,
                         color = if (isDone)
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         else
                             MaterialTheme.colorScheme.onSurface
                     ),

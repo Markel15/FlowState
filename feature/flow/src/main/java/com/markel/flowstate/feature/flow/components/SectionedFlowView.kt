@@ -1,6 +1,10 @@
 package com.markel.flowstate.feature.flow.components
 
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -128,7 +132,17 @@ fun SectionedFlowView(
                     index == uiState.tasks.lastIndex -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
                     else -> RoundedCornerShape(4.dp)
                 }
-                ReorderableItem(reorderableState, key = itemKey) { isDragging ->
+                ReorderableItem(
+                    reorderableState,
+                    key = itemKey,
+                    animateItemModifier = Modifier.animateItem(
+                        placementSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = 520f
+                        ),
+                        fadeOutSpec = tween(durationMillis = 130, easing = FastOutLinearInEasing)
+                    )
+                ) { isDragging ->
                     val scale by animateFloatAsState(
                         targetValue = if (isDragging) 1.03f else 1f,
                         label = "task_drag_scale"
