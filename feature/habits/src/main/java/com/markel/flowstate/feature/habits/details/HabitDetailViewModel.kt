@@ -278,7 +278,7 @@ class HabitDetailViewModel @AssistedInject constructor(
         val yearMonth = YearMonth.from(now)
 
         val monthEntriesByDate = entries
-            .filter { it.date.year == now.year && it.date.monthValue == now.monthValue }
+            .filter { it.date.year == now.year && it.date.monthValue == now.monthValue && !it.date.isAfter(now) }
             .groupBy { it.date }
 
         val dailyMaxValues = monthEntriesByDate.mapValues { (_, dayEntries) ->
