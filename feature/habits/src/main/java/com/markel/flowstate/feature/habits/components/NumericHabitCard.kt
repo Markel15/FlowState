@@ -148,12 +148,16 @@ fun NumericHabitCard(
         )
     }
 
-    // Input dialog
+    // Input sheet (goal-ring + hold-to-repeat steppers)
     if (showInputDialog) {
         val currentValueForDialog = currentWeekValues.getOrNull(selectedDayIndex)
-        NumericInputDialog(
+        NumericInputSheet(
             habitName = habit.name,
+            iconName = habit.iconName,
             unit = habit.unit,
+            step = habit.step,
+            habitColor = habitColor,
+            targetValue = habit.targetValue,
             currentValue = currentValueForDialog,
             onDismiss = { showInputDialog = false },
             onConfirm = { value ->

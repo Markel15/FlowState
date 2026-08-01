@@ -2,6 +2,9 @@
 <resources>
     <string name="add_habit_dialog_title">New habit</string>
     <string name="add_habit_typed_title">New %1$s habit</string>
+    <string name="habit_input_of_target">of %1$s</string>
+    <string name="habit_input_remaining">%1$s to go</string>
+    <string name="habit_input_goal_reached">Goal reached!</string>
     <string name="add_habit_name_label">Name</string>
     <string name="add_habit_color_label">Color</string>
     <string name="add_habit_create_button">Create</string>
