@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="add_habit_dialog_title">Nuevo hábito</string>
+    <string name="add_habit_typed_title">Nuevo hábito %1$s</string>
     <string name="add_habit_name_label">Nombre</string>
     <string name="add_habit_color_label">Color</string>
     <string name="add_habit_create_button">Crear</string>

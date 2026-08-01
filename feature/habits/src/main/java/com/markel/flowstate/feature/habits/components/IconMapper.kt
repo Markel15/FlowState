@@ -13,7 +13,7 @@ import com.markel.flowstate.core.designsystem.icon.HabitIconMapper
  * feature module don't need any import changes.
  */
 
-/** Full list of icon entries — used by [AddHabitDialog] icon picker. */
+/** Full list of icon entries — used by [AddHabitSheet] icon picker. */
 val HabitIconList: List<Pair<String, Int?>> = HabitIconMapper.iconList
 
 /**

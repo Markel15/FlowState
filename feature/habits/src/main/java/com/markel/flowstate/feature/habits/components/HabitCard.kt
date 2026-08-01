@@ -88,9 +88,9 @@ fun HabitCard(
         )
     }
 
-    // ── Edit dialog (reuses AddHabitDialog in edit mode) ─────────────────────
+    // ── Edit sheet (reuses AddHabitSheet in edit mode) ──────────────────────
     if (showEditDialog) {
-        AddHabitDialog(
+        AddHabitSheet(
             initialName = habit.name,
             initialIcon = habit.iconName,
             initialColor = habitColor,

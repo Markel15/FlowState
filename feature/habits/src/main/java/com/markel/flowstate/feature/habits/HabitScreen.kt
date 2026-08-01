@@ -23,9 +23,10 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.domain.HabitType
-import com.markel.flowstate.feature.habits.components.AddHabitDialog
+import com.markel.flowstate.feature.habits.components.AddHabitSheet
 import com.markel.flowstate.feature.habits.components.HabitCard
 import com.markel.flowstate.feature.habits.components.HabitEmptyState
+import com.markel.flowstate.feature.habits.components.HabitFabMenu
 import com.markel.flowstate.feature.habits.components.NumericHabitCard
 import com.markel.flowstate.feature.habits.details.components.HabitHeader
 import com.markel.flowstate.feature.habits.details.components.MotivationalMessage
@@ -67,6 +68,11 @@ fun HabitScreen(
                     lazyListState = listState,
                     forceVisible = state.habits.isEmpty()
                 )
+
+                // ── FAB menu state: type is chosen here, so the upsert sheet
+                // renders a form specific to that type (no in-sheet selector).
+                var fabMenuExpanded by remember { mutableStateOf(false) }
+                var addSheetType by remember { mutableStateOf(HabitType.BOOLEAN) }
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     HabitHeader(
@@ -209,28 +215,33 @@ fun HabitScreen(
                 }
 
                 if (state.showAddDialog) {
-                    AddHabitDialog(
+                    AddHabitSheet(
+                        initialHabitType = addSheetType,
                         onDismiss = { viewModel.hideAddDialog() },
-                        onConfirm = { name, icon, color,habitType, unit, targetValue, step -> viewModel.addHabit(name, icon, color, habitType, unit, targetValue, step) }
+                        onConfirm = { name, icon, color, habitType, unit, targetValue, step ->
+                            viewModel.addHabit(name, icon, color, habitType, unit, targetValue, step)
+                        }
                     )
                 }
 
-                MediumFloatingActionButton(
-                    onClick = { viewModel.showAddDialog() },
+                HabitFabMenu(
+                    expanded = fabMenuExpanded,
+                    onToggle = { fabMenuExpanded = !fabMenuExpanded },
+                    onBooleanHabitClick = {
+                        addSheetType = HabitType.BOOLEAN
+                        fabMenuExpanded = false
+                        viewModel.showAddDialog()
+                    },
+                    onNumericHabitClick = {
+                        addSheetType = HabitType.NUMERIC
+                        fabMenuExpanded = false
+                        viewModel.showAddDialog()
+                    },
+                    visible = fabVisible,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
-                        .animateFloatingActionButton(
-                            visible = fabVisible,
-                            alignment = Alignment.BottomEnd,
-                        )
-                ) {
-                    Icon(
-                        imageVector = ImageVector.vectorResource(DesignR.drawable.add_24px),
-                        contentDescription = "Add habit",
-                        modifier = Modifier.size(FloatingActionButtonDefaults.MediumIconSize),
-                    )
-                }
+                        .zIndex(1f)
+                )
             }
         }
     }

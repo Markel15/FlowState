@@ -1,5 +1,6 @@
 <resources>
     <string name="add_habit_dialog_title">New habit</string>
+    <string name="add_habit_typed_title">New %1$s habit</string>
     <string name="add_habit_name_label">Name</string>
     <string name="add_habit_color_label">Color</string>
     <string name="add_habit_create_button">Create</string>

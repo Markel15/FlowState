@@ -130,9 +130,9 @@ fun NumericHabitCard(
         )
     }
 
-    // Edition dialog
+    // Edition sheet
     if (showEditDialog) {
-        AddHabitDialog(
+        AddHabitSheet(
             initialName = habit.name,
             initialIcon = habit.iconName,
             initialColor = habitColor,
