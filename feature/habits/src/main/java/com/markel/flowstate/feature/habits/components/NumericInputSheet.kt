@@ -11,22 +11,24 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -40,8 +42,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toPath
@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,9 +76,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.graphics.shapes.Morph
@@ -92,29 +96,34 @@ private const val HOLD_REPEAT_START_MS = 170L
 private const val HOLD_REPEAT_MIN_MS = 60L
 private const val HOLD_REPEAT_ACCEL_MS = 22L
 
+/** Accepts "", "12", "12.", "12.5" — anything else is rejected per keystroke. */
+private val decimalInputRegex = Regex("^\\d*\\.?\\d*$")
+
 /**
  * Quick-entry sheet for numeric habits, redesigned around a "goal ring"
  * fully owned by the habit's own color:
  *
- *  - HERO: the day's progress vs the habit target is a large wavy ring tinted
- *    with the habit's own color. Every −/+ tap visibly fills it with a spring.
+ *  - HERO: the day's value is ONE big number that doubles as the exact-value
+ *    field (EditableHeroValue) — with a target it sits inside a large wavy
+ *    progress ring tinted with the habit color, so both the −/+ taps and the
+ *    keyboard fill it live with a spring; without a target it stands alone.
+ *    There is no duplicated readout anywhere.
  *  - HEADER: the pill shows the habit's real icon and morphs Pill → SoftBurst
  *    once the day counts as completed (target reached, or any value > 0 when
  *    the habit has no target), exactly like the cards' check button.
  *  - CELEBRATION: crossing the target fires one tactile beat, the wave calms
  *    down (amplitude → 0), the ring pops and the subline flips to
  *    "Goal reached!". Re-opening an already-completed day does NOT celebrate.
- *  - STEPPERS: chunky 64dp buttons with press-morph corners, painted with the
- *    habit color.
- *  - EXACT VALUES stay first-class and SPEED comes first: the keyboard opens
- *    on its own ~250ms after the sheet settles, the field
- *    lives synced with the ring (typing fills it live), and tapping the big
- *    number re-opens the keyboard.
+ *  - STEPPERS: chunky 64dp buttons with press-morph corners painted with the
+ *    habit color, hugging the hero in a compact centered cluster (the middle
+ *    slot sizes to its content instead of spreading to the sheet edges).
+ *  - SPEED comes first: the keyboard opens on its own ~250ms after the sheet
+ *    settles and types straight into the hero number; tapping the number
+ *    re-opens it.
  *  - LAYOUT: no drag handle (it clipped the morphed shape) and a fixed-but-
- *    adaptive max height (~460dp) keeps the whole primary flow visible even
+ *    adaptive max height (455dp) keeps the whole primary flow visible even
  *    with the keyboard open; the destructive "clear" action lives below the
  *    fold, inside the scrollable zone.
- *  - Habits without target: no ring, just the big bouncing number.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -243,6 +252,7 @@ fun NumericInputSheet(
                     onStep = { stepBy(-1f) }
                 )
 
+                // Compact cluster
                 if (hasTarget) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -267,31 +277,48 @@ fun NumericInputSheet(
                             amplitude = { if (isComplete) 0f else 1f },
                             modifier = Modifier.size(145.dp)
                         )
-                        HeroValue(
-                            valueText = valueText,
+                        // The number INSIDE the ring is the exact-value field:
+                        // typing fills the ring live (one number, both roles).
+                        EditableHeroValue(
+                            value = textFieldValue,
+                            onValueChange = { new ->
+                                if (new.text.isEmpty() || new.text.matches(decimalInputRegex)) {
+                                    textFieldValue = new
+                                }
+                            },
+                            onConfirm = { onConfirm(valueText.toFloatOrNull()) },
                             unit = unit,
                             targetValue = targetValue,
                             habitColor = habitColor,
                             numberScale = numberScale.value,
-                            showTargetLabel = true,
-                            onRequestExactEdit = {
+                            focusRequester = focusRequester,
+                            onRequestKeyboard = {
                                 focusRequester.requestFocus()
                                 keyboardController?.show()
-                            }
+                            },
+                            maxFieldWidth = 116.dp
                         )
                     }
                 } else {
-                    HeroValue(
-                        valueText = valueText,
+                    // No target → no ring; the hero still IS the field.
+                    EditableHeroValue(
+                        value = textFieldValue,
+                        onValueChange = { new ->
+                            if (new.text.isEmpty() || new.text.matches(decimalInputRegex)) {
+                                textFieldValue = new
+                            }
+                        },
+                        onConfirm = { onConfirm(valueText.toFloatOrNull()) },
                         unit = unit,
                         targetValue = null,
                         habitColor = habitColor,
                         numberScale = numberScale.value,
-                        showTargetLabel = false,
-                        onRequestExactEdit = {
+                        focusRequester = focusRequester,
+                        onRequestKeyboard = {
                             focusRequester.requestFocus()
                             keyboardController?.show()
-                        }
+                        },
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                 }
 
@@ -330,36 +357,6 @@ fun NumericInputSheet(
                     )
                 }
             }
-
-            // ── Exact value: same source of truth, so the ring reacts live ──
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { newValue ->
-                    if (newValue.text.isEmpty() || newValue.text.matches(Regex("^\\d*\\.?\\d*$"))) {
-                        textFieldValue = newValue
-                    }
-                },
-                label = {
-                    Text(
-                        if (unit != null) stringResource(R.string.habit_input_label_unit, unit)
-                        else stringResource(R.string.habit_input_label_plain)
-                    )
-                },
-                singleLine = true,
-                shape = MaterialTheme.shapes.large,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = habitColor,
-                    focusedLabelColor = habitColor,
-                    cursorColor = habitColor
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                keyboardActions = KeyboardActions(
-                    onDone = { onConfirm(valueText.toFloatOrNull()) }
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
-            )
 
             // ── Actions ──────────────────────────────────────────────────
             Row(
@@ -409,42 +406,77 @@ fun NumericInputSheet(
     }
 }
 
-/** Big animated value, scaled/bounced by the parent.
- *  Tapping it requests focus on the exact-value field below. */
+/**
+ * The big hero number doubles as the exact-value field — one number, both
+ * roles: with a target it lives inside the ring (which fills live as you
+ * type), without one it stands alone. It intentionally looks like a display,
+ * not a form control: centered display type in the habit color, habit-tinted
+ * cursor, a faint "0" placeholder when empty and no background/ripple. Tapping
+ * it re-opens the keyboard; the bounce keeps firing per digit via the parent's
+ * Animatable. [maxFieldWidth] keeps long values from covering the ring (the
+ * single-line field scrolls internally past the cap).
+ */
 @Composable
-private fun HeroValue(
-    valueText: String,
+private fun EditableHeroValue(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onConfirm: () -> Unit,
     unit: String?,
     targetValue: Float?,
     habitColor: Color,
     numberScale: Float,
-    showTargetLabel: Boolean,
-    onRequestExactEdit: () -> Unit
+    focusRequester: FocusRequester,
+    onRequestKeyboard: () -> Unit,
+    modifier: Modifier = Modifier,
+    maxFieldWidth: Dp = Dp.Unspecified
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .graphicsLayer {
-                scaleX = numberScale
-                scaleY = numberScale
-            }
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onRequestExactEdit)
-            .padding(horizontal = 8.dp)
+        modifier = modifier.graphicsLayer {
+            scaleX = numberScale
+            scaleY = numberScale
+        }
     ) {
-        AnimatedContent(
-            targetState = valueText.toFloatOrNull()?.let { formatFloat(it) } ?: "0",
-            transitionSpec = {
-                (slideInVertically { it / 2 } + fadeIn()) togetherWith
-                        (slideOutVertically { -it / 2 } + fadeOut())
-            },
-            label = "numeric_value"
-        ) { displayed ->
-            Text(
-                text = displayed,
-                style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
-                color = habitColor,
-                letterSpacing = (-2.0).sp,
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .defaultMinSize(minWidth = 48.dp, minHeight = 56.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onRequestKeyboard
+                )
+        ) {
+            if (value.text.isEmpty()) {
+                Text(
+                    text = "0",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-2.0).sp
+                    ),
+                    color = habitColor.copy(alpha = 0.30f)
+                )
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.displayMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = habitColor,
+                    textAlign = TextAlign.Center,
+                    letterSpacing = (-2.0).sp
+                ),
+                cursorBrush = SolidColor(habitColor),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { onConfirm() }),
+                modifier = Modifier
+                    .widthIn(max = maxFieldWidth)
+                    .focusRequester(focusRequester)
             )
         }
         if (unit != null) {
@@ -454,7 +486,7 @@ private fun HeroValue(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (showTargetLabel && targetValue != null) {
+        if (targetValue != null) {
             Text(
                 text = stringResource(R.string.habit_input_of_target, formatFloat(targetValue)),
                 style = MaterialTheme.typography.labelMedium,
