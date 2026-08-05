@@ -29,16 +29,18 @@ import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.feature.tasks.R
 import com.markel.flowstate.feature.flow.tasks.util.asColor
 
+/**
+ * Editor top bar, deliberately quiet: navigate back, the priority flag
+ * (tap to cycle, tinted with the priority color) and an overflow menu for
+ * task lifecycle actions (complete / delete). Due date and reminder live in
+ * the metadata chips row under the description (see TaskMetadataChips).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskEditorTopBar(
     priority: Priority,
     onPriorityChange: (Priority) -> Unit,
-    dueDate: Long?,
-    onDueDateChange: (Long?) -> Unit,
     isDone: Boolean,
-    reminderTime: Long?,
-    onReminderTimeChange: (Long?) -> Unit,
     onComplete: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit
@@ -77,16 +79,6 @@ fun TaskEditorTopBar(
                     )
                 }
 
-                DateSelector(
-                    dueDate = dueDate,
-                    onDueDateChange = onDueDateChange,
-                    showLabel = true
-                )
-                ReminderSelector(
-                    reminderTime = reminderTime,
-                    onReminderTimeChange = onReminderTimeChange
-                )
-
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
@@ -102,9 +94,8 @@ fun TaskEditorTopBar(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    if (isDone) stringResource(R.string.mark_pending) else stringResource(
-                                        R.string.mark_completed
-                                    )
+                                    if (isDone) stringResource(R.string.mark_pending)
+                                    else stringResource(R.string.mark_completed)
                                 )
                             },
                             leadingIcon = {

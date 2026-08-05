@@ -61,4 +61,7 @@
     <!-- Selector de categoría (editor de tarea/idea/lista) -->
     <string name="category_general">General</string>
     <string name="category_selector_title">Mover a categoría</string>
+    <!-- Task editor: fila de chips de metadatos -->
+    <string name="task_meta_add_date">Fecha</string>
+    <string name="task_meta_add_reminder">Recordatorio</string>
 </resources>

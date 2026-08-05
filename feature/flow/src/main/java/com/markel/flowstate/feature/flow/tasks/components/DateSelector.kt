@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -45,7 +46,8 @@ fun DateSelector(
     dueDate: Long?,
     onDueDateChange: (Long?) -> Unit,
     modifier: Modifier = Modifier,
-    showLabel: Boolean = true
+    showLabel: Boolean = true,
+    ghostChipWhenUnset: Boolean = false
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -113,52 +115,58 @@ fun DateSelector(
         }
     }
 
-    if (dueDate != null && showLabel) {
-        AssistChip(
-            onClick = { showDatePicker = true },
-            label = {
-                Text(
-                    formatDate(dueDate),
-                    color = if (isDateOverdue(dueDate)) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    }
-                )
-            },
-            leadingIcon = {
-                Icon(
-                    imageVector = ImageVector.vectorResource(R.drawable.event_24px),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (isDateOverdue(dueDate)) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onPrimary
-                    }
-                )
-            },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = if (isDateOverdue(dueDate)) {
-                    MaterialTheme.colorScheme.errorContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-            ),
-            border = null,
-            modifier = modifier
-        )
-    } else {
-        IconButton(
-            onClick = { showDatePicker = true },
-            modifier = modifier
-        ) {
-            Icon(
-                imageVector = ImageVector.vectorResource(R.drawable.calendar_today_24px),
-                "Date",
-                tint = if (dueDate != null) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant
+    when {
+        dueDate != null && showLabel -> {
+            val contentColor = if (isDateOverdue(dueDate)) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.primary
+            }
+            AssistChip(
+                onClick = { showDatePicker = true },
+                label = {
+                    Text(
+                        formatDate(dueDate),
+                        color = contentColor
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.event_24px),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = contentColor
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = Color.Transparent
+                ),
+                border = AssistChipDefaults.assistChipBorder(enabled = true),
+                modifier = modifier
             )
+        }
+
+        ghostChipWhenUnset && showLabel -> {
+            GhostMetaChip(
+                label = stringResource(R.string.task_meta_add_date),
+                iconRes = R.drawable.calendar_today_24px,
+                onClick = { showDatePicker = true },
+                modifier = modifier
+            )
+        }
+
+        else -> {
+            IconButton(
+                onClick = { showDatePicker = true },
+                modifier = modifier
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.calendar_today_24px),
+                    "Date",
+                    tint = if (dueDate != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

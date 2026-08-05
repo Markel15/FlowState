@@ -6,12 +6,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -49,6 +49,8 @@ fun TaskEditorSheetContent(
     dueDate: Long?,
     remTime: Long?,
     onAutoUpdate: (String, String, Priority, Long?, Long?, List<SubTask>) -> Unit,
+    onDueDateChange: (Long?) -> Unit = {},
+    onReminderTimeChange: (Long?) -> Unit = {},
     categories: List<Category> = emptyList(),
     categoriesEnabled: Boolean = false,
     categoryId: Int? = null,
@@ -196,57 +198,79 @@ fun TaskEditorSheetContent(
         }
 
 
-        // TASK
-        TextField(
-            value = title,
-            onValueChange = { title = it },
+        // ── Title & description
+        Box(
+            contentAlignment = Alignment.CenterStart,
             modifier = Modifier
                 .fillMaxWidth()
-                .focusRequester(focusRequester),
-            placeholder = {
+                .padding(vertical = 6.dp)
+        ) {
+            if (title.isEmpty()) {
                 Text(
-                    stringResource(R.string.edit_task_placeholder),
-                    style = MaterialTheme.typography.titleLarge
+                    text = stringResource(R.string.edit_task_placeholder),
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 30.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
-            },
-            textStyle = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Sentences,
-                imeAction = ImeAction.Next
+            }
+            BasicTextField(
+                value = title,
+                onValueChange = { title = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                textStyle = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 30.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Next
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
             )
-        )
+        }
 
-        TextField(
-            value = description,
-            onValueChange = { description = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    stringResource(R.string.edit_task_desc_placeholder),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            },
-            textStyle = MaterialTheme.typography.bodyLarge,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().height(8.dp)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            if (description.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.edit_task_desc_placeholder),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                )
+            }
+            BasicTextField(
+                value = description,
+                onValueChange = { description = it },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
+            )
+        }
+
+        // ── Metadata: due date · reminder as outlined chips ───────────
+        Spacer(modifier = Modifier.height(10.dp))
+        TaskMetadataChips(
+            dueDate = dueDate,
+            onDueDateChange = onDueDateChange,
+            reminderTime = remTime,
+            onReminderTimeChange = onReminderTimeChange
         )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // SUBTASKS

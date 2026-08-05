@@ -47,7 +47,8 @@ import java.time.format.DateTimeFormatter
 fun ReminderSelector(
     reminderTime: Long?,
     onReminderTimeChange: (Long?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ghostChipWhenUnset: Boolean = false
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -278,7 +279,7 @@ fun ReminderSelector(
             label = {
                 Text(
                     formatReminderDateTime(reminderTime),
-                    color = MaterialTheme.colorScheme.onTertiary
+                    color = MaterialTheme.colorScheme.tertiary
                 )
             },
             leadingIcon = {
@@ -286,13 +287,20 @@ fun ReminderSelector(
                     imageVector = ImageVector.vectorResource(R.drawable.notifications_active_24px),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onTertiary
+                    tint = MaterialTheme.colorScheme.tertiary
                 )
             },
             colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.tertiary
+                containerColor = Color.Transparent
             ),
-            border = null,
+            border = AssistChipDefaults.assistChipBorder(enabled = true),
+            modifier = modifier
+        )
+    } else if (ghostChipWhenUnset) {
+        GhostMetaChip(
+            label = stringResource(R.string.task_meta_add_reminder),
+            iconRes = R.drawable.notification_add_24px,
+            onClick = { openReminderPicker() },
             modifier = modifier
         )
     } else {
