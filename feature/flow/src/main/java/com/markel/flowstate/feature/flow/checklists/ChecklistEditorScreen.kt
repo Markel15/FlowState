@@ -206,7 +206,7 @@ fun CheckListEditorScreen(
                 BasicTextField(
                     value = editorState.title,
                     onValueChange = { viewModel.updateTitle(it) },
-                    textStyle = TextStyle(
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = 24.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = onCardColor
@@ -221,7 +221,11 @@ fun CheckListEditorScreen(
                                 Text(
                                     text = stringResource(R.string.title),
                                     fontSize = 24.sp,
-                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontSize = 23.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        lineHeight = 30.sp
+                                    ),
                                     color = onCardColor.copy(alpha = 0.4f)
                                 )
                             }

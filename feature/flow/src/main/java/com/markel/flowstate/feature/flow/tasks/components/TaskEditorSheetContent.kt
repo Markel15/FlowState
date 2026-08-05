@@ -209,6 +209,7 @@ fun TaskEditorSheetContent(
                 Text(
                     text = stringResource(R.string.edit_task_placeholder),
                     style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = 23.sp,
                         fontWeight = FontWeight.Normal,
                         lineHeight = 30.sp
                     ),
@@ -222,6 +223,7 @@ fun TaskEditorSheetContent(
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
+                    fontSize = 23.sp,
                     fontWeight = FontWeight.Normal,
                     lineHeight = 30.sp,
                     color = MaterialTheme.colorScheme.onSurface
