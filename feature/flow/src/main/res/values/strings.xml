@@ -60,7 +60,7 @@
 
     <!-- Selector de categoría (editor de tarea/idea/lista) -->
     <string name="category_general">General</string>
-    <string name="category_selector_title">Move a category</string>
+    <string name="category_selector_title">Move to category</string>
     <!-- Task editor: metadata chips row -->
     <string name="task_meta_add_date">Date</string>
     <string name="task_meta_add_reminder">Reminder</string>
