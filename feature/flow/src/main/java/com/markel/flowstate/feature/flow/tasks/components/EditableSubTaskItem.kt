@@ -211,7 +211,7 @@ fun EditableSubTaskItem(
                     if (isExpanded) {
                         IconButton(onClick = { onExpandChange(false) }) {
                             Icon(
-                                imageVector = ImageVector.vectorResource(R.drawable.arrow_back_24px),
+                                imageVector = ImageVector.vectorResource(R.drawable.close_24px),
                                 contentDescription = "Cancel edit",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )

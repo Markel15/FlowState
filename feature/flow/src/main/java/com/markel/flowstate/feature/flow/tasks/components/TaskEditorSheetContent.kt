@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -41,7 +42,7 @@ import com.markel.flowstate.feature.tasks.R
 import kotlinx.coroutines.delay
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TaskEditorSheetContent(
     task: Task?,
@@ -273,9 +274,9 @@ fun TaskEditorSheetContent(
             onReminderTimeChange = onReminderTimeChange
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // SUBTASKS
+        // SUBTASKS — computed lists & completed-chevron state
         val pendingSubTasks = remember(subTasks.toList()) {
             subTasks.filter { !it.isDone }
         }
@@ -288,96 +289,103 @@ fun TaskEditorSheetContent(
             label = "chevron_rotation"
         )
 
-        Text(
-            stringResource(R.string.subtasks),
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp
-            ),
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+        // ── Subtasks section ────────────────────────────────────────────────
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = ImageVector.vectorResource(R.drawable.subtask_24px),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = stringResource(R.string.subtasks),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // list of pending subtasks
-        if (pendingSubTasks.isNotEmpty()) {
-            Column (
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ){
-                pendingSubTasks.forEachIndexed { index, subTask ->
-                    val isFirst = index == 0
-                    val isLast = index == pendingSubTasks.lastIndex
-                    val isSingle = pendingSubTasks.size == 1
-                    val shape = when {
-                        isSingle -> RoundedCornerShape(16.dp)
-                        isFirst  -> RoundedCornerShape(
-                            topStart = 16.dp, topEnd = 16.dp,
-                            bottomStart = 4.dp, bottomEnd = 4.dp
-                        )
-                        isLast   -> RoundedCornerShape(
-                            topStart = 4.dp, topEnd = 4.dp,
-                            bottomStart = 16.dp, bottomEnd = 16.dp
-                        )
-                        else -> RoundedCornerShape(4.dp)
-                    }
-
-                    EditableSubTaskItem(
-                        subTask = subTask,
-                        isExpanded = expandedSubTaskId == subTask.id,
-                        itemShape = shape,
-                        onExpandChange = { shouldExpand ->
-                            expandedSubTaskId = if (shouldExpand) subTask.id else null
-                        },
-                        onUpdate = { updatedSubTask ->
-                            val realIndex = subTasks.indexOfFirst { it.id == updatedSubTask.id }
-                            if (realIndex != -1) {
-                                subTasks[realIndex] = updatedSubTask
-                            }
-                        },
-                        onCheckedChange = {
-                            // We need to find the index in the REAL list, not the visible list
-                            val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                            if (realIndex != -1) {
-                                subTasks[realIndex] = subTask.copy(isDone = !subTask.isDone)
-                            }
-                        },
-                        onDelete = {
-                            val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                            if (realIndex != -1) subTasks.removeAt(realIndex)
-                            // Close expansion if this was the expanded item
-                            if (expandedSubTaskId == subTask.id) expandedSubTaskId = null
-                        }
+        // Pending list + "add" row
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            pendingSubTasks.forEachIndexed { index, subTask ->
+                val isFirst = index == 0
+                val isLast = index == pendingSubTasks.lastIndex
+                val isSingle = pendingSubTasks.size == 1
+                val shape = when {
+                    isSingle -> RoundedCornerShape(16.dp)
+                    isFirst  -> RoundedCornerShape(
+                        topStart = 16.dp, topEnd = 16.dp,
+                        bottomStart = 4.dp, bottomEnd = 4.dp
                     )
+                    isLast   -> RoundedCornerShape(
+                        topStart = 4.dp, topEnd = 4.dp,
+                        bottomStart = 16.dp, bottomEnd = 16.dp
+                    )
+                    else -> RoundedCornerShape(4.dp)
                 }
+
+                EditableSubTaskItem(
+                    subTask = subTask,
+                    isExpanded = expandedSubTaskId == subTask.id,
+                    itemShape = shape,
+                    onExpandChange = { shouldExpand ->
+                        expandedSubTaskId = if (shouldExpand) subTask.id else null
+                    },
+                    onUpdate = { updatedSubTask ->
+                        val realIndex = subTasks.indexOfFirst { it.id == updatedSubTask.id }
+                        if (realIndex != -1) {
+                            subTasks[realIndex] = updatedSubTask
+                        }
+                    },
+                    onCheckedChange = {
+                        // We need to find the index in the REAL list, not the visible list
+                        val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
+                        if (realIndex != -1) {
+                            subTasks[realIndex] = subTask.copy(isDone = !subTask.isDone)
+                        }
+                    },
+                    onDelete = {
+                        val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
+                        if (realIndex != -1) subTasks.removeAt(realIndex)
+                        // Close expansion if this was the expanded item
+                        if (expandedSubTaskId == subTask.id) expandedSubTaskId = null
+                    }
+                )
             }
+
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Button to create a new subtask
-        TextButton(
+        // Add subtask: small button centered under the group
+        FilledTonalButton(
             onClick = {
-                // Close any expanded subtask before opening creation sheet
+                // Close any expanded subtask before opening the creation sheet
                 expandedSubTaskId = null
                 showCreationSheet = true
             },
-            colors = ButtonDefaults.textButtonColors(
+            shapes = ButtonDefaults.shapes(),
+            colors = ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                 contentColor = MaterialTheme.colorScheme.primary
             ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .imePadding()
+            modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
-            Icon(ImageVector.vectorResource(R.drawable.add_24px), contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(stringResource(R.string.add_subtask), fontWeight = FontWeight.SemiBold)
+            Icon(
+                imageVector = ImageVector.vectorResource(R.drawable.add_24px),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(stringResource(R.string.add_subtask))
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         // ── Completed subtasks section ──────────────────────────────────────
         if (completedSubTasks.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier

@@ -7,7 +7,7 @@
     <string name="description_placeholder">Descripción (opcional)</string>
     <string name="edit_task_placeholder">¿Qué hay que hacer?</string>
     <string name="edit_task_desc_placeholder">Añadir detalles</string>
-    <string name="subtasks">SUBTAREAS</string>
+    <string name="subtasks">Subtareas</string>
     <string name="idea">Idea</string>
     <string name="task">Tarea</string>
     <string name="clear">Todo limpio</string>
