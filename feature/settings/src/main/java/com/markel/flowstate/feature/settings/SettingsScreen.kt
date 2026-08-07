@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.markel.flowstate.feature.settings.components.settingsItemShape
 
@@ -65,7 +66,8 @@ fun SettingsScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.settings),
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

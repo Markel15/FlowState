@@ -43,6 +43,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -129,7 +130,8 @@ fun BackupScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.backup_title),
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {

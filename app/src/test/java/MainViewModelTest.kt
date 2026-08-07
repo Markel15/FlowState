@@ -248,4 +248,26 @@ class MainViewModelTest {
         coVerify(exactly = 1) { userPreferencesRepository.saveThemeMode(ThemeMode.DARK) }
         coVerify(exactly = 1) { userPreferencesRepository.saveDynamicColor(true) }
     }
+
+    /**
+     * `savePureSurfaces` and `saveSystemFont` must persist via their respective
+     * repository methods.
+     *
+     * Called by [AppearanceScreen]'s appearance toggles ("Pure surfaces" and
+     * "System font"); both must round-trip to DataStore so the chosen surfaces
+     * and typeface survive process death and reach [FlowStateTheme] on the
+     * next cold start.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun savePureSurfaces_and_saveSystemFont_persistViaRepository() = runTest {
+        val viewModel = buildViewModel()
+
+        viewModel.savePureSurfaces(enabled = true)
+        viewModel.saveSystemFont(enabled = true)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { userPreferencesRepository.savePureSurfaces(true) }
+        coVerify(exactly = 1) { userPreferencesRepository.saveSystemFont(true) }
+    }
 }

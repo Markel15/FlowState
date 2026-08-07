@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -107,7 +108,8 @@ fun CategoriesScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.categories_title),
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {

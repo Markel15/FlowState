@@ -83,7 +83,8 @@ fun AboutScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.about_title),
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 },
                 navigationIcon = {
