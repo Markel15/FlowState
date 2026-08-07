@@ -98,6 +98,7 @@ class UserPreferencesRepository @Inject constructor(
     private val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
 
     private val PURE_SURFACES_KEY = booleanPreferencesKey("pure_surfaces")
+    private val SYSTEM_FONT_KEY = booleanPreferencesKey("system_font")
 
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         val name = preferences[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name
@@ -132,6 +133,17 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun savePureSurfaces(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PURE_SURFACES_KEY] = enabled
+        }
+    }
+
+    /** System font: platform default typeface instead of the bundled Roboto Flex. */
+    val systemFont: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[SYSTEM_FONT_KEY] ?: false
+    }
+
+    suspend fun saveSystemFont(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SYSTEM_FONT_KEY] = enabled
         }
     }
 

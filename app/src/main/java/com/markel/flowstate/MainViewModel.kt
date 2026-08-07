@@ -60,6 +60,14 @@ class MainViewModel @Inject constructor(
             initialValue = false
         )
 
+    /** Whether the platform system typeface is used instead of the bundled Roboto Flex */
+    val systemFont: StateFlow<Boolean> = userPreferencesRepository.systemFont
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     init {
         viewModelScope.launch {
             // Combine last tab with hidden tabs to ensure startDestination is always visible
@@ -107,6 +115,12 @@ class MainViewModel @Inject constructor(
     fun savePureSurfaces(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.savePureSurfaces(enabled)
+        }
+    }
+
+    fun saveSystemFont(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveSystemFont(enabled)
         }
     }
 

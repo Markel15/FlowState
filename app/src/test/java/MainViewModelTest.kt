@@ -54,6 +54,7 @@ class MainViewModelTest {
         coEvery { userPreferencesRepository.themeMode } returns flowOf(ThemeMode.SYSTEM)
         coEvery { userPreferencesRepository.dynamicColor } returns flowOf(false)
         coEvery { userPreferencesRepository.pureSurfaces } returns flowOf(false)
+        coEvery { userPreferencesRepository.systemFont } returns flowOf(false)
     }
 
     private fun buildViewModel() = MainViewModel(userPreferencesRepository)

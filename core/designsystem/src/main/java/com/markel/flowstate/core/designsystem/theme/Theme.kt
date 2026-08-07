@@ -307,6 +307,9 @@ fun FlowStateTheme(
     // light theme. Orthogonal to [themeMode] (it also applies to SYSTEM) and
     // composes with [dynamicColor], exactly like [dynamicColor] composes with modes.
     pureSurfaces: Boolean = false,
+    // System font: true swaps the bundled Roboto Flex (plus its ss02/dlig features)
+    // for the platform default typeface.
+    systemFont: Boolean = false,
     content: @Composable() () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -344,7 +347,7 @@ fun FlowStateTheme(
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
-            typography = FlowStateTypography(),
+            typography = if (systemFont) Typography() else FlowStateTypography(),
             motionScheme = MotionScheme.expressive(),
             content = content
         )

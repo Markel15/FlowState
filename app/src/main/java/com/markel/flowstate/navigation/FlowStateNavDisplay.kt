@@ -78,9 +78,11 @@ fun FlowStateNavDisplay(
     themeMode: ThemeMode,
     dynamicColor: Boolean,
     pureSurfaces: Boolean,
+    systemFont: Boolean,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onPureSurfacesChange: (Boolean) -> Unit,
+    onSystemFontChange: (Boolean) -> Unit,
     bottomBar: @Composable () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     modifier: Modifier = Modifier,
@@ -256,9 +258,11 @@ fun FlowStateNavDisplay(
                 currentThemeMode = themeMode,
                 currentDynamicColor = dynamicColor,
                 currentPureSurfaces = pureSurfaces,
+                currentSystemFont = systemFont,
                 onThemeModeChange = onThemeModeChange,
                 onDynamicColorChange = onDynamicColorChange,
                 onPureSurfacesChange = onPureSurfacesChange,
+                onSystemFontChange = onSystemFontChange,
                 onBack = { navigator.goBack() },
             )
         }

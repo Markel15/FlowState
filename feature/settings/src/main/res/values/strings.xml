@@ -51,6 +51,8 @@
     <string name="theme_dark">Dark</string>
     <string name="settings_pure_surfaces">Pure surfaces</string>
     <string name="settings_pure_surfaces_desc">True black backgrounds in dark theme, true white in light theme</string>
+    <string name="settings_system_font">System font</string>
+    <string name="settings_system_font_desc">Use the device font</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_desc">Adapt app colors to your wallpaper (Android 12+)</string>
     <string name="settings_dynamic_color_unavailable">Requires Android 12 or above</string>

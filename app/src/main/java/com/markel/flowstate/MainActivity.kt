@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
             val dynamicColor by mainViewModel.dynamicColor.collectAsStateWithLifecycle()
             val pureSurfaces by mainViewModel.pureSurfaces.collectAsStateWithLifecycle()
+            val systemFont by mainViewModel.systemFont.collectAsStateWithLifecycle()
 
             splashScreen.setKeepOnScreenCondition { !isReady }
 
@@ -61,7 +62,8 @@ class MainActivity : ComponentActivity() {
                 FlowStateTheme(
                     themeMode = themeMode,
                     dynamicColor = dynamicColor,
-                    pureSurfaces = pureSurfaces
+                    pureSurfaces = pureSurfaces,
+                    systemFont = systemFont
                 ) {
                     // Check Orientation
                     val configuration = LocalConfiguration.current
@@ -126,9 +128,11 @@ class MainActivity : ComponentActivity() {
                                 themeMode = themeMode,
                                 dynamicColor = dynamicColor,
                                 pureSurfaces = pureSurfaces,
+                                systemFont = systemFont,
                                 onThemeModeChange = mainViewModel::saveThemeMode,
                                 onDynamicColorChange = mainViewModel::saveDynamicColor,
                                 onPureSurfacesChange = mainViewModel::savePureSurfaces,
+                                onSystemFontChange = mainViewModel::saveSystemFont,
                                 sharedTransitionScope = this,
                                 bottomBar = {
                                     FlowBottomBar(

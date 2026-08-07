@@ -39,9 +39,11 @@ fun AppearanceScreen(
     currentThemeMode: ThemeMode,
     currentDynamicColor: Boolean,
     currentPureSurfaces: Boolean,
+    currentSystemFont: Boolean,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onPureSurfacesChange: (Boolean) -> Unit,
+    onSystemFontChange: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -119,7 +121,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 3))
+                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 4))
             )
 
             // ── Dynamic color ──
@@ -153,7 +155,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 3))
+                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 4))
             )
 
             // ── Pure surfaces ──
@@ -180,7 +182,34 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 2, totalItems = 3))
+                modifier = Modifier.clip(settingsItemShape(index = 2, totalItems = 4))
+            )
+
+            // ── System font ──
+            ListItem(
+                leadingContent = {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.font_download_24px),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                headlineContent = {
+                    Text(text = stringResource(R.string.settings_system_font))
+                },
+                supportingContent = {
+                    Text(text = stringResource(R.string.settings_system_font_desc))
+                },
+                trailingContent = {
+                    Switch(
+                        checked = currentSystemFont,
+                        onCheckedChange = { onSystemFontChange(it) }
+                    )
+                },
+                colors = ListItemDefaults.colors(
+                    containerColor = groupContainerColor
+                ),
+                modifier = Modifier.clip(settingsItemShape(index = 3, totalItems = 4))
             )
         }
     }
