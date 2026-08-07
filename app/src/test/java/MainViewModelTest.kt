@@ -53,6 +53,7 @@ class MainViewModelTest {
         coEvery { userPreferencesRepository.bottomNavOrder } returns orderFlow
         coEvery { userPreferencesRepository.themeMode } returns flowOf(ThemeMode.SYSTEM)
         coEvery { userPreferencesRepository.dynamicColor } returns flowOf(false)
+        coEvery { userPreferencesRepository.pureSurfaces } returns flowOf(false)
     }
 
     private fun buildViewModel() = MainViewModel(userPreferencesRepository)

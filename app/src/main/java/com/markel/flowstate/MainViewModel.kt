@@ -52,6 +52,14 @@ class MainViewModel @Inject constructor(
             initialValue = false
         )
 
+    /** Whether neutral pure surfaces (true black / true white) are activated or not */
+    val pureSurfaces: StateFlow<Boolean> = userPreferencesRepository.pureSurfaces
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
     init {
         viewModelScope.launch {
             // Combine last tab with hidden tabs to ensure startDestination is always visible
@@ -93,6 +101,12 @@ class MainViewModel @Inject constructor(
     fun saveDynamicColor(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.saveDynamicColor(enabled)
+        }
+    }
+
+    fun savePureSurfaces(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.savePureSurfaces(enabled)
         }
     }
 

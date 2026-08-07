@@ -97,6 +97,8 @@ class UserPreferencesRepository @Inject constructor(
     private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
     private val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
 
+    private val PURE_SURFACES_KEY = booleanPreferencesKey("pure_surfaces")
+
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
         val name = preferences[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name
         try {
@@ -119,6 +121,17 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun saveDynamicColor(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[DYNAMIC_COLOR_KEY] = enabled
+        }
+    }
+
+    /** Neutral "pure surfaces": true black backgrounds in dark theme, true white in light. */
+    val pureSurfaces: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PURE_SURFACES_KEY] ?: false
+    }
+
+    suspend fun savePureSurfaces(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PURE_SURFACES_KEY] = enabled
         }
     }
 

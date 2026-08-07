@@ -49,6 +49,8 @@
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
     <string name="theme_dark">Oscuro</string>
+    <string name="settings_pure_surfaces">Superficies puras</string>
+    <string name="settings_pure_surfaces_desc">Fondos en negro puro en el tema oscuro y blanco puro en el claro</string>
     <string name="settings_dynamic_color">Color dinámico</string>
     <string name="settings_dynamic_color_desc">Adaptar colores al fondo de pantalla (Android 12+)</string>
     <string name="settings_dynamic_color_unavailable">Requiere Android 12 o superior</string>

@@ -53,13 +53,15 @@ class MainActivity : ComponentActivity() {
             val bottomNavHidden by mainViewModel.bottomNavHidden.collectAsState()
             val themeMode by mainViewModel.themeMode.collectAsStateWithLifecycle()
             val dynamicColor by mainViewModel.dynamicColor.collectAsStateWithLifecycle()
+            val pureSurfaces by mainViewModel.pureSurfaces.collectAsStateWithLifecycle()
 
             splashScreen.setKeepOnScreenCondition { !isReady }
 
             if (isReady) {
                 FlowStateTheme(
                     themeMode = themeMode,
-                    dynamicColor = dynamicColor
+                    dynamicColor = dynamicColor,
+                    pureSurfaces = pureSurfaces
                 ) {
                     // Check Orientation
                     val configuration = LocalConfiguration.current
@@ -123,8 +125,10 @@ class MainActivity : ComponentActivity() {
                                 onBottomNavConfigChanged = mainViewModel::saveBottomNavConfig,
                                 themeMode = themeMode,
                                 dynamicColor = dynamicColor,
+                                pureSurfaces = pureSurfaces,
                                 onThemeModeChange = mainViewModel::saveThemeMode,
                                 onDynamicColorChange = mainViewModel::saveDynamicColor,
+                                onPureSurfacesChange = mainViewModel::savePureSurfaces,
                                 sharedTransitionScope = this,
                                 bottomBar = {
                                     FlowBottomBar(

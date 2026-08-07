@@ -38,8 +38,10 @@ import com.markel.flowstate.feature.settings.components.settingsItemShape
 fun AppearanceScreen(
     currentThemeMode: ThemeMode,
     currentDynamicColor: Boolean,
+    currentPureSurfaces: Boolean,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onPureSurfacesChange: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -117,7 +119,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 2))
+                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 3))
             )
 
             // ── Dynamic color ──
@@ -151,7 +153,34 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 2))
+                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 3))
+            )
+
+            // ── Pure surfaces ──
+            ListItem(
+                leadingContent = {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.contrast_24px),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                headlineContent = {
+                    Text(text = stringResource(R.string.settings_pure_surfaces))
+                },
+                supportingContent = {
+                    Text(text = stringResource(R.string.settings_pure_surfaces_desc))
+                },
+                trailingContent = {
+                    Switch(
+                        checked = currentPureSurfaces,
+                        onCheckedChange = { onPureSurfacesChange(it) }
+                    )
+                },
+                colors = ListItemDefaults.colors(
+                    containerColor = groupContainerColor
+                ),
+                modifier = Modifier.clip(settingsItemShape(index = 2, totalItems = 3))
             )
         }
     }

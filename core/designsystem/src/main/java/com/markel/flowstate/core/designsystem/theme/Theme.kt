@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -302,6 +303,10 @@ fun FlowStateTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
+    // Neutral "pure surfaces": true black backgrounds in dark theme, true white in
+    // light theme. Orthogonal to [themeMode] (it also applies to SYSTEM) and
+    // composes with [dynamicColor], exactly like [dynamicColor] composes with modes.
+    pureSurfaces: Boolean = false,
     content: @Composable() () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -318,7 +323,7 @@ fun FlowStateTheme(
 
       darkTheme -> darkScheme
       else -> lightScheme
-    }
+    }.let { if (pureSurfaces) it.pureSurfaces(darkTheme) else it }
     val priorityColorScheme = if (darkTheme) darkPriorityScheme else lightPriorityScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -345,6 +350,30 @@ fun FlowStateTheme(
         )
     }
 }
+
+/**
+ * Neutral "pure surfaces" variant: pulls the base surfaces to true black
+ * ([darkTheme] == true) or true white (light). Only the ends of the ladder
+ * are flattened — in dark, [ColorScheme.surfaceDim]; in light,
+ * [ColorScheme.surfaceBright]. All container roles stay untouched because
+ * they are already one step away from the base surface, so cards, sheets and
+ * segmented groups keep reading as elevated layers over the pure base.
+ * Accent colors are not modified.
+ */
+private fun ColorScheme.pureSurfaces(darkTheme: Boolean): ColorScheme =
+    if (darkTheme) {
+        copy(
+            background = Color.Black,
+            surface = Color.Black,
+            surfaceDim = Color.Black
+        )
+    } else {
+        copy(
+            background = Color.White,
+            surface = Color.White,
+            surfaceBright = Color.White
+        )
+    }
 
 val MaterialTheme.priority: PriorityColorScheme
     @Composable
