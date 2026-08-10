@@ -208,6 +208,7 @@ fun CheckListEditorScreen(
                     onValueChange = { viewModel.updateTitle(it) },
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = 24.sp,
+                        lineHeight = 29.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = onCardColor
                     ),
@@ -220,11 +221,10 @@ fun CheckListEditorScreen(
                             if (editorState.title.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.title),
-                                    fontSize = 24.sp,
                                     style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontSize = 23.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        lineHeight = 30.sp
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        lineHeight = 29.sp
                                     ),
                                     color = onCardColor.copy(alpha = 0.4f)
                                 )

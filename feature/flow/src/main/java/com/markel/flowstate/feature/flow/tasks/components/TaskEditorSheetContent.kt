@@ -212,7 +212,7 @@ fun TaskEditorSheetContent(
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = 23.sp,
                         fontWeight = FontWeight.SemiBold,
-                        lineHeight = 30.sp
+                        lineHeight = 28.sp
                     ),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
@@ -226,7 +226,7 @@ fun TaskEditorSheetContent(
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
-                    lineHeight = 30.sp,
+                    lineHeight = 28.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 ),
                 keyboardOptions = KeyboardOptions(
