@@ -24,17 +24,15 @@
 - **Drag & Drop**: Reorder tasks via intuitive drag handles
 - **Auto-save**: Changes are saved automatically when editing a task
 - **Material 3**: Modern design
-- **Task Scheduling**: Add due dates
+- **Task Scheduling**: With due dates and reminders
 - **Calendar** view
 - **Habit Tracking**: Build daily routines and track streaks
-- **Reminders**
 - **Widgets** for basic habits
 
 ### In Development
 - **Widgets**: More widgets
 - **Mood Tracking**: Log daily emotions and view trends
-- **Improve UI**: in the flow module
-- **Themes**: More customization options
+- **Improve UX**: with the subtasks
 - Any new **suggestion**
 
 ## Motivation
