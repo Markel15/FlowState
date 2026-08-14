@@ -58,7 +58,7 @@ fun ReminderPermissionBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 10.dp)
                 .background(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(16.dp)
