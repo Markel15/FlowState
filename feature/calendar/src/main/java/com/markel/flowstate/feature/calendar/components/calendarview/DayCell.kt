@@ -41,9 +41,12 @@ fun DayCell(
     // Only show selection circle if the day is in the current month AND selected
     val showSelection = isSelected && isCurrentMonth
 
+    // The "today" emphasis only applies inside the current month.
+    val isTodayInMonth = isToday && isCurrentMonth
+
     val textColor = when {
         showSelection -> MaterialTheme.colorScheme.onPrimary
-        isToday -> MaterialTheme.colorScheme.onSurfaceVariant
+        isTodayInMonth -> MaterialTheme.colorScheme.onSurfaceVariant
         isCurrentMonth -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
     }
@@ -61,7 +64,7 @@ fun DayCell(
             .background(
                 color = when {
                     showSelection -> MaterialTheme.colorScheme.primary
-                    isToday && isCurrentMonth -> MaterialTheme.colorScheme.surfaceVariant
+                    isTodayInMonth -> MaterialTheme.colorScheme.surfaceVariant
                     else -> Color.Transparent
                 },
                 shape = shape
@@ -75,7 +78,7 @@ fun DayCell(
                 text = day.date.dayOfMonth.toString(),
                 color = textColor,
                 fontSize = 16.sp,
-                fontWeight = if (showSelection || isToday) FontWeight.Bold else FontWeight.Normal
+                fontWeight = if (showSelection || isTodayInMonth) FontWeight.Bold else FontWeight.Normal
             )
 
             // Dot if there are tasks
