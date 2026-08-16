@@ -335,7 +335,8 @@ fun EditableSubTaskItem(
                             DateSelector(
                                 dueDate = editedDueDate,
                                 onDueDateChange = { editedDueDate = it },
-                                showLabel = true
+                                showLabel = true,
+                                filled = true
                             )
                         }
 

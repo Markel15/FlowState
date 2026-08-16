@@ -48,7 +48,8 @@ fun ReminderSelector(
     reminderTime: Long?,
     onReminderTimeChange: (Long?) -> Unit,
     modifier: Modifier = Modifier,
-    ghostChipWhenUnset: Boolean = false
+    ghostChipWhenUnset: Boolean = false,
+    filled: Boolean = false
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -273,13 +274,17 @@ fun ReminderSelector(
     }
 
     // ── Trigger UI ────────────────────────────────────────────────────────────
+    // Same dual style as DateSelector: outlined (editor metadata strip) or
+    // filled (capture contexts — creation sheet).
     if (reminderTime != null) {
+        val contentColor = if (filled) MaterialTheme.colorScheme.onTertiary
+        else MaterialTheme.colorScheme.tertiary
         AssistChip(
             onClick = { openReminderPicker() },
             label = {
                 Text(
                     formatReminderDateTime(reminderTime),
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = contentColor
                 )
             },
             leadingIcon = {
@@ -287,13 +292,14 @@ fun ReminderSelector(
                     imageVector = ImageVector.vectorResource(R.drawable.notifications_active_24px),
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.tertiary
+                    tint = contentColor
                 )
             },
             colors = AssistChipDefaults.assistChipColors(
-                containerColor = Color.Transparent
+                containerColor = if (filled) MaterialTheme.colorScheme.tertiary
+                else Color.Transparent
             ),
-            border = AssistChipDefaults.assistChipBorder(enabled = true),
+            border = if (filled) null else AssistChipDefaults.assistChipBorder(enabled = true),
             modifier = modifier
         )
     } else if (ghostChipWhenUnset) {

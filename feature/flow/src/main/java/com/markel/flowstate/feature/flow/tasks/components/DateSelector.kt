@@ -47,7 +47,8 @@ fun DateSelector(
     onDueDateChange: (Long?) -> Unit,
     modifier: Modifier = Modifier,
     showLabel: Boolean = true,
-    ghostChipWhenUnset: Boolean = false
+    ghostChipWhenUnset: Boolean = false,
+    filled: Boolean = false
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -117,10 +118,18 @@ fun DateSelector(
 
     when {
         dueDate != null && showLabel -> {
-            val contentColor = if (isDateOverdue(dueDate)) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.primary
+            // filled = false → quiet outlined chip
+            // filled = true  → solid chip for capture contexts
+            val overdue = isDateOverdue(dueDate)
+            val containerColor = when {
+                overdue -> MaterialTheme.colorScheme.errorContainer
+                filled -> MaterialTheme.colorScheme.primary
+                else -> Color.Transparent
+            }
+            val contentColor = when {
+                overdue -> MaterialTheme.colorScheme.error
+                filled -> MaterialTheme.colorScheme.onPrimary
+                else -> MaterialTheme.colorScheme.primary
             }
             AssistChip(
                 onClick = { showDatePicker = true },
@@ -139,9 +148,9 @@ fun DateSelector(
                     )
                 },
                 colors = AssistChipDefaults.assistChipColors(
-                    containerColor = Color.Transparent
+                    containerColor = containerColor
                 ),
-                border = AssistChipDefaults.assistChipBorder(enabled = true),
+                border = if (filled) null else AssistChipDefaults.assistChipBorder(enabled = true),
                 modifier = modifier
             )
         }

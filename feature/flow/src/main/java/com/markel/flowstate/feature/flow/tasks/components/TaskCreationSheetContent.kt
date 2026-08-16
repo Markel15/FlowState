@@ -120,11 +120,13 @@ fun TaskCreationSheetContent(
                 DateSelector(
                     dueDate = dueDate,
                     onDueDateChange = onDueDateChange,
-                    showLabel = true
+                    showLabel = true,
+                    filled = true
                 )
                 ReminderSelector(
                     reminderTime = reminderTime,
-                    onReminderTimeChange = onReminderTimeChange
+                    onReminderTimeChange = onReminderTimeChange,
+                    filled = true
                 )
                 IconButton(onClick = {
                     val nextPriority = when(priority) {
