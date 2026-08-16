@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.feature.tasks.R
 import com.markel.flowstate.feature.flow.tasks.util.asColor
+import com.markel.flowstate.feature.flow.tasks.util.flagIconRes
 
 /**
  * Editor top bar, deliberately quiet: navigate back, the priority flag
@@ -72,7 +73,7 @@ fun TaskEditorTopBar(
                     onPriorityChange(nextPriority)
                 }) {
                     Icon(
-                        imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
+                        imageVector = ImageVector.vectorResource(priority.flagIconRes()),
                         contentDescription = "Priority",
                         tint = priority.asColor(),
                         modifier = Modifier.size(24.dp)

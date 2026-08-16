@@ -64,6 +64,7 @@ import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.feature.tasks.R
 import com.markel.flowstate.feature.flow.tasks.util.asColor
+import com.markel.flowstate.feature.flow.tasks.util.flagIconRes
 import kotlinx.coroutines.delay
 
 @Composable
@@ -324,7 +325,7 @@ fun EditableSubTaskItem(
                                 }
                             }) {
                                 Icon(
-                                    imageVector = ImageVector.vectorResource(R.drawable.flag_2_24px),
+                                    imageVector = ImageVector.vectorResource(editedPriority.flagIconRes()),
                                     contentDescription = "Priority",
                                     tint = editedPriority.asColor(),
                                     modifier = Modifier.size(22.dp)
