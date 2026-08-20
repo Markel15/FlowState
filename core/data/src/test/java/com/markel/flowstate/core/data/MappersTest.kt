@@ -22,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.DayOfWeek
 
 /**
  * Unit tests for the bidirectional mapper extension functions in [Mappers.kt].
@@ -417,13 +418,17 @@ class MappersTest {
             name = "Running",
             iconName = "directions_run",
             colorArgb = 0xFFE91E63.toInt(),
-            frequency = "DAILY",
             createdAt = 1700000000000L,
             habitType = "NUMERIC",
             unit = "km",
             targetValue = 5.0f,
             step = 0.5f,
-            position = 2
+            position = 2,
+            scheduledDays = setOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.FRIDAY
+            )
         )
 
         val schema = entity.toSchema()
@@ -432,12 +437,12 @@ class MappersTest {
         assertEquals(entity.name, schema.name)
         assertEquals(entity.iconName, schema.iconName)
         assertEquals(entity.colorArgb, schema.colorArgb)
-        assertEquals(entity.frequency, schema.frequency)
         assertEquals(entity.createdAt, schema.createdAt)
         assertEquals(entity.habitType, schema.habitType)
         assertEquals(entity.unit, schema.unit)
         assertEquals(entity.step, schema.step, 0.001f)
         assertEquals(entity.position, schema.position)
+        assertEquals("MONDAY,WEDNESDAY,FRIDAY", schema.scheduledDays)
     }
 
     @Test
@@ -447,13 +452,13 @@ class MappersTest {
             name = "Reading",
             iconName = "menu_book",
             colorArgb = 0xFF4CAF50.toInt(),
-            frequency = "WEEKLY",
             createdAt = 1700099999999L,
             habitType = "BOOLEAN",
             unit = null,
             targetValue = null,
             step = 1f,
-            position = 0
+            position = 0,
+            scheduledDays = "TUESDAY,THURSDAY"
         )
 
         val entity = schema.toEntity()
@@ -462,19 +467,19 @@ class MappersTest {
         assertEquals(schema.name, entity.name)
         assertEquals(schema.iconName, entity.iconName)
         assertEquals(schema.colorArgb, entity.colorArgb)
-        assertEquals(schema.frequency, entity.frequency)
         assertEquals(schema.createdAt, entity.createdAt)
         assertEquals(schema.habitType, entity.habitType)
         assertEquals(schema.unit, entity.unit)
         assertEquals(schema.step, entity.step, 0.001f)
         assertEquals(schema.position, entity.position)
+        assertEquals(setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY), entity.scheduledDays)
     }
 
     @Test
     fun habitEntity_roundTrip_withAllFieldsPopulated() {
         val original = HabitEntity(
             id = 10, name = "Yoga", iconName = "self_improvement",
-            colorArgb = 0xFF9C27B0.toInt(), frequency = "DAILY",
+            colorArgb = 0xFF9C27B0.toInt(),
             createdAt = 5000L, habitType = "NUMERIC",
             unit = "min", targetValue = 30f, step = 5f, position = 8
         )
@@ -486,7 +491,7 @@ class MappersTest {
     fun habitEntity_roundTrip_withNullablesNull_preservesAllFields() {
         val original = HabitEntity(
             id = 11, name = "Meditate", iconName = "spa",
-            colorArgb = 0xFF6650A4.toInt(), frequency = "DAILY",
+            colorArgb = 0xFF6650A4.toInt(),
             createdAt = 6000L, habitType = "BOOLEAN",
             unit = null, targetValue = null, step = 1f, position = 0
         )
@@ -500,7 +505,7 @@ class MappersTest {
     fun habitSchema_roundTrip_preservesAllFields() {
         val original = HabitSchema(
             id = 30, name = "Push-ups", iconName = "fitness_center",
-            colorArgb = 0xFFF44336.toInt(), frequency = "DAILY",
+            colorArgb = 0xFFF44336.toInt(),
             createdAt = 7777L, habitType = "NUMERIC",
             unit = "reps", targetValue = 50f, step = 10f, position = 3
         )
@@ -633,7 +638,7 @@ class MappersTest {
         // Step is Float — verify zero step doesn't get lost
         val original = HabitEntity(
             id = 0, name = "Zero step", iconName = "",
-            colorArgb = 0, frequency = "",
+            colorArgb = 0,
             createdAt = 0L, habitType = "",
             unit = "", targetValue = 0f, step = 0f, position = 0
         )
@@ -686,7 +691,7 @@ class MappersTest {
     fun habitEntity_fullRoundTrip_viaJson_preservesNullableFields() {
         val original = HabitEntity(
             id = 1, name = "Full RT Habit", iconName = "spa",
-            colorArgb = 0xFF6650A4.toInt(), frequency = "DAILY",
+            colorArgb = 0xFF6650A4.toInt(),
             createdAt = 1700000000000L, habitType = "BOOLEAN",
             unit = null, targetValue = null, step = 1f, position = 0
         )
@@ -704,7 +709,7 @@ class MappersTest {
     fun habitEntity_fullRoundTrip_viaJson_withNumericFields_preservesAllFields() {
         val original = HabitEntity(
             id = 2, name = "Water intake", iconName = "water_drop",
-            colorArgb = 0xFF2196F3.toInt(), frequency = "DAILY",
+            colorArgb = 0xFF2196F3.toInt(),
             createdAt = 1700000000000L, habitType = "NUMERIC",
             unit = "ml", targetValue = 2000f, step = 250f, position = 1
         )

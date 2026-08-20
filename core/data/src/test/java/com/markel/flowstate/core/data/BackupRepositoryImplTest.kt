@@ -10,6 +10,7 @@ import com.markel.flowstate.core.data.local.CheckListDao
 import com.markel.flowstate.core.data.local.CheckListEntity
 import com.markel.flowstate.core.data.local.CheckListItemEntity
 import com.markel.flowstate.core.data.local.CheckListWithItems
+import com.markel.flowstate.core.data.local.HabitConverters
 import com.markel.flowstate.core.data.local.HabitDao
 import com.markel.flowstate.core.data.local.HabitEntryEntity
 import com.markel.flowstate.core.data.local.HabitEntity
@@ -79,7 +80,7 @@ class BackupRepositoryImplTest {
 
     private val sampleHabit = HabitEntity(
         id = 1, name = "Meditation", iconName = "self_improvement",
-        colorArgb = 0xFF6650A4.toInt(), frequency = "DAILY",
+        colorArgb = 0xFF6650A4.toInt(),
         createdAt = 1700000000000L, habitType = "BOOLEAN",
         unit = null, targetValue = null, step = 1f, position = 0
     )
@@ -448,13 +449,13 @@ class BackupRepositoryImplTest {
         assertEquals(sampleHabit.name, habit.name)
         assertEquals(sampleHabit.iconName, habit.iconName)
         assertEquals(sampleHabit.colorArgb, habit.colorArgb)
-        assertEquals(sampleHabit.frequency, habit.frequency)
         assertEquals(sampleHabit.createdAt, habit.createdAt)
         assertEquals(sampleHabit.habitType, habit.habitType)
         assertEquals(sampleHabit.unit, habit.unit)
         assertEquals(sampleHabit.targetValue, habit.targetValue)
         assertEquals(sampleHabit.step, habit.step, 0.001f)
         assertEquals(sampleHabit.position, habit.position)
+        assertEquals(HabitConverters.ALL_DAYS, habit.scheduledDays)
 
         // -- Habit Entries --
         assertEquals(1, exported.habitEntries.size)

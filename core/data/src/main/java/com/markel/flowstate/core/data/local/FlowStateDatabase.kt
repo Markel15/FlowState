@@ -3,6 +3,7 @@ package com.markel.flowstate.core.data.local
 import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
@@ -13,9 +14,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [TaskEntity::class, SubTaskEntity::class, IdeaEntity::class, CheckListEntity::class, CheckListItemEntity::class, HabitEntity::class, HabitEntryEntity::class, HabitNumericEntryEntity::class, CategoryEntity::class], // List of all tables
-    version = 19,
+    version = 20,
     exportSchema = true
 )
+@TypeConverters(HabitConverters::class)
 abstract class FlowStateDatabase : RoomDatabase() {
 
     // Exposes our DAO so the rest of the app can use it
@@ -250,6 +252,118 @@ abstract class FlowStateDatabase : RoomDatabase() {
                 db.execSQL(
                     "INSERT OR REPLACE INTO sqlite_sequence (name, seq) " +
                             "VALUES ('categories', (SELECT MAX(id) FROM categories))"
+                )
+            }
+        }
+
+        /**
+         * Replaces the unused frequency field with the concrete weekdays on
+         * which the habit is scheduled. Existing habits remain daily.
+         *
+         * The dependent entry tables are temporarily copied and recreated so
+         * the migration works on Android versions whose SQLite does not
+         * support DROP COLUMN, without losing entries through FK cascades.
+         */
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE habits_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        iconName TEXT NOT NULL,
+                        colorArgb INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        habitType TEXT NOT NULL,
+                        unit TEXT,
+                        targetValue REAL,
+                        step REAL NOT NULL,
+                        position INTEGER NOT NULL,
+                        scheduledDays TEXT NOT NULL DEFAULT '${HabitConverters.ALL_DAYS}'
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO habits_new (
+                        id, name, iconName, colorArgb, createdAt, habitType,
+                        unit, targetValue, step, position, scheduledDays
+                    )
+                    SELECT
+                        id, name, iconName, colorArgb, createdAt, habitType,
+                        unit, targetValue, step, position, '${HabitConverters.ALL_DAYS}'
+                    FROM habits
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    "CREATE TEMP TABLE habit_entries_19_backup AS " +
+                            "SELECT id, habitId, completedAt FROM habit_entries"
+                )
+                db.execSQL(
+                    "CREATE TEMP TABLE habit_numeric_entries_19_backup AS " +
+                            "SELECT habitId, epochDay, value FROM habit_numeric_entries"
+                )
+
+                db.execSQL("DROP TABLE habit_entries")
+                db.execSQL("DROP TABLE habit_numeric_entries")
+                db.execSQL("DROP TABLE habits")
+                db.execSQL("ALTER TABLE habits_new RENAME TO habits")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE habit_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        habitId INTEGER NOT NULL,
+                        completedAt INTEGER NOT NULL,
+                        FOREIGN KEY(habitId) REFERENCES habits(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX index_habit_entries_habitId " +
+                            "ON habit_entries (habitId)"
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO habit_entries (id, habitId, completedAt)
+                    SELECT id, habitId, completedAt
+                    FROM habit_entries_19_backup
+                    """.trimIndent()
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE habit_numeric_entries (
+                        habitId INTEGER NOT NULL,
+                        epochDay INTEGER NOT NULL,
+                        value REAL NOT NULL,
+                        PRIMARY KEY(habitId, epochDay),
+                        FOREIGN KEY(habitId) REFERENCES habits(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX index_habit_numeric_entries_habitId " +
+                            "ON habit_numeric_entries (habitId)"
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO habit_numeric_entries (habitId, epochDay, value)
+                    SELECT habitId, epochDay, value
+                    FROM habit_numeric_entries_19_backup
+                    """.trimIndent()
+                )
+
+                db.execSQL("DROP TABLE habit_entries_19_backup")
+                db.execSQL("DROP TABLE habit_numeric_entries_19_backup")
+
+                db.execSQL("DELETE FROM sqlite_sequence WHERE name = 'habits'")
+                db.execSQL(
+                    "INSERT INTO sqlite_sequence (name, seq) " +
+                            "SELECT 'habits', COALESCE(MAX(id), 0) FROM habits"
                 )
             }
         }

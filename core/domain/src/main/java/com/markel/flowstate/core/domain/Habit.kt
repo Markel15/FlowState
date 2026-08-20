@@ -1,8 +1,8 @@
 package com.markel.flowstate.core.domain
 
+import java.time.DayOfWeek
 import java.time.LocalDate
 
-enum class HabitFrequency { DAILY, WEEKLY }
 enum class HabitType { BOOLEAN, NUMERIC }
 
 data class Habit(
@@ -10,13 +10,13 @@ data class Habit(
     val name: String,
     val iconName: String = "self_improvement",
     val colorArgb: Int = 0xFF6650A4.toInt(),
-    val frequency: HabitFrequency = HabitFrequency.DAILY,
     val createdAt: LocalDate = LocalDate.now(),
     val habitType: HabitType = HabitType.BOOLEAN,
     val unit: String? = null,
     val targetValue: Float? = null,
     val step: Float = 1f,
-    val position: Int = 0
+    val position: Int = 0,
+    val scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 )
 
 data class HabitWithStatus(

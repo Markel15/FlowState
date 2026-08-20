@@ -2,6 +2,8 @@ package com.markel.flowstate.core.data.backup
 
 import com.markel.flowstate.core.data.local.*
 
+private val habitConverters = HabitConverters()
+
 // ── Task ──────────────────────────────────────────────────────────────
 
 fun TaskEntity.toSchema() = TaskSchema(
@@ -121,13 +123,13 @@ fun HabitEntity.toSchema() = HabitSchema(
     name = name,
     iconName = iconName,
     colorArgb = colorArgb,
-    frequency = frequency,
     createdAt = createdAt,
     habitType = habitType,
     unit = unit,
     targetValue = targetValue,
     step = step,
-    position = position
+    position = position,
+    scheduledDays = habitConverters.fromScheduledDays(scheduledDays)
 )
 
 fun HabitSchema.toEntity() = HabitEntity(
@@ -135,13 +137,13 @@ fun HabitSchema.toEntity() = HabitEntity(
     name = name,
     iconName = iconName,
     colorArgb = colorArgb,
-    frequency = frequency,
     createdAt = createdAt,
     habitType = habitType,
     unit = unit,
     targetValue = targetValue,
     step = step,
-    position = position
+    position = position,
+    scheduledDays = habitConverters.toScheduledDays(scheduledDays)
 )
 
 fun HabitEntryEntity.toSchema() = HabitEntrySchema(
