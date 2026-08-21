@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.markel.flowstate.core.domain.HabitWithStatus
+import com.markel.flowstate.core.domain.isScheduledFor
 import com.markel.flowstate.feature.habits.R
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -49,7 +50,8 @@ fun HabitCard(
     val habit = habitWithStatus.habit
     val habitColor = Color(habit.colorArgb)
     val today = LocalDate.now()
-    val isCompletedToday = today.toEpochDay() in weekEntries
+    val isScheduledToday = habit.isScheduledFor(today)
+    val isCompletedToday = isScheduledToday && today.toEpochDay() in weekEntries
 
     // State for the WeekCalendar — starts in the current week,
     // can scroll back to the beginning of the habit
@@ -134,17 +136,25 @@ fun HabitCard(
                     isCompleted = isCompletedToday,
                     color = habitColor,
                     iconName = habit.iconName,
-                    onClick = { onToggleDay(today) }
+                    onClick = { onToggleDay(today) },
+                    enabled = isScheduledToday
                 )
-                Text(
-                    text = habit.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .weight(1f)
-                        .basicMarquee(repeatDelayMillis = 3500)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = habit.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.basicMarquee(repeatDelayMillis = 3500)
+                    )
+                    if (!isScheduledToday) {
+                        Text(
+                            text = stringResource(R.string.habit_not_scheduled_today),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Text(
@@ -188,6 +198,7 @@ fun HabitCard(
                     val isDone = date.toEpochDay() in weekEntries
                     val isFuture = date.isAfter(today)
                     val isToday = date == today
+                    val isScheduled = habit.isScheduledFor(date)
 
                     // Connection with adjacent days
                     val donePrev = date.minusDays(1).toEpochDay() in weekEntries
@@ -229,7 +240,7 @@ fun HabitCard(
                             .clip(animatedShape)
                             .background(bgColor)
                             .then(
-                                if (!isFuture) Modifier.clickable(
+                                if (!isFuture && isScheduled) Modifier.clickable(
                                     role = Role.Button,
                                     onClick = { onToggleDay(date) }
                                 ) else Modifier
@@ -247,6 +258,7 @@ fun HabitCard(
                                 color = when {
                                     isDone && !isFuture -> Color.White
                                     isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+                                    !isScheduled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                                     isToday -> MaterialTheme.colorScheme.onSurface
                                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 }
@@ -259,7 +271,8 @@ fun HabitCard(
                                 fontSize = 10.sp,
                                 color = when {
                                     isDone && !isFuture -> Color.White.copy(alpha = 0.8f)
-                                    isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                    isFuture || !isScheduled ->
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                                     else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                 }
                             )

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.domain.Habit
 import com.markel.flowstate.core.domain.HabitRepository
 import com.markel.flowstate.core.domain.HabitType
+import com.markel.flowstate.core.domain.isScheduledFor
 import com.markel.flowstate.core.domain.usecase.habits.DecrementNumericValueUseCase
 import com.markel.flowstate.core.domain.usecase.habits.DeleteHabitUseCase
 import com.markel.flowstate.core.domain.usecase.habits.DeleteNumericEntryUseCase
@@ -62,15 +63,17 @@ class HabitViewModel @Inject constructor(
                     .mapValues { it.value.toSet() }
 
                 val numericEntriesByHabit = allNumericEntries.groupBy { it.habitId }
+                val today = LocalDate.now()
+                val habitsDueToday = habits.filter { it.habit.isScheduledFor(today) }
 
                 HabitUiState.Success(
                     habits = habits,
                     weekEntriesByHabit = weekEntriesByHabit,
                     numericEntriesByHabit = numericEntriesByHabit,
                     showAddDialog = showDialog,
-                    completedToday = habits.count { it.isCompletedToday },
-                    totalHabits = habits.size,
-                    motivationalMessageIndex = LocalDate.now().dayOfYear % 7
+                    completedToday = habitsDueToday.count { it.isCompletedToday },
+                    totalHabits = habitsDueToday.size,
+                    motivationalMessageIndex = today.dayOfYear % 7
                 )
             }.collect {newState ->
                 _uiState.value = newState

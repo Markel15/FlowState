@@ -42,8 +42,11 @@ class HabitRepositoryImpl @Inject constructor(
     override suspend fun deleteHabit(habit: Habit) =
         dao.deleteHabit(habit.toEntity())
 
-    override suspend fun toggleEntry(habitId: Int, date: LocalDate) =
+    override suspend fun toggleEntry(habitId: Int, date: LocalDate) {
+        val habit = dao.getHabitById(habitId) ?: return
+        if (date.dayOfWeek !in habit.scheduledDays) return
         dao.toggleEntry(habitId, date.toEpochDay())
+    }
 
     override fun getAllEntries(): Flow<List<HabitEntryFlat>> =  // boolean habits only
         dao.getAllEntries().map { list ->
@@ -60,7 +63,9 @@ class HabitRepositoryImpl @Inject constructor(
             entries.map { it.toDomain() }
         }
 
-    override suspend fun logNumericEntry(habitId: Int, date: LocalDate, value: Float) =
+    override suspend fun logNumericEntry(habitId: Int, date: LocalDate, value: Float) {
+        val habit = dao.getHabitById(habitId) ?: return
+        if (date.dayOfWeek !in habit.scheduledDays) return
         dao.upsertNumericEntry(
             HabitNumericEntryEntity(
                 habitId = habitId,
@@ -68,6 +73,7 @@ class HabitRepositoryImpl @Inject constructor(
                 value = value
             )
         )
+    }
 
     override suspend fun deleteNumericEntry(habitId: Int, date: LocalDate) =
         dao.deleteNumericEntry(habitId, date.toEpochDay())

@@ -19,6 +19,8 @@ data class Habit(
     val scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 )
 
+fun Habit.isScheduledFor(date: LocalDate): Boolean = date.dayOfWeek in scheduledDays
+
 data class HabitWithStatus(
     val habit: Habit,
     val isCompletedToday: Boolean,

@@ -59,13 +59,18 @@ class HabitViewModelTest {
     }
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun habit(id: Int = 1, name: String = "Test habit") = Habit(
+    private fun habit(
+        id: Int = 1,
+        name: String = "Test habit",
+        scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
+    ) = Habit(
         id = id,
         name = name,
         iconName = "icon",
         colorArgb = 0xFF123456.toInt(),
         habitType = HabitType.BOOLEAN,
-        createdAt = LocalDate.now().minusDays(7)
+        createdAt = LocalDate.now().minusDays(7),
+        scheduledDays = scheduledDays
     )
 
     private fun habitWithStatus(habit: Habit = habit(), completedToday: Boolean = false) =
@@ -167,6 +172,62 @@ class HabitViewModelTest {
             } as HabitUiState.Success
 
             assertEquals(1, successState.completedToday)
+        }
+    }
+
+    @Test
+    fun uiState_progressCountsOnlyHabitsScheduledToday() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val anotherDay = today.dayOfWeek.plus(1)
+        coEvery { getHabitsWithStatus() } returns flowOf(
+            listOf(
+                habitWithStatus(
+                    habit(id = 1, scheduledDays = setOf(today.dayOfWeek)),
+                    completedToday = true
+                ),
+                habitWithStatus(
+                    habit(id = 2, scheduledDays = setOf(anotherDay)),
+                    completedToday = true
+                )
+            )
+        )
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val successState = awaitItem().let {
+                if (it is HabitUiState.Loading) awaitItem() else it
+            } as HabitUiState.Success
+
+            assertEquals(1, successState.totalHabits)
+            assertEquals(1, successState.completedToday)
+        }
+    }
+
+    @Test
+    fun uiState_withNoHabitsScheduledToday_hasEmptyProgress() = runTest {
+        // GIVEN
+        val anotherDay = LocalDate.now().dayOfWeek.plus(1)
+        coEvery { getHabitsWithStatus() } returns flowOf(
+            listOf(habitWithStatus(habit(scheduledDays = setOf(anotherDay))))
+        )
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val successState = awaitItem().let {
+                if (it is HabitUiState.Loading) awaitItem() else it
+            } as HabitUiState.Success
+
+            assertEquals(0, successState.totalHabits)
+            assertEquals(0, successState.completedToday)
         }
     }
 

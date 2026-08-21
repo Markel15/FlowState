@@ -8,8 +8,8 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import com.markel.flowstate.core.domain.isScheduledFor
 import dagger.hilt.android.EntryPointAccessors
-import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
 class ToggleHabitAction : ActionCallback {
@@ -32,6 +32,8 @@ class ToggleHabitAction : ActionCallback {
         )
         val repository = entryPoint.habitRepository()
         val habit = repository.getHabitById(habitId) ?: return
+        val today = LocalDate.now()
+        if (!habit.isScheduledFor(today)) return
 
         // For the numeric habits (should be impossible, but in any case) open the app
         if (habit.habitType.name == "NUMERIC") {
@@ -44,7 +46,7 @@ class ToggleHabitAction : ActionCallback {
             return
         }
         // Boolean habit : Toggle and persist in the DB
-        repository.toggleEntry(habitId, LocalDate.now())
+        repository.toggleEntry(habitId, today)
 
         // Force redraw of the widget
         HabitWidget().update(context, glanceId)
