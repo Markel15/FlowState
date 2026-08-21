@@ -44,7 +44,15 @@ fun NumericHabitCard(
     onDecrementToday: () -> Unit,
     onSetValue: (LocalDate, Float?) -> Unit,
     onDelete: () -> Unit,
-    onEdit: (name: String, icon: String, colorArgb: Int, unit: String?, targetValue: Float?, step: Float?) -> Unit,
+    onEdit: (
+        name: String,
+        icon: String,
+        colorArgb: Int,
+        unit: String?,
+        targetValue: Float?,
+        step: Float?,
+        scheduledDays: Set<DayOfWeek>
+    ) -> Unit,
     onNavigateToDetail: (() -> Unit)? = null
 ) {
     val habit = habitWithStatus.habit
@@ -140,9 +148,10 @@ fun NumericHabitCard(
             initialUnit = habit.unit,
             initialTargetValue = habit.targetValue,
             initialStep = habit.step,
+            initialScheduledDays = habit.scheduledDays,
             onDismiss = { showEditDialog = false },
-            onConfirm = { name, icon, colorArgb, _, unit, target, step ->
-                onEdit(name, icon, colorArgb, unit, target, step)
+            onConfirm = { name, icon, colorArgb, _, unit, target, step, scheduledDays ->
+                onEdit(name, icon, colorArgb, unit, target, step, scheduledDays)
                 showEditDialog = false
             }
         )

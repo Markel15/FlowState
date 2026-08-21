@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -141,9 +142,10 @@ class HabitViewModel @Inject constructor(
         colorArgb: Int,
         habitType: HabitType = HabitType.BOOLEAN,
         unit: String? = null, targetValue: Float? = null,
-        step: Float = 1f)
+        step: Float = 1f,
+        scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet())
     {
-        if (name.isBlank()) return
+        if (name.isBlank() || scheduledDays.isEmpty()) return
         viewModelScope.launch {
             insertHabit(
                 Habit(
@@ -153,7 +155,8 @@ class HabitViewModel @Inject constructor(
                     habitType = habitType,
                     unit = unit,
                     targetValue = targetValue,
-                    step = step
+                    step = step,
+                    scheduledDays = scheduledDays
                 )
             )
             _showAddDialog.value = false
@@ -170,9 +173,10 @@ class HabitViewModel @Inject constructor(
         newColorArgb: Int,
         newUnit: String? = null,
         newTargetValue: Float? = null,
-        newStep: Float? = null
+        newStep: Float? = null,
+        newScheduledDays: Set<DayOfWeek> = habit.scheduledDays
     ) {
-        if (newName.isBlank()) return
+        if (newName.isBlank() || newScheduledDays.isEmpty()) return
         viewModelScope.launch {
             updateHabit(
                 habit.copy(
@@ -181,7 +185,8 @@ class HabitViewModel @Inject constructor(
                     colorArgb = newColorArgb,
                     unit = newUnit,
                     targetValue = newTargetValue,
-                    step = newStep ?: habit.step
+                    step = newStep ?: habit.step,
+                    scheduledDays = newScheduledDays
                 )
             )
         }

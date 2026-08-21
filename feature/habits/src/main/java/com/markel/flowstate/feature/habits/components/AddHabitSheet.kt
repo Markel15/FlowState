@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -53,11 +54,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.markel.flowstate.core.domain.HabitType
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import com.markel.flowstate.feature.habits.R
 import com.markel.flowstate.feature.habits.util.formatFloat
 import com.markel.flowstate.core.designsystem.R as DesignR
@@ -88,7 +95,8 @@ fun AddHabitSheet(
         habitType: HabitType,
         unit: String?,
         targetValue: Float?,
-        step: Float
+        step: Float,
+        scheduledDays: Set<DayOfWeek>
     ) -> Unit,
     initialName: String = "",
     initialIcon: String = "none",
@@ -96,7 +104,8 @@ fun AddHabitSheet(
     initialHabitType: HabitType = HabitType.BOOLEAN,
     initialUnit: String? = null,
     initialTargetValue: Float? = null,
-    initialStep: Float = 1f
+    initialStep: Float = 1f,
+    initialScheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 ) {
     val isEditMode = initialName.isNotEmpty() || initialColor != null
     var name by remember { mutableStateOf(initialName) }
@@ -108,6 +117,9 @@ fun AddHabitSheet(
     var unit by remember { mutableStateOf(initialUnit ?: "") }
     var targetValueText by remember { mutableStateOf(initialTargetValue?.let { formatFloat(it) } ?: "") }
     var stepText by remember { mutableStateOf(formatFloat(initialStep)) }
+    var scheduledDays by remember(initialScheduledDays) {
+        mutableStateOf(initialScheduledDays.toSet())
+    }
 
     val parsedTarget = targetValueText.toFloatOrNull()
     val parsedStep = stepText.toFloatOrNull()
@@ -237,6 +249,73 @@ fun AddHabitSheet(
                 }
             }
 
+            // ── Schedule ─────────────────────────────────────────────────
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.habit_schedule_title),
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Text(
+                    text = stringResource(R.string.habit_schedule_at_least_one),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val locale = LocalLocale.current.platformLocale
+                    DayOfWeek.entries.forEach { day ->
+                        val isSelected = day in scheduledDays
+                        val canToggle = !isSelected || scheduledDays.size > 1
+
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = CircleShape
+                                )
+                                .semantics {
+                                    contentDescription = day.getDisplayName(TextStyle.FULL, locale)
+                                }
+                                .toggleable(
+                                    value = isSelected,
+                                    enabled = canToggle,
+                                    role = Role.Checkbox
+                                ) { checked ->
+                                    scheduledDays = if (checked) {
+                                        scheduledDays + day
+                                    } else {
+                                        scheduledDays - day
+                                    }
+                                }
+                        ) {
+                            Text(
+                                text = day
+                                    .getDisplayName(TextStyle.NARROW, locale)
+                                    .uppercase(locale),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Icon picker ──────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.icon), style = MaterialTheme.typography.labelLarge)
@@ -300,11 +379,13 @@ fun AddHabitSheet(
                             habitType,
                             if (habitType == HabitType.NUMERIC && unit.isNotBlank()) unit else null,
                             if (habitType == HabitType.NUMERIC) target else null,
-                            if (habitType == HabitType.NUMERIC && stepText.isNotBlank()) step else 1f
+                            if (habitType == HabitType.NUMERIC && stepText.isNotBlank()) step else 1f,
+                            scheduledDays
                         )
                         onDismiss()
                     },
-                    enabled = name.isNotBlank() && !isTargetInvalid && !isStepInvalid,
+                    enabled = name.isNotBlank() && scheduledDays.isNotEmpty() &&
+                            !isTargetInvalid && !isStepInvalid,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -326,21 +407,30 @@ fun AddHabitSheet(
 @Composable
 fun AddHabitSheet(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, icon: String, colorArgb: Int) -> Unit,
+    onConfirm: (
+        name: String,
+        icon: String,
+        colorArgb: Int,
+        scheduledDays: Set<DayOfWeek>
+    ) -> Unit,
     initialName: String = "",
     initialIcon: String = "none",
-    initialColor: Color? = null
+    initialColor: Color? = null,
+    initialScheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 ) {
     AddHabitSheet(
         onDismiss = onDismiss,
-        onConfirm = { name, icon, colorArgb, _, _, _, _ -> onConfirm(name, icon, colorArgb) },
+        onConfirm = { name, icon, colorArgb, _, _, _, _, scheduledDays ->
+            onConfirm(name, icon, colorArgb, scheduledDays)
+        },
         initialName = initialName,
         initialIcon = initialIcon,
         initialColor = initialColor,
         initialHabitType = HabitType.BOOLEAN,
         initialUnit = null,
         initialTargetValue = null,
-        initialStep = 1f
+        initialStep = 1f,
+        initialScheduledDays = initialScheduledDays
     )
 }
 

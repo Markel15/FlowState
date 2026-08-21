@@ -38,7 +38,12 @@ fun HabitCard(
     weekEntries: Set<Long>,
     onToggleDay: (LocalDate) -> Unit,
     onDelete: () -> Unit,
-    onEdit: (name: String, icon:String, colorArgb: Int) -> Unit,
+    onEdit: (
+        name: String,
+        icon: String,
+        colorArgb: Int,
+        scheduledDays: Set<DayOfWeek>
+    ) -> Unit,
     onNavigateToDetail: (() -> Unit)? = null
 ) {
     val habit = habitWithStatus.habit
@@ -94,9 +99,10 @@ fun HabitCard(
             initialName = habit.name,
             initialIcon = habit.iconName,
             initialColor = habitColor,
+            initialScheduledDays = habit.scheduledDays,
             onDismiss = { showEditDialog = false },
-            onConfirm = { name, icon, colorArgb ->
-                onEdit(name, icon, colorArgb)
+            onConfirm = { name, icon, colorArgb, scheduledDays ->
+                onEdit(name, icon, colorArgb, scheduledDays)
                 showEditDialog = false
             }
         )

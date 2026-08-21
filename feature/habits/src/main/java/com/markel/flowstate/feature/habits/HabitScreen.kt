@@ -132,12 +132,13 @@ fun HabitScreen(
                                                             habitWithStatus.habit
                                                         )
                                                     },
-                                                    onEdit = { name, icon, colorArgb ->
+                                                    onEdit = { name, icon, colorArgb, scheduledDays ->
                                                         viewModel.editHabit(
-                                                            habitWithStatus.habit,
-                                                            name,
-                                                            icon,
-                                                            colorArgb
+                                                            habit = habitWithStatus.habit,
+                                                            newName = name,
+                                                            newIcon = icon,
+                                                            newColorArgb = colorArgb,
+                                                            newScheduledDays = scheduledDays
                                                         )
                                                     },
                                                     onNavigateToDetail = {
@@ -188,15 +189,16 @@ fun HabitScreen(
                                                             habitWithStatus.habit
                                                         )
                                                     },
-                                                    onEdit = { name, icon, colorArgb, unit, targetValue, step ->
+                                                    onEdit = { name, icon, colorArgb, unit, targetValue, step, scheduledDays ->
                                                         viewModel.editHabit(
-                                                            habitWithStatus.habit,
-                                                            name,
-                                                            icon,
-                                                            colorArgb,
-                                                            unit,
-                                                            targetValue,
-                                                            step
+                                                            habit = habitWithStatus.habit,
+                                                            newName = name,
+                                                            newIcon = icon,
+                                                            newColorArgb = colorArgb,
+                                                            newUnit = unit,
+                                                            newTargetValue = targetValue,
+                                                            newStep = step,
+                                                            newScheduledDays = scheduledDays
                                                         )
                                                     },
                                                     onNavigateToDetail = {
@@ -218,8 +220,17 @@ fun HabitScreen(
                     AddHabitSheet(
                         initialHabitType = addSheetType,
                         onDismiss = { viewModel.hideAddDialog() },
-                        onConfirm = { name, icon, color, habitType, unit, targetValue, step ->
-                            viewModel.addHabit(name, icon, color, habitType, unit, targetValue, step)
+                        onConfirm = { name, icon, color, habitType, unit, targetValue, step, scheduledDays ->
+                            viewModel.addHabit(
+                                name = name,
+                                iconName = icon,
+                                colorArgb = color,
+                                habitType = habitType,
+                                unit = unit,
+                                targetValue = targetValue,
+                                step = step,
+                                scheduledDays = scheduledDays
+                            )
                         }
                     )
                 }
