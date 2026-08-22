@@ -4,6 +4,7 @@ import com.markel.flowstate.core.domain.Habit
 import com.markel.flowstate.core.domain.HabitEntryFlat
 import com.markel.flowstate.core.domain.HabitNumericEntry
 import com.markel.flowstate.core.domain.HabitRepository
+import com.markel.flowstate.core.domain.HabitStreakCalculator
 import com.markel.flowstate.core.domain.HabitType
 import com.markel.flowstate.core.domain.HabitWithStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import java.time.DayOfWeek
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -78,7 +78,13 @@ class GetHabitsWithStatusUseCase @Inject constructor(
                     HabitType.BOOLEAN -> {
                         val entries = boolEntriesByHabit[habit.id] ?: emptyList()
                         val isCompletedToday = entries.any { it.epochDay == today }
-                        val streak = calculateStreak(entries.map { it.epochDay }, date)
+                        val completedDates = entries.map { LocalDate.ofEpochDay(it.epochDay) }
+                        val streak = HabitStreakCalculator.current(
+                            completedDates = completedDates,
+                            scheduledDays = habit.scheduledDays,
+                            today = date,
+                            startedOn = habit.createdAt
+                        )
                         HabitWithStatus(
                             habit = habit,
                             isCompletedToday = isCompletedToday,
@@ -97,7 +103,16 @@ class GetHabitsWithStatusUseCase @Inject constructor(
                             else -> todayValue > 0f
                         }
 
-                        val streak = calculateNumericStreak(entries, habit.targetValue, date)
+                        val completedDates = HabitStreakCalculator.qualifyingNumericDates(
+                            entries = entries,
+                            targetValue = habit.targetValue
+                        )
+                        val streak = HabitStreakCalculator.current(
+                            completedDates = completedDates,
+                            scheduledDays = habit.scheduledDays,
+                            today = date,
+                            startedOn = habit.createdAt
+                        )
 
                         HabitWithStatus(
                             habit = habit,
@@ -110,40 +125,4 @@ class GetHabitsWithStatusUseCase @Inject constructor(
             }
     }
 
-    private fun calculateStreak(epochDays: List<Long>, from: LocalDate): Int {
-        if (epochDays.isEmpty()) return 0
-        val sorted = epochDays.toSortedSet(reverseOrder())
-        var streak = 0
-        var expected = from.toEpochDay()
-
-        // If today is not completed, we start counting from yesterday
-        if (expected !in sorted) expected--
-
-        while (expected in sorted) {
-            streak++
-            expected--
-        }
-        return streak
-    }
-
-    private fun calculateNumericStreak(
-        entries: List<HabitNumericEntry>,
-        targetValue: Float?,
-        from: LocalDate
-    ): Int {
-        if (entries.isEmpty()) return 0
-        val validDays = entries
-            .filter { targetValue == null || it.value >= targetValue }
-            .map { it.date.toEpochDay() }
-            .toSortedSet(reverseOrder())
-
-        var streak = 0
-        var expected = from.toEpochDay()
-        if (expected !in validDays) expected--
-        while (expected in validDays) {
-            streak++
-            expected--
-        }
-        return streak
-    }
 }

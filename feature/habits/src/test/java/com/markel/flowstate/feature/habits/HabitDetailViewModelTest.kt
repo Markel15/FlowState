@@ -51,7 +51,8 @@ class HabitDetailViewModelTest {
     private fun habit(
         id: Int = 1,
         type: HabitType = HabitType.BOOLEAN,
-        targetValue: Float? = null
+        targetValue: Float? = null,
+        scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
     ) = Habit(
         id = id,
         name = "Test habit",
@@ -59,7 +60,8 @@ class HabitDetailViewModelTest {
         colorArgb = 0xFF123456.toInt(),
         habitType = type,
         targetValue = targetValue,
-        createdAt = LocalDate.now().minusDays(30)
+        createdAt = LocalDate.now().minusDays(30),
+        scheduledDays = scheduledDays
     )
 
     private fun numericEntry(date: LocalDate, value: Float) = HabitNumericEntry(
@@ -178,6 +180,29 @@ class HabitDetailViewModelTest {
     }
 
     @Test
+    fun scheduledBooleanHabit_countsOnlyScheduledOccurrencesInStreaks() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val scheduledDates = listOf(today.minusDays(4), today.minusDays(2), today)
+        val scheduledDays = scheduledDates.mapTo(mutableSetOf()) { it.dayOfWeek }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.BOOLEAN,
+            scheduledDays = scheduledDays
+        )
+        coEvery { habitRepository.getEntriesForHabit(1) } returns flowOf(scheduledDates)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(3, state.currentStreak)
+            assertEquals(3, state.bestStreak)
+        }
+    }
+
+    @Test
     fun calculateDayOfWeekCompletions_groupsCorrectlyAsRates() = runTest {
         // GIVEN - 2 Mondays and 1 Friday, habit created 30 days ago
         val monday1 = LocalDate.now().minusWeeks(1).with(DayOfWeek.MONDAY)
@@ -226,6 +251,31 @@ class HabitDetailViewModelTest {
         // THEN - Streak should be 2
         viewModel.uiState.test {
             assertEquals(2, awaitItem().currentStreak)
+        }
+    }
+
+    @Test
+    fun scheduledNumericHabit_usesSameStreakRulesAsBooleanHabit() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val scheduledDates = listOf(today.minusDays(4), today.minusDays(2), today)
+        val scheduledDays = scheduledDates.mapTo(mutableSetOf()) { it.dayOfWeek }
+        val entries = scheduledDates.map { numericEntry(it, 10f) }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.NUMERIC,
+            targetValue = 10f,
+            scheduledDays = scheduledDays
+        )
+        coEvery { getNumericDetails(1) } returns flowOf(entries)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(3, state.currentStreak)
+            assertEquals(3, state.bestStreak)
         }
     }
 
