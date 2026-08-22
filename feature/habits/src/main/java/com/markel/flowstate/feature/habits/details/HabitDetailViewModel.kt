@@ -75,13 +75,11 @@ class HabitDetailViewModel @AssistedInject constructor(
                     allEntries = epochDays,
                     currentStreak = HabitStreakCalculator.current(
                         completedDates = entries,
-                        scheduledDays = habit.scheduledDays,
-                        startedOn = habit.createdAt
+                        scheduledDays = habit.scheduledDays
                     ),
                     bestStreak = HabitStreakCalculator.best(
                         completedDates = entries,
-                        scheduledDays = habit.scheduledDays,
-                        startedOn = habit.createdAt
+                        scheduledDays = habit.scheduledDays
                     ),
                     weeklyCompletions = calculateWeeklyCompletions(epochDays),
                     dayOfWeekCompletions = calculateDayOfWeekCompletions(entries, habit.createdAt)
@@ -107,13 +105,11 @@ class HabitDetailViewModel @AssistedInject constructor(
                     dayOfWeekAverages = calculateDayOfWeekAverages(entries, habit.createdAt),
                     currentStreak = HabitStreakCalculator.current(
                         completedDates = completedDates,
-                        scheduledDays = habit.scheduledDays,
-                        startedOn = habit.createdAt
+                        scheduledDays = habit.scheduledDays
                     ),
                     bestStreak = HabitStreakCalculator.best(
                         completedDates = completedDates,
-                        scheduledDays = habit.scheduledDays,
-                        startedOn = habit.createdAt
+                        scheduledDays = habit.scheduledDays
                     )
                 )
             }

@@ -6,25 +6,28 @@ import java.time.LocalDate
 /**
  * Calculates streaks in scheduled habit occurrences rather than consecutive
  * calendar days. Days on which the habit is not scheduled are ignored.
+ *
+ * Entries completed on dates before the habit's creation date (for example
+ * backfilled from the week calendar) still count towards the streak.
  */
 object HabitStreakCalculator {
 
     fun current(
         completedDates: Collection<LocalDate>,
         scheduledDays: Set<DayOfWeek>,
-        today: LocalDate = LocalDate.now(),
-        startedOn: LocalDate? = null
+        today: LocalDate = LocalDate.now()
     ): Int {
         if (completedDates.isEmpty() || scheduledDays.isEmpty()) return 0
 
         val validDates = completedDates.asSequence()
             .filter { it.dayOfWeek in scheduledDays }
             .filter { !it.isAfter(today) }
-            .filter { startedOn == null || !it.isBefore(startedOn) }
             .toSet()
 
         if (validDates.isEmpty()) return 0
 
+        // If today is scheduled but still pending, the streak survives one
+        // grace occurrence: counting starts from the previous scheduled date.
         var expected = if (today.dayOfWeek in scheduledDays && today in validDates) {
             today
         } else {
@@ -32,7 +35,7 @@ object HabitStreakCalculator {
         }
 
         var streak = 0
-        while ((startedOn == null || !expected.isBefore(startedOn)) && expected in validDates) {
+        while (expected in validDates) {
             streak++
             expected = previousScheduledDate(expected, scheduledDays)
         }
@@ -41,14 +44,12 @@ object HabitStreakCalculator {
 
     fun best(
         completedDates: Collection<LocalDate>,
-        scheduledDays: Set<DayOfWeek>,
-        startedOn: LocalDate? = null
+        scheduledDays: Set<DayOfWeek>
     ): Int {
         if (completedDates.isEmpty() || scheduledDays.isEmpty()) return 0
 
         val validDates = completedDates.asSequence()
             .filter { it.dayOfWeek in scheduledDays }
-            .filter { startedOn == null || !it.isBefore(startedOn) }
             .distinct()
             .sorted()
             .toList()

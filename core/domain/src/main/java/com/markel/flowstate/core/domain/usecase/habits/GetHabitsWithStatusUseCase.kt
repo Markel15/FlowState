@@ -82,8 +82,7 @@ class GetHabitsWithStatusUseCase @Inject constructor(
                         val streak = HabitStreakCalculator.current(
                             completedDates = completedDates,
                             scheduledDays = habit.scheduledDays,
-                            today = date,
-                            startedOn = habit.createdAt
+                            today = date
                         )
                         HabitWithStatus(
                             habit = habit,
@@ -110,8 +109,7 @@ class GetHabitsWithStatusUseCase @Inject constructor(
                         val streak = HabitStreakCalculator.current(
                             completedDates = completedDates,
                             scheduledDays = habit.scheduledDays,
-                            today = date,
-                            startedOn = habit.createdAt
+                            today = date
                         )
 
                         HabitWithStatus(

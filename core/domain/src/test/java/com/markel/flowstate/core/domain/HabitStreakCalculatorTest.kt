@@ -125,14 +125,24 @@ class HabitStreakCalculatorTest {
     }
 
     @Test
-    fun current_doesNotCountEntriesBeforeHabitCreation() {
+    fun current_countsBackfilledEntriesCompletedBeforeCreation() {
         assertEquals(
-            1,
+            2,
             HabitStreakCalculator.current(
                 completedDates = setOf(monday.minusDays(1), monday),
                 scheduledDays = everyDay,
-                today = monday,
-                startedOn = monday
+                today = monday
+            )
+        )
+    }
+
+    @Test
+    fun best_countsBackfilledEntriesCompletedBeforeCreation() {
+        assertEquals(
+            3,
+            HabitStreakCalculator.best(
+                completedDates = setOf(monday.minusDays(2), monday.minusDays(1), monday),
+                scheduledDays = everyDay
             )
         )
     }
