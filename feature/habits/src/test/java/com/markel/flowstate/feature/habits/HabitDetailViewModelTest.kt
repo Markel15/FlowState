@@ -338,6 +338,41 @@ class HabitDetailViewModelTest {
     }
 
     @Test
+    fun calculateMonthlyProgress_countsOnlyScheduledDaysOfTheMonth() = runTest {
+        // GIVEN - Mon/Wed/Fri habit with a 5f per-session target
+        val today = LocalDate.now()
+        val currentMonth = YearMonth.now()
+        val scheduledDays = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
+        val scheduledDatesInMonth = (1..currentMonth.lengthOfMonth())
+            .map { currentMonth.atDay(it) }
+            .filter { it.dayOfWeek in scheduledDays }
+        // Entries on the elapsed scheduled days of the month (robust on month boundaries)
+        val elapsedScheduled = scheduledDatesInMonth.filter { !it.isAfter(today) }
+        val entries = elapsedScheduled.take(2).mapIndexed { index, date ->
+            numericEntry(date, if (index == 0) 10f else 2f)
+        }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.NUMERIC,
+            targetValue = 5f,
+            scheduledDays = scheduledDays
+        )
+        coEvery { getNumericDetails(1) } returns flowOf(entries)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val progress = awaitItem().monthlyProgress
+            assertNotNull(progress)
+            assertEquals(scheduledDatesInMonth.size, progress!!.totalDays)
+            assertEquals(5f * scheduledDatesInMonth.size, progress.targetValue!!)
+            assertEquals(entries.sumOf { it.value.toDouble() }.toFloat(), progress.currentValue)
+            assertEquals(entries.count { it.value >= 5f }, progress.daysCompleted)
+        }
+    }
+
+    @Test
     fun calculateDayOfWeekAverages_averagesOverAllOpportunities() = runTest {
         // GIVEN - Two Mondays with values 10 and 20, habit created 30 days ago
         val monday1 = LocalDate.now().with(DayOfWeek.MONDAY)

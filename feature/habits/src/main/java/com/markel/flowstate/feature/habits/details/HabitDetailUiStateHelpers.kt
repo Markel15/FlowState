@@ -4,25 +4,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import java.time.LocalDate
 import java.time.format.TextStyle
+import com.markel.flowstate.core.domain.HabitStatsCalculator
 import com.markel.flowstate.feature.habits.R
 import java.time.Month
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 
+/**
+ * Consistency over the visible range, measured against the habit's
+ * scheduled days.
+ */
 fun HabitDetailUiState.completionPct(): String {
-    if (allEntries.isEmpty()) return "0%"
+    val habit = habit ?: return "0%"
     val now = LocalDate.now()
     val start = when (viewMode) {
         CalendarViewMode.ONE_MONTH -> now.withDayOfMonth(1)
         CalendarViewMode.THREE_MONTHS -> now.withDayOfMonth(1).minusMonths(2)
         CalendarViewMode.ONE_YEAR -> now.withDayOfYear(1)
     }
-    val days = ChronoUnit.DAYS.between(start, now.plusDays(1)).toInt()
-    val done = allEntries.count { epochDay ->
-        val d = LocalDate.ofEpochDay(epochDay)
-        !d.isBefore(start) && !d.isAfter(now)
-    }
-    return "${(done * 100 / days)}%"
+    val pct = HabitStatsCalculator.consistencyPercent(
+        completedDates = allEntries.map { LocalDate.ofEpochDay(it) },
+        scheduledDays = habit.scheduledDays,
+        start = start,
+        end = now
+    ) ?: return "0%"
+    return "$pct%"
 }
 
 @Composable

@@ -6,6 +6,7 @@ import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.Habit
 import com.markel.flowstate.core.domain.HabitNumericEntry
 import com.markel.flowstate.core.domain.HabitRepository
+import com.markel.flowstate.core.domain.HabitStatsCalculator
 import com.markel.flowstate.core.domain.HabitStreakCalculator
 import com.markel.flowstate.core.domain.HabitType
 import com.markel.flowstate.core.domain.usecase.habits.GetHabitByIdUseCase
@@ -285,7 +286,13 @@ class HabitDetailViewModel @AssistedInject constructor(
         val daysCompleted = dailyMaxValues.count { (_, maxValue) ->
             maxValue >= (habit.targetValue ?: 0f)
         }
-        val totalDays = yearMonth.lengthOfMonth()
+        // In scheduled habits the month goal/denominator uses only the
+        // scheduled days of the month, not every calendar day
+        val totalDays = HabitStatsCalculator.countScheduledDaysBetween(
+            start = yearMonth.atDay(1),
+            end = yearMonth.atEndOfMonth(),
+            scheduledDays = habit.scheduledDays
+        )
         val dailyAverage = if (daysWithData > 0) currentValue / daysWithData else 0f
 
         val monthName = now.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
