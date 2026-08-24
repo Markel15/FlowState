@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -191,49 +192,61 @@ fun AddHabitSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // ── Numeric-only fields ──────────────────────────────────────
+            // ── Numeric-only fields ─────────────────────────────────────
             if (habitType == HabitType.NUMERIC) {
-                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                    OutlinedTextField(
-                        value = unit,
-                        onValueChange = { unit = it },
-                        label = { Text(stringResource(R.string.habit_unit_label)) },
-                        placeholder = {
-                            Text(
-                                text = " h, km, kg...",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        },
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth(),
-                        supportingText = { Text("") } // keep padding even between fields
-                    )
-                    OutlinedTextField(
-                        value = targetValueText,
-                        onValueChange = { targetValueText = it },
-                        label = {
-                            Text("${stringResource(R.string.habit_target_label)} (${stringResource(R.string.habit_target_optional)})")
-                        },
-                        placeholder = {
-                            Text(
-                                text = "2",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth(),
-                        isError = isTargetInvalid,
-                        supportingText = {
-                            when {
-                                isTargetInvalid -> Text(text = stringResource(R.string.habit_target_error))
-                                unit.isNotBlank() && targetValueText.isNotBlank() ->
-                                    Text(stringResource(R.string.habit_target_preview, targetValueText, unit))
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = unit,
+                            onValueChange = { unit = it },
+                            label = { Text(stringResource(R.string.habit_unit_label)) },
+                            placeholder = {
+                                Text(
+                                    text = "km, h, kg...",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                            supportingText = {
+                                if (unit.isNotBlank() && targetValueText.isNotBlank())
+                                    Text(
+                                        stringResource(
+                                            R.string.habit_target_preview,
+                                            targetValueText,
+                                            unit
+                                        )
+                                    )
+                                else Text("") // keep the baselines aligned with the goal field
                             }
-                        }
-                    )
+                        )
+                        OutlinedTextField(
+                            value = targetValueText,
+                            onValueChange = { targetValueText = it },
+                            label = { Text(stringResource(R.string.habit_target_label)) },
+                            placeholder = {
+                                Text(
+                                    text = "2",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.width(112.dp),
+                            isError = isTargetInvalid,
+                            supportingText = {
+                                when {
+                                    isTargetInvalid ->
+                                        Text(text = stringResource(R.string.habit_target_error))
+                                    targetValueText.isBlank() ->
+                                        Text(text = stringResource(R.string.habit_target_optional))
+                                    else -> Text("") // preview shown under the unit field
+                                }
+                            }
+                        )
+                    }
                     OutlinedTextField(
                         value = stepText,
                         onValueChange = { stepText = it },
