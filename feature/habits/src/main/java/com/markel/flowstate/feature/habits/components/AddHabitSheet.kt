@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -38,6 +39,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -249,73 +252,6 @@ fun AddHabitSheet(
                 }
             }
 
-            // ── Schedule ─────────────────────────────────────────────────
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.habit_schedule_title),
-                    style = MaterialTheme.typography.labelLarge
-                )
-                Text(
-                    text = stringResource(R.string.habit_schedule_at_least_one),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val locale = LocalLocale.current.platformLocale
-                    DayOfWeek.entries.forEach { day ->
-                        val isSelected = day in scheduledDays
-                        val canToggle = !isSelected || scheduledDays.size > 1
-
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(42.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerHighest
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant,
-                                    shape = CircleShape
-                                )
-                                .semantics {
-                                    contentDescription = day.getDisplayName(TextStyle.FULL, locale)
-                                }
-                                .toggleable(
-                                    value = isSelected,
-                                    enabled = canToggle,
-                                    role = Role.Checkbox
-                                ) { checked ->
-                                    scheduledDays = if (checked) {
-                                        scheduledDays + day
-                                    } else {
-                                        scheduledDays - day
-                                    }
-                                }
-                        ) {
-                            Text(
-                                text = day
-                                    .getDisplayName(TextStyle.NARROW, locale)
-                                    .uppercase(locale),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (isSelected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
             // ── Icon picker ──────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.icon), style = MaterialTheme.typography.labelLarge)
@@ -354,6 +290,68 @@ fun AddHabitSheet(
                         )
                     }
                 }
+            }
+
+            // ── Scheduled days ──
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(R.string.habit_schedule_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        ButtonGroupDefaults.ConnectedSpaceBetween
+                    )
+                ) {
+                    val locale = LocalLocale.current.platformLocale
+                    DayOfWeek.entries.forEachIndexed { index, day ->
+                        val isSelected = day in scheduledDays
+                        val canToggle = !isSelected || scheduledDays.size > 1
+
+                        ToggleButton(
+                            checked = isSelected,
+                            onCheckedChange = { checked ->
+                                scheduledDays =
+                                    if (checked) scheduledDays + day
+                                    else scheduledDays - day
+                            },
+                            enabled = canToggle,
+                            shapes = when (index) {
+                                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                DayOfWeek.entries.lastIndex ->
+                                    ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                            }.let { base ->
+                                base.copy(checkedShape = base.shape)
+                            },
+                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics {
+                                    contentDescription = day.getDisplayName(TextStyle.FULL, locale)
+                                }
+                        ) {
+                            Text(
+                                text = day
+                                    .getDisplayName(TextStyle.NARROW, locale)
+                                    .uppercase(locale),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.habit_schedule_at_least_one),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
 
             // ── Actions (M3 Expressive press morph) ─
