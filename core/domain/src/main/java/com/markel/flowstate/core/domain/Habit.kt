@@ -21,6 +21,17 @@ data class Habit(
 
 fun Habit.isScheduledFor(date: LocalDate): Boolean = date.dayOfWeek in scheduledDays
 
+/**
+ * The first scheduled date strictly after [after], at most one week
+ * ahead. Searches at most 7 days, so it always terminates, and returns
+ * null for a defensive edge case: a habit with an empty schedule.
+ */
+fun Habit.nextScheduledDate(after: LocalDate): LocalDate? =
+    (1L..7L)
+        .asSequence()
+        .map { after.plusDays(it) }
+        .firstOrNull { isScheduledFor(it) }
+
 data class HabitWithStatus(
     val habit: Habit,
     val isCompletedToday: Boolean,

@@ -5,4 +5,6 @@
     <string name="no_boolean_habits">No tienes hábitos booleanos aún</string>
     <string name="cancel">Cancelar</string>
     <string name="no_config">Widget no configurado</string>
+    <string name="widget_rest_day_toast">«%1$s» no toca hoy. Próximo: %2$s</string>
+    <string name="widget_rest_day_toast_no_next">«%1$s» no toca hoy.</string>
 </resources>
