@@ -17,17 +17,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -37,6 +40,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -53,11 +58,17 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.markel.flowstate.core.domain.HabitType
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import com.markel.flowstate.feature.habits.R
 import com.markel.flowstate.feature.habits.util.formatFloat
 import com.markel.flowstate.core.designsystem.R as DesignR
@@ -88,7 +99,8 @@ fun AddHabitSheet(
         habitType: HabitType,
         unit: String?,
         targetValue: Float?,
-        step: Float
+        step: Float,
+        scheduledDays: Set<DayOfWeek>
     ) -> Unit,
     initialName: String = "",
     initialIcon: String = "none",
@@ -96,7 +108,8 @@ fun AddHabitSheet(
     initialHabitType: HabitType = HabitType.BOOLEAN,
     initialUnit: String? = null,
     initialTargetValue: Float? = null,
-    initialStep: Float = 1f
+    initialStep: Float = 1f,
+    initialScheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 ) {
     val isEditMode = initialName.isNotEmpty() || initialColor != null
     var name by remember { mutableStateOf(initialName) }
@@ -108,6 +121,9 @@ fun AddHabitSheet(
     var unit by remember { mutableStateOf(initialUnit ?: "") }
     var targetValueText by remember { mutableStateOf(initialTargetValue?.let { formatFloat(it) } ?: "") }
     var stepText by remember { mutableStateOf(formatFloat(initialStep)) }
+    var scheduledDays by remember(initialScheduledDays) {
+        mutableStateOf(initialScheduledDays.toSet())
+    }
 
     val parsedTarget = targetValueText.toFloatOrNull()
     val parsedStep = stepText.toFloatOrNull()
@@ -176,49 +192,61 @@ fun AddHabitSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // ── Numeric-only fields ──────────────────────────────────────
+            // ── Numeric-only fields ─────────────────────────────────────
             if (habitType == HabitType.NUMERIC) {
-                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                    OutlinedTextField(
-                        value = unit,
-                        onValueChange = { unit = it },
-                        label = { Text(stringResource(R.string.habit_unit_label)) },
-                        placeholder = {
-                            Text(
-                                text = " h, km, kg...",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        },
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth(),
-                        supportingText = { Text("") } // keep padding even between fields
-                    )
-                    OutlinedTextField(
-                        value = targetValueText,
-                        onValueChange = { targetValueText = it },
-                        label = {
-                            Text("${stringResource(R.string.habit_target_label)} (${stringResource(R.string.habit_target_optional)})")
-                        },
-                        placeholder = {
-                            Text(
-                                text = "2",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = MaterialTheme.shapes.large,
-                        modifier = Modifier.fillMaxWidth(),
-                        isError = isTargetInvalid,
-                        supportingText = {
-                            when {
-                                isTargetInvalid -> Text(text = stringResource(R.string.habit_target_error))
-                                unit.isNotBlank() && targetValueText.isNotBlank() ->
-                                    Text(stringResource(R.string.habit_target_preview, targetValueText, unit))
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = unit,
+                            onValueChange = { unit = it },
+                            label = { Text(stringResource(R.string.habit_unit_label)) },
+                            placeholder = {
+                                Text(
+                                    text = "km, h, kg...",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                            supportingText = {
+                                if (unit.isNotBlank() && targetValueText.isNotBlank())
+                                    Text(
+                                        stringResource(
+                                            R.string.habit_target_preview,
+                                            targetValueText,
+                                            unit
+                                        )
+                                    )
+                                else Text("") // keep the baselines aligned with the goal field
                             }
-                        }
-                    )
+                        )
+                        OutlinedTextField(
+                            value = targetValueText,
+                            onValueChange = { targetValueText = it },
+                            label = { Text(stringResource(R.string.habit_target_label)) },
+                            placeholder = {
+                                Text(
+                                    text = "2",
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.width(112.dp),
+                            isError = isTargetInvalid,
+                            supportingText = {
+                                when {
+                                    isTargetInvalid ->
+                                        Text(text = stringResource(R.string.habit_target_error))
+                                    targetValueText.isBlank() ->
+                                        Text(text = stringResource(R.string.habit_target_optional))
+                                    else -> Text("") // preview shown under the unit field
+                                }
+                            }
+                        )
+                    }
                     OutlinedTextField(
                         value = stepText,
                         onValueChange = { stepText = it },
@@ -277,6 +305,68 @@ fun AddHabitSheet(
                 }
             }
 
+            // ── Scheduled days ──
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(R.string.habit_schedule_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        ButtonGroupDefaults.ConnectedSpaceBetween
+                    )
+                ) {
+                    val locale = LocalLocale.current.platformLocale
+                    DayOfWeek.entries.forEachIndexed { index, day ->
+                        val isSelected = day in scheduledDays
+                        val canToggle = !isSelected || scheduledDays.size > 1
+
+                        ToggleButton(
+                            checked = isSelected,
+                            onCheckedChange = { checked ->
+                                scheduledDays =
+                                    if (checked) scheduledDays + day
+                                    else scheduledDays - day
+                            },
+                            enabled = canToggle,
+                            shapes = when (index) {
+                                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                DayOfWeek.entries.lastIndex ->
+                                    ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                            }.let { base ->
+                                base.copy(checkedShape = base.shape)
+                            },
+                            colors = ToggleButtonDefaults.toggleButtonColors(
+                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics {
+                                    contentDescription = day.getDisplayName(TextStyle.FULL, locale)
+                                }
+                        ) {
+                            Text(
+                                text = day
+                                    .getDisplayName(TextStyle.NARROW, locale)
+                                    .uppercase(locale),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.habit_schedule_at_least_one),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+
             // ── Actions (M3 Expressive press morph) ─
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -300,11 +390,13 @@ fun AddHabitSheet(
                             habitType,
                             if (habitType == HabitType.NUMERIC && unit.isNotBlank()) unit else null,
                             if (habitType == HabitType.NUMERIC) target else null,
-                            if (habitType == HabitType.NUMERIC && stepText.isNotBlank()) step else 1f
+                            if (habitType == HabitType.NUMERIC && stepText.isNotBlank()) step else 1f,
+                            scheduledDays
                         )
                         onDismiss()
                     },
-                    enabled = name.isNotBlank() && !isTargetInvalid && !isStepInvalid,
+                    enabled = name.isNotBlank() && scheduledDays.isNotEmpty() &&
+                            !isTargetInvalid && !isStepInvalid,
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f)
                 ) {
@@ -326,21 +418,30 @@ fun AddHabitSheet(
 @Composable
 fun AddHabitSheet(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, icon: String, colorArgb: Int) -> Unit,
+    onConfirm: (
+        name: String,
+        icon: String,
+        colorArgb: Int,
+        scheduledDays: Set<DayOfWeek>
+    ) -> Unit,
     initialName: String = "",
     initialIcon: String = "none",
-    initialColor: Color? = null
+    initialColor: Color? = null,
+    initialScheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
 ) {
     AddHabitSheet(
         onDismiss = onDismiss,
-        onConfirm = { name, icon, colorArgb, _, _, _, _ -> onConfirm(name, icon, colorArgb) },
+        onConfirm = { name, icon, colorArgb, _, _, _, _, scheduledDays ->
+            onConfirm(name, icon, colorArgb, scheduledDays)
+        },
         initialName = initialName,
         initialIcon = initialIcon,
         initialColor = initialColor,
         initialHabitType = HabitType.BOOLEAN,
         initialUnit = null,
         initialTargetValue = null,
-        initialStep = 1f
+        initialStep = 1f,
+        initialScheduledDays = initialScheduledDays
     )
 }
 

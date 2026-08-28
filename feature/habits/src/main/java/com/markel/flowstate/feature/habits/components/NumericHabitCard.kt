@@ -32,6 +32,7 @@ import java.time.LocalDate
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.times
 import com.markel.flowstate.core.domain.HabitNumericEntry
+import com.markel.flowstate.core.domain.isScheduledFor
 import com.markel.flowstate.feature.habits.util.formatFloat
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.launch
@@ -44,7 +45,15 @@ fun NumericHabitCard(
     onDecrementToday: () -> Unit,
     onSetValue: (LocalDate, Float?) -> Unit,
     onDelete: () -> Unit,
-    onEdit: (name: String, icon: String, colorArgb: Int, unit: String?, targetValue: Float?, step: Float?) -> Unit,
+    onEdit: (
+        name: String,
+        icon: String,
+        colorArgb: Int,
+        unit: String?,
+        targetValue: Float?,
+        step: Float?,
+        scheduledDays: Set<DayOfWeek>
+    ) -> Unit,
     onNavigateToDetail: (() -> Unit)? = null
 ) {
     val habit = habitWithStatus.habit
@@ -81,6 +90,8 @@ fun NumericHabitCard(
     val selectedDayIndex = remember(selectedDate, weekStart) {
         ChronoUnit.DAYS.between(weekStart, selectedDate).toInt().coerceIn(0, 6)
     }
+    val isScheduledToday = habit.isScheduledFor(today)
+    val selectedDateIsScheduled = habit.isScheduledFor(selectedDate)
 
     val selectedValue = if (selectedDate.isAfter(today)) {
         null
@@ -89,7 +100,7 @@ fun NumericHabitCard(
     } ?: 0f
 
     val targetValue = habit.targetValue
-    val isCompletedToday = habitWithStatus.isCompletedToday
+    val isCompletedToday = isScheduledToday && habitWithStatus.isCompletedToday
 
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
     val cardBg by animateColorAsState(
@@ -140,16 +151,17 @@ fun NumericHabitCard(
             initialUnit = habit.unit,
             initialTargetValue = habit.targetValue,
             initialStep = habit.step,
+            initialScheduledDays = habit.scheduledDays,
             onDismiss = { showEditDialog = false },
-            onConfirm = { name, icon, colorArgb, _, unit, target, step ->
-                onEdit(name, icon, colorArgb, unit, target, step)
+            onConfirm = { name, icon, colorArgb, _, unit, target, step, scheduledDays ->
+                onEdit(name, icon, colorArgb, unit, target, step, scheduledDays)
                 showEditDialog = false
             }
         )
     }
 
     // Input sheet (goal-ring + hold-to-repeat steppers)
-    if (showInputDialog) {
+    if (showInputDialog && selectedDateIsScheduled) {
         val currentValueForDialog = currentWeekValues.getOrNull(selectedDayIndex)
         NumericInputSheet(
             habitName = habit.name,
@@ -192,7 +204,8 @@ fun NumericHabitCard(
                     isCompleted = isCompletedToday,
                     color = habitColor,
                     iconName = habit.iconName,
-                    onClick = { } // Nothing to do here yet, only used as an indicator
+                    onClick = { }, // Only used as an indicator for numeric habits
+                    enabled = isScheduledToday
                 )
 
                 Column(modifier = Modifier.weight(1f)) {
@@ -210,6 +223,13 @@ fun NumericHabitCard(
                                 formatFloat(targetValue),
                                 habit.unit ?: ""
                             ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (!isScheduledToday) {
+                        Text(
+                            text = stringResource(R.string.habit_not_scheduled_today),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -286,6 +306,7 @@ fun NumericHabitCard(
                     val date = weekStart.plusDays(index.toLong())
                     val isFuture = date.isAfter(today)
                     val isToday = date == today
+                    val isScheduled = habit.isScheduledFor(date)
                     val isSelected = date == selectedDate
 
                     NumericWeekBar(
@@ -296,12 +317,9 @@ fun NumericHabitCard(
                         date = date,
                         isToday = isToday,
                         isFuture = isFuture,
+                        isScheduled = isScheduled,
                         isSelected = isSelected,
-                        onClick = {
-                            if (!isFuture) {
-                                selectedDate = date
-                            }
-                        },
+                        onClick = { selectedDate = date },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -318,6 +336,7 @@ fun NumericHabitCard(
                 // Actual value (clickable to edit)
                 Surface(
                     onClick = { showInputDialog = true },
+                    enabled = selectedDateIsScheduled,
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier
@@ -385,7 +404,7 @@ fun NumericHabitCard(
                                 onSetValue(selectedDate, if (newVal > 0f) newVal else null)
                             }
                         },
-                        enabled = selectedValue > 0,
+                        enabled = selectedDateIsScheduled && selectedValue > 0,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = habitColor.copy(alpha = 0.60f),
                             contentColor = habitColor
@@ -436,6 +455,7 @@ fun NumericHabitCard(
                                 onSetValue(selectedDate, newVal)
                             }
                         },
+                        enabled = selectedDateIsScheduled,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = habitColor.copy(alpha = 0.60f),
                             contentColor = habitColor

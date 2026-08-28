@@ -29,6 +29,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 class HabitViewModelTest {
@@ -58,13 +59,18 @@ class HabitViewModelTest {
     }
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private fun habit(id: Int = 1, name: String = "Test habit") = Habit(
+    private fun habit(
+        id: Int = 1,
+        name: String = "Test habit",
+        scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
+    ) = Habit(
         id = id,
         name = name,
         iconName = "icon",
         colorArgb = 0xFF123456.toInt(),
         habitType = HabitType.BOOLEAN,
-        createdAt = LocalDate.now().minusDays(7)
+        createdAt = LocalDate.now().minusDays(7),
+        scheduledDays = scheduledDays
     )
 
     private fun habitWithStatus(habit: Habit = habit(), completedToday: Boolean = false) =
@@ -170,6 +176,62 @@ class HabitViewModelTest {
     }
 
     @Test
+    fun uiState_progressCountsOnlyHabitsScheduledToday() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val anotherDay = today.dayOfWeek.plus(1)
+        coEvery { getHabitsWithStatus() } returns flowOf(
+            listOf(
+                habitWithStatus(
+                    habit(id = 1, scheduledDays = setOf(today.dayOfWeek)),
+                    completedToday = true
+                ),
+                habitWithStatus(
+                    habit(id = 2, scheduledDays = setOf(anotherDay)),
+                    completedToday = true
+                )
+            )
+        )
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val successState = awaitItem().let {
+                if (it is HabitUiState.Loading) awaitItem() else it
+            } as HabitUiState.Success
+
+            assertEquals(1, successState.totalHabits)
+            assertEquals(1, successState.completedToday)
+        }
+    }
+
+    @Test
+    fun uiState_withNoHabitsScheduledToday_hasEmptyProgress() = runTest {
+        // GIVEN
+        val anotherDay = LocalDate.now().dayOfWeek.plus(1)
+        coEvery { getHabitsWithStatus() } returns flowOf(
+            listOf(habitWithStatus(habit(scheduledDays = setOf(anotherDay))))
+        )
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val successState = awaitItem().let {
+                if (it is HabitUiState.Loading) awaitItem() else it
+            } as HabitUiState.Success
+
+            assertEquals(0, successState.totalHabits)
+            assertEquals(0, successState.completedToday)
+        }
+    }
+
+    @Test
     fun uiState_entriesGroupedByHabitId_inWeekEntriesByHabit() = runTest {
         // GIVEN - Two entries for habit 1, one for habit 2
         val today = LocalDate.now().toEpochDay()
@@ -260,9 +322,55 @@ class HabitViewModelTest {
                 habit.name == "Read" &&
                         habit.iconName == "book_icon" &&
                         habit.colorArgb == 0xFF0000FF.toInt() &&
-                        habit.habitType == HabitType.BOOLEAN
+                        habit.habitType == HabitType.BOOLEAN &&
+                        habit.scheduledDays == DayOfWeek.entries.toSet()
             })
         }
+    }
+
+    @Test
+    fun addHabit_withSelectedDays_persistsSelection() = runTest {
+        // GIVEN
+        coEvery { getHabitsWithStatus() } returns flowOf(emptyList())
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+        viewModel = buildViewModel()
+        val selectedDays = setOf(
+            DayOfWeek.MONDAY,
+            DayOfWeek.WEDNESDAY,
+            DayOfWeek.FRIDAY
+        )
+
+        // WHEN
+        viewModel.addHabit(
+            name = "Exercise",
+            iconName = "fitness_center",
+            colorArgb = 0,
+            scheduledDays = selectedDays
+        )
+
+        // THEN
+        coVerify {
+            insertHabit(match { it.scheduledDays == selectedDays })
+        }
+    }
+
+    @Test
+    fun addHabit_withNoScheduledDays_doesNotCallInsertHabitUseCase() = runTest {
+        // GIVEN
+        coEvery { getHabitsWithStatus() } returns flowOf(emptyList())
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+        viewModel = buildViewModel()
+
+        // WHEN
+        viewModel.addHabit(
+            name = "Exercise",
+            iconName = "fitness_center",
+            colorArgb = 0,
+            scheduledDays = emptySet()
+        )
+
+        // THEN
+        coVerify(exactly = 0) { insertHabit(any()) }
     }
 
     @Test
@@ -309,6 +417,7 @@ class HabitViewModelTest {
         coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
         viewModel = buildViewModel()
         val oldHabit = habit(id = 1, name = "Old Name")
+        val newScheduledDays = setOf(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY)
 
         // WHEN
         viewModel.editHabit(
@@ -318,7 +427,8 @@ class HabitViewModelTest {
             newColorArgb = 0xFF00FF00.toInt(),
             newUnit = "Pages",
             newTargetValue = 20f,
-            newStep = 5f
+            newStep = 5f,
+            newScheduledDays = newScheduledDays
         )
 
         // THEN
@@ -330,7 +440,8 @@ class HabitViewModelTest {
                         habit.colorArgb == 0xFF00FF00.toInt() &&
                         habit.unit == "Pages" &&
                         habit.targetValue == 20f &&
-                        habit.step == 5f
+                        habit.step == 5f &&
+                        habit.scheduledDays == newScheduledDays
             })
         }
     }
@@ -352,6 +463,26 @@ class HabitViewModelTest {
         )
 
         // THEN - A blank name must be silently ignored
+        coVerify(exactly = 0) { updateHabit(any()) }
+    }
+
+    @Test
+    fun editHabit_withNoScheduledDays_doesNotCallUpdateHabitUseCase() = runTest {
+        // GIVEN
+        coEvery { getHabitsWithStatus() } returns flowOf(emptyList())
+        coEvery { getAllBooleanEntries() } returns flowOf(emptyList())
+        viewModel = buildViewModel()
+
+        // WHEN
+        viewModel.editHabit(
+            habit = habit(id = 1),
+            newName = "Exercise",
+            newIcon = "fitness_center",
+            newColorArgb = 0,
+            newScheduledDays = emptySet()
+        )
+
+        // THEN
         coVerify(exactly = 0) { updateHabit(any()) }
     }
 

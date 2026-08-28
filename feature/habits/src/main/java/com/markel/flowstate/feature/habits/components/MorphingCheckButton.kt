@@ -37,7 +37,8 @@ fun MorphingCheckButton(
     iconName: String,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     // Animation states
     val morphProgress by animateFloatAsState(
@@ -88,9 +89,11 @@ fun MorphingCheckButton(
                 rotationZ = rotation
                 scaleX = scale
                 scaleY = scale
+                alpha = if (enabled) 1f else 0.4f
             }
             .background(color, shape)
             .clickable(
+                enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick

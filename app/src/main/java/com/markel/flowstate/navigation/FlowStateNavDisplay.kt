@@ -45,6 +45,7 @@ import com.markel.flowstate.feature.settings.AboutScreen
 import com.markel.flowstate.feature.settings.AppearanceScreen
 import com.markel.flowstate.feature.settings.BackupScreen
 import com.markel.flowstate.feature.settings.BottomNavConfigScreen
+import com.markel.flowstate.feature.settings.AchievementsScreen
 import com.markel.flowstate.feature.settings.CategoriesScreen
 import com.markel.flowstate.feature.settings.SettingsScreen
 
@@ -170,6 +171,7 @@ fun FlowStateNavDisplay(
                 onNavigateToAppearance = { navigator.navigate(FullScreenKey.Appearance) },
                 onNavigateToBottomNavConfig = { navigator.navigate(FullScreenKey.BottomNavConfig) },
                 onNavigateToCategories = { navigator.navigate(FullScreenKey.Categories) },
+                onNavigateToAchievements = { navigator.navigate(FullScreenKey.Achievements) },
                 onNavigateToIntegrations = { navigator.navigate(FullScreenKey.Integrations) },
                 onNavigateToAbout = { navigator.navigate(FullScreenKey.About) },
                 notificationsEnabled = notificationsEnabled,
@@ -277,6 +279,12 @@ fun FlowStateNavDisplay(
             metadata = fullScreenVerticalSlide()
         ) {
             CategoriesScreen(onBack = { navigator.goBack() })
+        }
+
+        entry<FullScreenKey.Achievements>(
+            metadata = fullScreenVerticalSlide()
+        ) {
+            AchievementsScreen(onBack = { navigator.goBack() })
         }
     }
 

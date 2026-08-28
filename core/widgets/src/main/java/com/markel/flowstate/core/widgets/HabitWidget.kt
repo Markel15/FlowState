@@ -39,6 +39,7 @@ import java.time.LocalDate
 import com.markel.flowstate.core.designsystem.icon.HabitIconMapper
 import com.markel.flowstate.core.domain.Habit
 import com.markel.flowstate.core.domain.HabitRepository
+import com.markel.flowstate.core.domain.isScheduledFor
 import kotlinx.coroutines.flow.first
 
 // Key preferences for the widget
@@ -109,12 +110,14 @@ class HabitWidget : GlanceAppWidget() {
 
         val today = LocalDate.now()
         val isCompleted = entries.contains(today)
+        val isScheduledToday = currentHabit.isScheduledFor(today)
 
         // Render the widget subscribed to the flow data
         WidgetPill(
             habitName = currentHabit.name,
             iconName = currentHabit.iconName,
             isCompleted = isCompleted,
+            isScheduledToday = isScheduledToday,
             dayNumber = today.dayOfMonth
         )
     }
@@ -141,17 +144,27 @@ class HabitWidget : GlanceAppWidget() {
         habitName: String,
         iconName: String,
         isCompleted: Boolean,
+        isScheduledToday: Boolean,
         dayNumber: Int
     ) {
-        val backgColor = GlanceTheme.colors.primaryContainer
-        val backgIconColor = GlanceTheme.colors.onPrimaryContainer
+        // On rest days (habit not scheduled today) the pill switches to the
+        // muted surfaceVariant color role, so it reads as "nothing to do
+        // today" at a glance in both light and dark dynamic themes
+        val backgColor =
+            if (isScheduledToday) GlanceTheme.colors.primaryContainer
+            else GlanceTheme.colors.surfaceVariant
+        val backgIconColor =
+            if (isScheduledToday) GlanceTheme.colors.onPrimaryContainer
+            else GlanceTheme.colors.onSurfaceVariant
 
         val badgeColor =
             if (isCompleted) GlanceTheme.colors.primary
             else GlanceTheme.colors.primaryContainer
-        val badgeTextColor =
-            if (isCompleted) GlanceTheme.colors.onPrimary
-            else GlanceTheme.colors.onPrimaryContainer
+        val badgeTextColor = when {
+            isCompleted -> GlanceTheme.colors.onPrimary
+            !isScheduledToday -> GlanceTheme.colors.onSurfaceVariant
+            else -> GlanceTheme.colors.onPrimaryContainer
+        }
 
         val size = LocalSize.current
         val widgetSize = if (size.width < size.height) size.width else size.height

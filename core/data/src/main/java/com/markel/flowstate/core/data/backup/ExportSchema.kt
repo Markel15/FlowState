@@ -1,5 +1,6 @@
 package com.markel.flowstate.core.data.backup
 
+import com.markel.flowstate.core.data.local.HabitConverters
 import kotlinx.serialization.Serializable
 
 /**
@@ -99,13 +100,13 @@ data class HabitSchema(
     val name: String,
     val iconName: String,
     val colorArgb: Int,
-    val frequency: String,
     val createdAt: Long,
     val habitType: String,
     val unit: String? = null,
     val targetValue: Float? = null,
     val step: Float,
-    val position: Int
+    val position: Int,
+    val scheduledDays: String = HabitConverters.ALL_DAYS
 )
 
 @Serializable

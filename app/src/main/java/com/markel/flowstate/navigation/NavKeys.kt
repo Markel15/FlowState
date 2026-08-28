@@ -46,6 +46,7 @@ sealed interface FullScreenKey : NavKey {
     @Serializable data object BottomNavConfig : FullScreenKey
     @Serializable data object Integrations : FullScreenKey
     @Serializable data object Categories : FullScreenKey
+    @Serializable data object Achievements : FullScreenKey
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

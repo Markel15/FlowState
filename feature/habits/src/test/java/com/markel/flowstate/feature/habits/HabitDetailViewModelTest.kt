@@ -51,7 +51,8 @@ class HabitDetailViewModelTest {
     private fun habit(
         id: Int = 1,
         type: HabitType = HabitType.BOOLEAN,
-        targetValue: Float? = null
+        targetValue: Float? = null,
+        scheduledDays: Set<DayOfWeek> = DayOfWeek.entries.toSet()
     ) = Habit(
         id = id,
         name = "Test habit",
@@ -59,7 +60,8 @@ class HabitDetailViewModelTest {
         colorArgb = 0xFF123456.toInt(),
         habitType = type,
         targetValue = targetValue,
-        createdAt = LocalDate.now().minusDays(30)
+        createdAt = LocalDate.now().minusDays(30),
+        scheduledDays = scheduledDays
     )
 
     private fun numericEntry(date: LocalDate, value: Float) = HabitNumericEntry(
@@ -178,6 +180,29 @@ class HabitDetailViewModelTest {
     }
 
     @Test
+    fun scheduledBooleanHabit_countsOnlyScheduledOccurrencesInStreaks() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val scheduledDates = listOf(today.minusDays(4), today.minusDays(2), today)
+        val scheduledDays = scheduledDates.mapTo(mutableSetOf()) { it.dayOfWeek }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.BOOLEAN,
+            scheduledDays = scheduledDays
+        )
+        coEvery { habitRepository.getEntriesForHabit(1) } returns flowOf(scheduledDates)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(3, state.currentStreak)
+            assertEquals(3, state.bestStreak)
+        }
+    }
+
+    @Test
     fun calculateDayOfWeekCompletions_groupsCorrectlyAsRates() = runTest {
         // GIVEN - 2 Mondays and 1 Friday, habit created 30 days ago
         val monday1 = LocalDate.now().minusWeeks(1).with(DayOfWeek.MONDAY)
@@ -226,6 +251,31 @@ class HabitDetailViewModelTest {
         // THEN - Streak should be 2
         viewModel.uiState.test {
             assertEquals(2, awaitItem().currentStreak)
+        }
+    }
+
+    @Test
+    fun scheduledNumericHabit_usesSameStreakRulesAsBooleanHabit() = runTest {
+        // GIVEN
+        val today = LocalDate.now()
+        val scheduledDates = listOf(today.minusDays(4), today.minusDays(2), today)
+        val scheduledDays = scheduledDates.mapTo(mutableSetOf()) { it.dayOfWeek }
+        val entries = scheduledDates.map { numericEntry(it, 10f) }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.NUMERIC,
+            targetValue = 10f,
+            scheduledDays = scheduledDays
+        )
+        coEvery { getNumericDetails(1) } returns flowOf(entries)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(3, state.currentStreak)
+            assertEquals(3, state.bestStreak)
         }
     }
 
@@ -284,6 +334,41 @@ class HabitDetailViewModelTest {
                 assertEquals(1, progress.daysCompleted) // Only one day met the 5f target
                 assertEquals(6f, progress.dailyAverage) // 12f / 2 days with data
             }
+        }
+    }
+
+    @Test
+    fun calculateMonthlyProgress_countsOnlyScheduledDaysOfTheMonth() = runTest {
+        // GIVEN - Mon/Wed/Fri habit with a 5f per-session target
+        val today = LocalDate.now()
+        val currentMonth = YearMonth.now()
+        val scheduledDays = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY)
+        val scheduledDatesInMonth = (1..currentMonth.lengthOfMonth())
+            .map { currentMonth.atDay(it) }
+            .filter { it.dayOfWeek in scheduledDays }
+        // Entries on the elapsed scheduled days of the month (robust on month boundaries)
+        val elapsedScheduled = scheduledDatesInMonth.filter { !it.isAfter(today) }
+        val entries = elapsedScheduled.take(2).mapIndexed { index, date ->
+            numericEntry(date, if (index == 0) 10f else 2f)
+        }
+        coEvery { getHabitById(1) } returns habit(
+            type = HabitType.NUMERIC,
+            targetValue = 5f,
+            scheduledDays = scheduledDays
+        )
+        coEvery { getNumericDetails(1) } returns flowOf(entries)
+
+        // WHEN
+        viewModel = buildViewModel()
+
+        // THEN
+        viewModel.uiState.test {
+            val progress = awaitItem().monthlyProgress
+            assertNotNull(progress)
+            assertEquals(scheduledDatesInMonth.size, progress!!.totalDays)
+            assertEquals(5f * scheduledDatesInMonth.size, progress.targetValue!!)
+            assertEquals(entries.sumOf { it.value.toDouble() }.toFloat(), progress.currentValue)
+            assertEquals(entries.count { it.value >= 5f }, progress.daysCompleted)
         }
     }
 

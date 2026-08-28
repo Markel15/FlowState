@@ -7,6 +7,9 @@
     <string name="habit_input_goal_reached">¡Objetivo cumplido!</string>
     <string name="add_habit_name_label">Nombre</string>
     <string name="add_habit_color_label">Color</string>
+    <string name="habit_schedule_title">Días programados</string>
+    <string name="habit_schedule_at_least_one">Selecciona al menos un día</string>
+    <string name="habit_not_scheduled_today">No programado para hoy</string>
     <string name="add_habit_create_button">Crear</string>
     <string name="add_habit_cancel_button">Cancelar</string>
     <string name="habit">Hábitos</string>

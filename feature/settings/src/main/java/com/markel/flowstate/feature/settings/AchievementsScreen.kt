@@ -1,0 +1,455 @@
+package com.markel.flowstate.feature.settings
+
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.markel.flowstate.core.designsystem.R as DesignR
+import com.markel.flowstate.core.domain.achievements.AchievementId
+import com.markel.flowstate.core.domain.achievements.AchievementProgress
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun AchievementsScreen(
+    onBack: () -> Unit,
+    viewModel: AchievementsViewModel = hiltViewModel()
+) {
+    val achievements by viewModel.achievements.collectAsStateWithLifecycle()
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        // To avoid big gaps of surface at the top & bottom (same as the
+        // main tabs): the grid scrolls behind the gesture navigation bar.
+        contentWindowInsets = WindowInsets(0.dp),
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.achievements_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                },
+                navigationIcon = {
+                    FilledTonalIconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = ImageVector.vectorResource(R.drawable.arrow_back_24px),
+                            contentDescription = null
+                        )
+                    }
+                }
+            )
+        }
+    ) { innerPadding ->
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 60.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // ── Hero summary card ─────────────────────────────
+            if (achievements.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    HeroSummary(achievements)
+                }
+            }
+
+            items(achievements, key = { it.definition.id }) { progress ->
+                AchievementCard(progress, modifier = Modifier.animateItem())
+            }
+        }
+    }
+}
+
+/** Visual assets per achievement: the icon and its strings. */
+private data class AchievementVisuals(val iconRes: Int, val nameRes: Int, val descRes: Int)
+
+private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
+    AchievementId.PERFECT_DAY -> AchievementVisuals(
+        R.drawable.star_shine_24px,
+        R.string.achievement_perfect_day_name, R.string.achievement_perfect_day_desc
+    )
+    AchievementId.STREAK -> AchievementVisuals(
+        R.drawable.mode_heat_24px,
+        R.string.achievement_streak_name, R.string.achievement_streak_desc
+    )
+    AchievementId.UNSTOPPABLE -> AchievementVisuals(
+        R.drawable.check_circle_24px,
+        R.string.achievement_unstoppable_name, R.string.achievement_unstoppable_desc
+    )
+    AchievementId.NIGHT_OWL -> AchievementVisuals(
+        R.drawable.owl_24px,
+        R.string.achievement_night_owl_name, R.string.achievement_night_owl_desc
+    )
+    AchievementId.FLAWLESS_MONDAY -> AchievementVisuals(
+        R.drawable.calendar_month_24px,
+        R.string.achievement_flawless_monday_name, R.string.achievement_flawless_monday_desc
+    )
+    AchievementId.SUNDAY_FUN_DAY -> AchievementVisuals(
+        R.drawable.task_alt_24px,
+        R.string.achievement_sunday_fun_day_name, R.string.achievement_sunday_fun_day_desc
+    )
+    AchievementId.FLAWLESS_WEEK -> AchievementVisuals(
+        R.drawable.view_week_24px,
+        R.string.achievement_flawless_week_name, R.string.achievement_flawless_week_desc
+    )
+    AchievementId.COLLECTOR -> AchievementVisuals(
+        R.drawable.award_star_24px,
+        R.string.achievement_collector_name, R.string.achievement_collector_desc
+    )
+}
+
+/**
+ * Shared visual language: the cookie gains sides as the level grows.
+ * Locked -> Cookie4 (dimmed), tier1 -> Cookie6, tier2 -> Cookie9,
+ * tier3 -> Cookie12. Single-tier achievements jump 4 -> 12.
+ */
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
+    totalTiers == 1 -> if (tierReached >= 1) MaterialShapes.SoftBurst.toShape()
+    else MaterialShapes.Cookie4Sided.toShape()
+
+    else -> when (tierReached) {
+        0 -> MaterialShapes.Square.toShape()
+        1 -> MaterialShapes.Cookie4Sided.toShape()
+        2 -> MaterialShapes.Cookie9Sided.toShape()
+        else -> MaterialShapes.SoftBurst.toShape()
+    }
+}
+
+/**
+ * Summary: ring with the unlocked tier count, plus the closest achievable next level
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun HeroSummary(achievements: List<AchievementProgress>) {
+    val unlocked = achievements.sumOf { it.tierReached }
+    val total = achievements.sumOf { it.definition.tiers.size }
+
+    // Animate the ring up from 0 when the screen opens / data changes.
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { started = true }
+    val ringFraction by animateFloatAsState(
+        targetValue = if (started && total > 0) unlocked.toFloat() / total else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "heroRing"
+    )
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        ),
+        shape = RoundedCornerShape(26.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.achievements_hero_summary, unlocked, total),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Closest next level: the achievement missing the fewest units.
+                val nextUp = achievements
+                    .filter { it.nextTier != null }
+                    .minByOrNull { (it.nextTier ?: Int.MAX_VALUE) - it.current }
+                if (nextUp != null) {
+                    val name = stringResource(visualsFor(nextUp.definition.id).nameRes)
+                    Text(
+                        text = stringResource(
+                            R.string.achievements_hero_next,
+                            (nextUp.nextTier ?: 0) - nextUp.current,
+                            name
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
+
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp)) {
+                CircularProgressIndicator(
+                    progress = { ringFraction },
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
+                    modifier = Modifier.size(84.dp)
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "$unlocked",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = stringResource(R.string.achievements_hero_of, total),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = Modifier) {
+    val visuals = visualsFor(progress.definition.id)
+    val tier = progress.tierReached
+    val totalTiers = progress.definition.tiers.size
+    val cookieShape = shapeForTier(tier, totalTiers)
+
+    // Level semantics: a single "primary" hue that fills up as the tier
+    // grows — level 3 (max) is always the solid one, so the rank reads
+    // at a glance with any dynamic color scheme.
+    val locked = tier == 0
+    val maxed = progress.maxed
+    val cookieColor: Color = when {
+        locked -> MaterialTheme.colorScheme.onSurfaceVariant
+        maxed -> MaterialTheme.colorScheme.primary
+        tier == 1 -> MaterialTheme.colorScheme.primaryContainer
+        else -> lerp(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary,
+            0.25f
+        )
+    }
+    val onCookie: Color = when {
+        locked -> MaterialTheme.colorScheme.surface
+        maxed -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val accent: Color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+    else MaterialTheme.colorScheme.primary
+    val onAccent: Color = if (locked) MaterialTheme.colorScheme.surface
+    else MaterialTheme.colorScheme.onPrimary
+
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(72.dp)
+                    .graphicsLayer {
+                        val s = if (locked) 0.9f else 1f
+                        scaleX = s
+                        scaleY = s
+                        alpha = if (locked) 0.55f else 1f
+                    }
+                    .background(color = cookieColor, shape = cookieShape)
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(visuals.iconRes),
+                    contentDescription = stringResource(visuals.nameRes),
+                    tint = onCookie,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+
+            Text(
+                text = stringResource(visuals.nameRes),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+                else Color.Unspecified
+            )
+            Text(
+                text = stringResource(visuals.descRes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    .copy(alpha = if (locked) 0.55f else 0.8f),
+                textAlign = TextAlign.Center,
+                minLines = 2
+            )
+
+            Text(
+                text = stringResource(R.string.achievement_level_chip, tier, totalTiers),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+                        .copy(alpha = 0.65f) else onCookie,
+                modifier = Modifier
+                    .background(
+                        color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+                            .copy(alpha = 0.10f) else cookieColor,
+                        shape = CircleShape
+                    )
+                    .padding(horizontal = 9.dp, vertical = 2.dp)
+            )
+
+            TierDots(
+                tiers = totalTiers,
+                reached = tier,
+                unlockedColor = accent,
+                modifier = Modifier.height(8.dp)
+            )
+
+            // Fixed-height bottom zone: progress or the "maxed" pill, so
+            // every card in the grid measures exactly the same height.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (progress.maxed) {
+                    Surface(
+                        shape = CircleShape,
+                        color = accent,
+                        contentColor = onAccent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(26.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "★ " + stringResource(R.string.achievement_max_level),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                } else {
+                    val target = progress.nextTier ?: return@Column
+                    Text(
+                        text = stringResource(
+                            R.string.achievement_progress_format,
+                            minOf(progress.current, target),
+                            target
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 0.2.sp
+                    )
+                    // Straight bar with a spring — it "grows" to its value
+                    // when the screen opens or the data advances.
+                    var started by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { started = true }
+                    val fraction by animateFloatAsState(
+                        targetValue = if (started)
+                            (progress.current.toFloat() / target).coerceIn(0f, 1f)
+                        else 0f,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
+                        label = "cardProgress"
+                    )
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+                            .copy(alpha = 0.4f) else accent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 5.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TierDots(
+    tiers: Int,
+    reached: Int,
+    unlockedColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        repeat(tiers) { index ->
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .background(
+                        color = if (index < reached) unlockedColor
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                        shape = CircleShape
+                    )
+            )
+        }
+    }
+}

@@ -38,6 +38,7 @@ fun NumericWeekBar(
     date: LocalDate,
     isToday: Boolean,
     isFuture: Boolean,
+    isScheduled: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -66,6 +67,8 @@ fun NumericWeekBar(
     val barColor by animateColorAsState(
         targetValue = when {
             isFuture -> MaterialTheme.colorScheme.surfaceContainerHigh
+            !isScheduled && value != null && value > 0f -> color.copy(alpha = 0.2f)
+            !isScheduled -> MaterialTheme.colorScheme.surfaceContainerHigh
             value == null || value == 0f -> MaterialTheme.colorScheme.surfaceContainerHigh
             targetValue == null && value > 0 -> color
             targetValue != null && value >= targetValue -> color
@@ -85,7 +88,10 @@ fun NumericWeekBar(
     }
 
     Column(
-        modifier = modifier.clickable(enabled = !isFuture, onClick = onClick),
+        modifier = modifier.clickable(
+            enabled = !isFuture && isScheduled,
+            onClick = onClick
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Bottom
     ) {
@@ -110,7 +116,7 @@ fun NumericWeekBar(
                     )
                     .background(barColor)
                     .then(
-                        if (isSelected && !isFuture) {
+                        if (isSelected && !isFuture && isScheduled) {
                             Modifier.border(
                                 width = 2.dp,
                                 color = color,
@@ -137,8 +143,9 @@ fun NumericWeekBar(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Normal,
                 color = when {
-                    isSelected && !isFuture -> color
-                    isFuture -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    isSelected && !isFuture && isScheduled -> color
+                    isFuture || !isScheduled ->
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 fontSize = 11.sp
@@ -147,7 +154,11 @@ fun NumericWeekBar(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
-                color = if (isToday) color else MaterialTheme.colorScheme.onSurface
+                color = when {
+                    !isScheduled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    isToday -> color
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
             )
         }
     }
