@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -30,11 +32,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,13 +44,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -70,15 +68,14 @@ fun AchievementsScreen(
     viewModel: AchievementsViewModel = hiltViewModel()
 ) {
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize(),
+        // To avoid big gaps of surface at the top & bottom (same as the
+        // main tabs): the grid scrolls behind the gesture navigation bar.
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
-            MediumFlexibleTopAppBar(
-                scrollBehavior = scrollBehavior,
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.achievements_title),
@@ -93,10 +90,7 @@ fun AchievementsScreen(
                             contentDescription = null
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         }
     ) { innerPadding ->
@@ -181,9 +175,7 @@ private fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
 }
 
 /**
- * Expressive summary: wavy ring with the unlocked tier count, plus the
- * closest achievable next level — information that stays useful no
- * matter how often the screen is opened (no motivational filler).
+ * Summary: ring with the unlocked tier count, plus the closest achievable next level
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -314,20 +306,6 @@ private fun AchievementCard(progress: AchievementProgress) {
                     }
                     .background(color = accent, shape = cookieShape)
             ) {
-                if (!locked) {
-                    // Gloss on the top half so the cookie reads as "lit".
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    0.0f to Color.White.copy(alpha = 0.30f),
-                                    0.45f to Color.Transparent
-                                ),
-                                shape = cookieShape
-                            )
-                    )
-                }
                 Icon(
                     imageVector = ImageVector.vectorResource(visuals.iconRes),
                     contentDescription = stringResource(visuals.nameRes),
