@@ -22,7 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
@@ -44,10 +44,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -242,10 +242,12 @@ private fun HeroSummary(achievements: List<AchievementProgress>) {
             }
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp)) {
-                CircularWavyProgressIndicator(
+                CircularProgressIndicator(
                     progress = { ringFraction },
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                    strokeCap = StrokeCap.Round,
+                    gapSize = 0.dp,
                     modifier = Modifier.size(84.dp)
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -309,18 +311,6 @@ private fun AchievementCard(progress: AchievementProgress) {
                         scaleX = s
                         scaleY = s
                         alpha = if (locked) 0.55f else 1f
-                    }
-                    .run {
-                        // Soft colored glow on the top tier.
-                        if (tier == totalTiers && !locked) {
-                            shadow(
-                                elevation = 10.dp,
-                                shape = cookieShape,
-                                clip = false,
-                                ambientColor = accent,
-                                spotColor = accent
-                            )
-                        } else this
                     }
                     .background(color = accent, shape = cookieShape)
             ) {

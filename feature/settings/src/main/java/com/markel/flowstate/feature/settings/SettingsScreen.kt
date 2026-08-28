@@ -255,7 +255,7 @@ private fun SettingsGroup(
                         icon = {
                             Icon(
                                 imageVector = ImageVector.Companion.vectorResource(
-                                    R.drawable.analytics_24px
+                                    R.drawable.workspace_premium_24px
                                 ),
                                 contentDescription = stringResource(R.string.achievements_title)
                             )
