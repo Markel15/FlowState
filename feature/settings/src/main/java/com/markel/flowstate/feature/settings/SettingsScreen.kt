@@ -39,6 +39,7 @@ fun SettingsScreen(
     onNavigateToAppearance: () -> Unit = {},
     onNavigateToBottomNavConfig: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
+    onNavigateToAchievements: () -> Unit = {},
     onNavigateToIntegrations: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     notificationsEnabled: Boolean = true,
@@ -50,6 +51,7 @@ fun SettingsScreen(
             SettingsItemData.Appearance -> onNavigateToAppearance()
             SettingsItemData.BottomNavConfig -> onNavigateToBottomNavConfig()
             SettingsItemData.Categories -> onNavigateToCategories()
+            SettingsItemData.Achievements -> onNavigateToAchievements()
             SettingsItemData.Integrations -> onNavigateToIntegrations()
             SettingsItemData.About -> onNavigateToAbout()
         }
@@ -98,6 +100,7 @@ fun SettingsScreen(
                     SettingsItemData.Notifications,
                     SettingsItemData.Appearance,
                     SettingsItemData.Categories,
+                    SettingsItemData.Achievements,
                     SettingsItemData.BottomNavConfig
                 )
                 SettingsGroup(
@@ -163,6 +166,7 @@ private sealed interface SettingsItemData {
     data object Appearance : SettingsItemData
     data object BottomNavConfig : SettingsItemData
     data object Categories : SettingsItemData
+    data object Achievements : SettingsItemData
     data object Integrations : SettingsItemData
     data object About : SettingsItemData
 }
@@ -240,6 +244,24 @@ private fun SettingsGroup(
                         },
                         headline = stringResource(R.string.categories_title),
                         supporting = stringResource(R.string.categories_settings_description),
+                        shape = shape,
+                        colors = itemColors,
+                        onClick = onClick
+                    )
+                }
+
+                is SettingsItemData.Achievements -> {
+                    SettingsNavigationItem(
+                        icon = {
+                            Icon(
+                                imageVector = ImageVector.Companion.vectorResource(
+                                    R.drawable.analytics_24px
+                                ),
+                                contentDescription = stringResource(R.string.achievements_title)
+                            )
+                        },
+                        headline = stringResource(R.string.achievements_title),
+                        supporting = stringResource(R.string.achievements_settings_description),
                         shape = shape,
                         colors = itemColors,
                         onClick = onClick
