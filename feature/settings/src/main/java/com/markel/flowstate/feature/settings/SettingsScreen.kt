@@ -100,7 +100,6 @@ fun SettingsScreen(
                     SettingsItemData.Notifications,
                     SettingsItemData.Appearance,
                     SettingsItemData.Categories,
-                    SettingsItemData.Achievements,
                     SettingsItemData.BottomNavConfig
                 )
                 SettingsGroup(
@@ -133,7 +132,10 @@ fun SettingsScreen(
                 SettingsGroupLabel(stringResource(R.string.settings_info))
             }
             item {
-                val infoItems = listOf(SettingsItemData.About)
+                val infoItems = listOf(
+                    SettingsItemData.Achievements,
+                    SettingsItemData.About
+                )
                 SettingsGroup(
                     items = infoItems,
                     appVersion = appVersion,

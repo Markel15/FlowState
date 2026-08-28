@@ -100,17 +100,17 @@
     <string name="achievement_perfect_day_name">Día perfecto</string>
     <string name="achievement_perfect_day_desc">Completa todos los hábitos programados en un mismo día</string>
     <string name="achievement_streak_name">En racha</string>
-    <string name="achievement_streak_desc">Tu mejor racha en cualquier hábito</string>
+    <string name="achievement_streak_desc">No falles ningún día programado de un mismo hábito</string>
     <string name="achievement_unstoppable_name">Imparable</string>
-    <string name="achievement_unstoppable_desc">Completaciones de hábito acumuladas</string>
+    <string name="achievement_unstoppable_desc">Completa hábitos una y otra vez: cada una suma</string>
     <string name="achievement_night_owl_name">Búho nocturno</string>
     <string name="achievement_night_owl_desc">Completa una tarea entre las 0:00 y las 5:00</string>
     <string name="achievement_flawless_monday_name">Lunes impecable</string>
-    <string name="achievement_flawless_monday_desc">Días perfectos que caen en lunes</string>
+    <string name="achievement_flawless_monday_desc">Completa todos los hábitos programados un lunes</string>
     <string name="achievement_sunday_fun_day_name">Domingo productivo</string>
-    <string name="achievement_sunday_fun_day_desc">Tareas completadas en un mismo domingo</string>
+    <string name="achievement_sunday_fun_day_desc">Completa varias tareas en un mismo domingo</string>
     <string name="achievement_flawless_week_name">Semana impecable</string>
-    <string name="achievement_flawless_week_desc">Una semana completa con todos los hábitos programados</string>
+    <string name="achievement_flawless_week_desc">Completa todos los hábitos programados durante una semana entera</string>
     <string name="achievement_collector_name">Coleccionista</string>
     <string name="achievement_collector_desc">Desbloquea niveles del resto de logros</string>
 </resources>

@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -111,7 +112,7 @@ fun AchievementsScreen(
             }
 
             items(achievements, key = { it.definition.id }) { progress ->
-                AchievementCard(progress)
+                AchievementCard(progress, modifier = Modifier.animateItem())
             }
         }
     }
@@ -163,14 +164,14 @@ private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
-    totalTiers == 1 -> if (tierReached >= 1) MaterialShapes.Cookie12Sided.toShape()
+    totalTiers == 1 -> if (tierReached >= 1) MaterialShapes.SoftBurst.toShape()
     else MaterialShapes.Cookie4Sided.toShape()
 
     else -> when (tierReached) {
-        0 -> MaterialShapes.Cookie4Sided.toShape()
-        1 -> MaterialShapes.Cookie6Sided.toShape()
+        0 -> MaterialShapes.Square.toShape()
+        1 -> MaterialShapes.Cookie4Sided.toShape()
         2 -> MaterialShapes.Cookie9Sided.toShape()
-        else -> MaterialShapes.Cookie12Sided.toShape()
+        else -> MaterialShapes.SoftBurst.toShape()
     }
 }
 
@@ -261,28 +262,39 @@ private fun HeroSummary(achievements: List<AchievementProgress>) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AchievementCard(progress: AchievementProgress) {
+private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = Modifier) {
     val visuals = visualsFor(progress.definition.id)
     val tier = progress.tierReached
     val totalTiers = progress.definition.tiers.size
     val cookieShape = shapeForTier(tier, totalTiers)
 
-    // The accent mirrors the highest unlocked tier; locked stays dim.
-    val accent: Color = when (tier) {
-        0 -> MaterialTheme.colorScheme.onSurfaceVariant
-        1 -> MaterialTheme.colorScheme.primary
-        2 -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.tertiary
-    }
-    val onAccent: Color = when (tier) {
-        0 -> MaterialTheme.colorScheme.surface
-        1 -> MaterialTheme.colorScheme.onPrimary
-        2 -> MaterialTheme.colorScheme.onSecondary
-        else -> MaterialTheme.colorScheme.onTertiary
-    }
+    // Level semantics: a single "primary" hue that fills up as the tier
+    // grows — level 3 (max) is always the solid one, so the rank reads
+    // at a glance with any dynamic color scheme.
     val locked = tier == 0
+    val maxed = progress.maxed
+    val cookieColor: Color = when {
+        locked -> MaterialTheme.colorScheme.onSurfaceVariant
+        maxed -> MaterialTheme.colorScheme.primary
+        tier == 1 -> MaterialTheme.colorScheme.primaryContainer
+        else -> lerp(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.primary,
+            0.25f
+        )
+    }
+    val onCookie: Color = when {
+        locked -> MaterialTheme.colorScheme.surface
+        maxed -> MaterialTheme.colorScheme.onPrimary
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val accent: Color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+    else MaterialTheme.colorScheme.primary
+    val onAccent: Color = if (locked) MaterialTheme.colorScheme.surface
+    else MaterialTheme.colorScheme.onPrimary
 
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
@@ -304,12 +316,12 @@ private fun AchievementCard(progress: AchievementProgress) {
                         scaleY = s
                         alpha = if (locked) 0.55f else 1f
                     }
-                    .background(color = accent, shape = cookieShape)
+                    .background(color = cookieColor, shape = cookieShape)
             ) {
                 Icon(
                     imageVector = ImageVector.vectorResource(visuals.iconRes),
                     contentDescription = stringResource(visuals.nameRes),
-                    tint = onAccent,
+                    tint = onCookie,
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -336,11 +348,11 @@ private fun AchievementCard(progress: AchievementProgress) {
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
-                        .copy(alpha = 0.65f) else accent,
+                        .copy(alpha = 0.65f) else onCookie,
                 modifier = Modifier
                     .background(
                         color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
-                            .copy(alpha = 0.10f) else accent.copy(alpha = 0.14f),
+                            .copy(alpha = 0.10f) else cookieColor,
                         shape = CircleShape
                     )
                     .padding(horizontal = 9.dp, vertical = 2.dp)

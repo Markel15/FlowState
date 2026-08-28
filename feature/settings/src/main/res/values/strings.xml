@@ -100,17 +100,17 @@
     <string name="achievement_perfect_day_name">Perfect day</string>
     <string name="achievement_perfect_day_desc">Complete every habit scheduled on a single day</string>
     <string name="achievement_streak_name">On a streak</string>
-    <string name="achievement_streak_desc">Best streak of any habit</string>
+    <string name="achievement_streak_desc">Keep a habit alive: never miss its scheduled days</string>
     <string name="achievement_unstoppable_name">Unstoppable</string>
-    <string name="achievement_unstoppable_desc">Total habit completions</string>
+    <string name="achievement_unstoppable_desc">Complete habits over and over: every completion counts</string>
     <string name="achievement_night_owl_name">Night owl</string>
     <string name="achievement_night_owl_desc">Complete a task between 0:00 and 5:00</string>
-    <string name="achievement_flawless_monday_name">Flawless monday</string>
-    <string name="achievement_flawless_monday_desc">Perfect days that fall on a Monday</string>
-    <string name="achievement_sunday_fun_day_name">Productive sunday</string>
-    <string name="achievement_sunday_fun_day_desc">Tasks completed on a single Sunday</string>
+    <string name="achievement_flawless_monday_name">Flawless Monday</string>
+    <string name="achievement_flawless_monday_desc">Complete every habit scheduled on a Monday</string>
+    <string name="achievement_sunday_fun_day_name">Productive Sunday</string>
+    <string name="achievement_sunday_fun_day_desc">Complete several tasks on the same Sunday</string>
     <string name="achievement_flawless_week_name">Flawless week</string>
-    <string name="achievement_flawless_week_desc">A full week with every scheduled habit completed</string>
+    <string name="achievement_flawless_week_desc">Complete every scheduled habit for a whole week</string>
     <string name="achievement_collector_name">Collector</string>
-    <string name="achievement_collector_desc">Unlock levels from the other milestones</string>
+    <string name="achievement_collector_desc">Unlock levels in the other achievements</string>
 </resources>
