@@ -137,4 +137,44 @@ class HabitAchievementMetricsTest {
         )
         assertEquals(0, m.perfectWeeks)
     }
+
+    @Test
+    fun `comeback needs three missed occurrences in a row`() {
+        val habit = boolHabit(1, createdAt = today.minusDays(6))
+        // Daily habit silent Aug 18-22 (5 missed), completed yesterday Aug 23
+        val entries = listOf(entry(1, today.minusDays(1)))
+        val m = computeHabitAchievementMetrics(listOf(habit), entries, emptyList(), today)
+        assertEquals(1, m.comebacks)
+    }
+
+    @Test
+    fun `two missed days are not enough for a comeback`() {
+        val habit = boolHabit(1, createdAt = today.minusDays(4))
+        // Missed Aug 20-21 (2), completed Aug 22, missed Aug 23, today pending
+        val entries = listOf(entry(1, today.minusDays(2)))
+        val m = computeHabitAchievementMetrics(listOf(habit), entries, emptyList(), today)
+        assertEquals(0, m.comebacks)
+    }
+
+    @Test
+    fun `a pending today is never counted as missed`() {
+        val habit = boolHabit(1, createdAt = today.minusDays(3))
+        // Three past days missed but no completion after them, today still open
+        val m = computeHabitAchievementMetrics(listOf(habit), emptyList(), emptyList(), today)
+        assertEquals(0, m.comebacks)
+    }
+
+    @Test
+    fun `scheduled days shape the missed run`() {
+        // Created Sunday Aug 2: the Sundays of Aug 2, 9 and 16 were missed,
+        // Aug 23 (yesterday, also a Sunday) completed -> one comeback.
+        val sundaysOnly = boolHabit(
+            1,
+            createdAt = today.minusDays(22),
+            scheduled = setOf(DayOfWeek.SUNDAY)
+        )
+        val entries = listOf(entry(1, today.minusDays(1)))
+        val m = computeHabitAchievementMetrics(listOf(sundaysOnly), entries, emptyList(), today)
+        assertEquals(1, m.comebacks)
+    }
 }

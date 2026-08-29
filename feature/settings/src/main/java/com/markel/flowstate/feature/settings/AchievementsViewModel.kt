@@ -23,6 +23,11 @@ class AchievementsViewModel @Inject constructor(
             AchievementEvaluator.evaluate(
                 AchievementInputs(
                     totalHabitCompletions = metrics.habit.totalCompletions,
+                    totalTaskCompletions = metrics.tasks.totalDone,
+                    earlyBirdTasks = metrics.tasks.earlyBirdTasks,
+                    productiveMornings = metrics.tasks.productiveMornings,
+                    onTimeTasks = metrics.tasks.onTimeTasks,
+                    comebacks = metrics.habit.comebacks,
                     bestStreak = metrics.habit.bestStreak,
                     perfectDays = metrics.habit.perfectDays,
                     mondayPerfectDays = metrics.habit.mondayPerfectDays,

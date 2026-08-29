@@ -49,31 +49,39 @@ class AchievementEvaluatorTest {
     }
 
     @Test
-    fun `collector counts tiers unlocked by other achievements`() {
-        // 3 tiers from a maxed streak + 1 tier from a perfect day
-        val inputs = AchievementInputs(bestStreak = 365, perfectDays = 1)
-        val p = progress(AchievementId.COLLECTOR, inputs)
-        assertEquals(4, p.current)
-        assertEquals(1, p.tierReached)
-        assertEquals(8, p.nextTier)
+    fun `comeback unlocks at 1, 3 and 5`() {
+        assertEquals(0, progress(AchievementId.COMEBACK, AchievementInputs()).tierReached)
+        val first = progress(AchievementId.COMEBACK, AchievementInputs(comebacks = 1))
+        assertEquals(1, first.tierReached)
+        assertEquals(3, first.nextTier)
+        assertTrue(progress(AchievementId.COMEBACK, AchievementInputs(comebacks = 5)).maxed)
     }
 
     @Test
-    fun `collector does not count itself`() {
-        // Everything maxed: 22 tiers total, collector contributes 3,
-        // so it must see 19 unlocked tiers (reaching its own top tier).
+    fun `new task achievements unlock at their thresholds`() {
         val inputs = AchievementInputs(
-            totalHabitCompletions = 5000,
-            bestStreak = 365,
-            perfectDays = 30,
-            mondayPerfectDays = 10,
-            nightOwlTasks = 1,
-            bestSundayTasks = 15,
-            perfectWeeks = 10
+            earlyBirdTasks = 5,
+            onTimeTasks = 15,
+            productiveMornings = 1
         )
-        val p = progress(AchievementId.COLLECTOR, inputs)
-        assertEquals(19, p.current)
-        assertTrue(p.maxed)
+        assertEquals(2, progress(AchievementId.EARLY_BIRD, inputs).tierReached)
+        assertEquals(2, progress(AchievementId.ON_TIME, inputs).tierReached)
+        assertEquals(1, progress(AchievementId.PRODUCTIVE_MORNING, inputs).tierReached)
+    }
+
+    @Test
+    fun `task total tiers climb at 25, 100 and 500`() {
+        assertEquals(
+            0,
+            progress(AchievementId.TASK_TOTAL, AchievementInputs(totalTaskCompletions = 24))
+                .tierReached
+        )
+        val first = progress(AchievementId.TASK_TOTAL, AchievementInputs(totalTaskCompletions = 25))
+        assertEquals(1, first.tierReached)
+        assertEquals(100, first.nextTier)
+        val maxed = progress(AchievementId.TASK_TOTAL, AchievementInputs(totalTaskCompletions = 500))
+        assertEquals(3, maxed.tierReached)
+        assertTrue(maxed.maxed)
     }
 
     @Test

@@ -16,7 +16,9 @@ data class HabitAchievementMetrics(
     val bestStreak: Int,
     val perfectDays: Int,
     val mondayPerfectDays: Int,
-    val perfectWeeks: Int
+    val perfectWeeks: Int,
+    /** Times a habit was completed right after missing 3+ scheduled occurrences in a row. */
+    val comebacks: Int
 )
 
 /** Completed dates per habit (numeric entries must reach the target). */
@@ -58,7 +60,7 @@ fun computeHabitAchievementMetrics(
     today: LocalDate = LocalDate.now()
 ): HabitAchievementMetrics {
     if (habits.isEmpty()) {
-        return HabitAchievementMetrics(0, 0, 0, 0, 0)
+        return HabitAchievementMetrics(0, 0, 0, 0, 0, 0)
     }
 
     val datesByHabit = completedDatesByHabit(habits, booleanEntries, numericEntries)
@@ -75,7 +77,8 @@ fun computeHabitAchievementMetrics(
         bestStreak = bestStreak,
         perfectDays = countPerfectDays(habits, datesByHabit, today),
         mondayPerfectDays = countPerfectDays(habits, datesByHabit, today, DayOfWeek.MONDAY),
-        perfectWeeks = countPerfectWeeks(habits, datesByHabit, today)
+        perfectWeeks = countPerfectWeeks(habits, datesByHabit, today),
+        comebacks = habits.sumOf { countComebacks(it, datesByHabit[it.id].orEmpty(), today) }
     )
 }
 
@@ -108,6 +111,43 @@ internal fun countPerfectDays(
         date = date.plusDays(1)
     }
     return perfect
+}
+
+private const val COMEBACK_MIN_MISSED = 3
+
+/**
+ * Times the habit was completed right after a run of at least
+ * [COMEBACK_MIN_MISSED] consecutive MISSED scheduled occurrences. Only
+ * past scheduled days count as missed (today is still pending), and the
+ * scan starts at the habit's creation — or at an earlier backfilled
+ * entry.
+ */
+internal fun countComebacks(
+    habit: Habit,
+    completedDates: Set<LocalDate>,
+    today: LocalDate
+): Int {
+    val firstEntry = completedDates.minOrNull() ?: habit.createdAt
+    val start = minOf(habit.createdAt, firstEntry)
+    if (start.isAfter(today)) return 0
+
+    var missed = 0
+    var count = 0
+    var date = start
+    while (!date.isAfter(today)) {
+        if (habit.isScheduledFor(date)) {
+            when {
+                date in completedDates -> {
+                    if (missed >= COMEBACK_MIN_MISSED) count++
+                    missed = 0
+                }
+                date.isBefore(today) -> missed++
+                // Today is still pending: neither a miss nor a completion.
+            }
+        }
+        date = date.plusDays(1)
+    }
+    return count
 }
 
 /**

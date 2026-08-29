@@ -19,11 +19,15 @@ enum class AchievementId {
     PERFECT_DAY,
     STREAK,
     UNSTOPPABLE,
+    TASK_TOTAL,
     NIGHT_OWL,
+    EARLY_BIRD,
     FLAWLESS_MONDAY,
     SUNDAY_FUN_DAY,
+    PRODUCTIVE_MORNING,
+    ON_TIME,
     FLAWLESS_WEEK,
-    COLLECTOR
+    COMEBACK
 }
 
 data class AchievementDefinition(
@@ -34,12 +38,17 @@ data class AchievementDefinition(
 /** Aggregated raw values the catalog is evaluated against. */
 data class AchievementInputs(
     val totalHabitCompletions: Int = 0,
+    val totalTaskCompletions: Int = 0,
     val bestStreak: Int = 0,
     val perfectDays: Int = 0,
     val mondayPerfectDays: Int = 0,
     val nightOwlTasks: Int = 0,
+    val earlyBirdTasks: Int = 0,
     val bestSundayTasks: Int = 0,
-    val perfectWeeks: Int = 0
+    val productiveMornings: Int = 0,
+    val onTimeTasks: Int = 0,
+    val perfectWeeks: Int = 0,
+    val comebacks: Int = 0
 )
 
 data class AchievementProgress(
@@ -56,38 +65,30 @@ data class AchievementProgress(
 
 object AchievementCatalog {
 
-    /** Achievement list, in display order. [COLLECTOR] is evaluated last. */
+    /** Achievement list, in display order. */
     val definitions: List<AchievementDefinition> = listOf(
         AchievementDefinition(AchievementId.PERFECT_DAY, listOf(1, 10, 30)),
         AchievementDefinition(AchievementId.STREAK, listOf(21, 100, 365)),
         AchievementDefinition(AchievementId.UNSTOPPABLE, listOf(100, 1000, 5000)),
+        AchievementDefinition(AchievementId.TASK_TOTAL, listOf(25, 100, 500)),
         AchievementDefinition(AchievementId.NIGHT_OWL, listOf(1)),
+        AchievementDefinition(AchievementId.EARLY_BIRD, listOf(1, 5, 15)),
         AchievementDefinition(AchievementId.FLAWLESS_MONDAY, listOf(1, 4, 10)),
         AchievementDefinition(AchievementId.SUNDAY_FUN_DAY, listOf(3, 5, 15)),
+        AchievementDefinition(AchievementId.PRODUCTIVE_MORNING, listOf(1, 5, 10)),
+        AchievementDefinition(AchievementId.ON_TIME, listOf(5, 15, 30)),
         AchievementDefinition(AchievementId.FLAWLESS_WEEK, listOf(1, 4, 10)),
-        AchievementDefinition(AchievementId.COLLECTOR, listOf(4, 8, 12))
+        AchievementDefinition(AchievementId.COMEBACK, listOf(1, 3, 5))
     )
 }
 
 object AchievementEvaluator {
 
-    /**
-     * Evaluates the catalog. [AchievementId.COLLECTOR] is a meta
-     * achievement: its current value is the number of tiers unlocked
-     * across every OTHER achievement.
-     */
-    fun evaluate(inputs: AchievementInputs): List<AchievementProgress> {
-        val base = AchievementCatalog.definitions
-            .filterNot { it.id == AchievementId.COLLECTOR }
-            .map { definition -> toProgress(definition, currentValue(definition.id, inputs)) }
-
-        val unlockedTiers = base.sumOf { it.tierReached }
-        val collector = AchievementCatalog.definitions
-            .first { it.id == AchievementId.COLLECTOR }
-            .let { toProgress(it, unlockedTiers) }
-
-        return base + collector
-    }
+    /** Evaluates the whole catalog against [inputs]. */
+    fun evaluate(inputs: AchievementInputs): List<AchievementProgress> =
+        AchievementCatalog.definitions.map { definition ->
+            toProgress(definition, currentValue(definition.id, inputs))
+        }
 
     private fun toProgress(definition: AchievementDefinition, current: Int): AchievementProgress {
         val tierReached = definition.tiers.count { current >= it }
@@ -103,10 +104,14 @@ object AchievementEvaluator {
         AchievementId.PERFECT_DAY -> inputs.perfectDays
         AchievementId.STREAK -> inputs.bestStreak
         AchievementId.UNSTOPPABLE -> inputs.totalHabitCompletions
+        AchievementId.TASK_TOTAL -> inputs.totalTaskCompletions
         AchievementId.NIGHT_OWL -> inputs.nightOwlTasks
+        AchievementId.EARLY_BIRD -> inputs.earlyBirdTasks
         AchievementId.FLAWLESS_MONDAY -> inputs.mondayPerfectDays
         AchievementId.SUNDAY_FUN_DAY -> inputs.bestSundayTasks
+        AchievementId.PRODUCTIVE_MORNING -> inputs.productiveMornings
+        AchievementId.ON_TIME -> inputs.onTimeTasks
         AchievementId.FLAWLESS_WEEK -> inputs.perfectWeeks
-        AchievementId.COLLECTOR -> 0 // evaluated in a second pass
+        AchievementId.COMEBACK -> inputs.comebacks
     }
 }

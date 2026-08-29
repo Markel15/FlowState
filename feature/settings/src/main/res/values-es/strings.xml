@@ -97,6 +97,9 @@
     <string name="achievement_level_chip">Nivel %1$d / %2$d</string>
     <string name="achievement_progress_format">%1$d / %2$d</string>
     <string name="achievement_max_level">Nivel máximo</string>
+    <string name="achievements_section_locked">Por desbloquear</string>
+    <string name="achievements_section_in_progress">En progreso</string>
+    <string name="achievements_section_completed">Completados</string>
     <string name="achievement_perfect_day_name">Día perfecto</string>
     <string name="achievement_perfect_day_desc">Completa todos los hábitos programados en un mismo día</string>
     <string name="achievement_streak_name">En racha</string>
@@ -111,6 +114,14 @@
     <string name="achievement_sunday_fun_day_desc">Completa varias tareas en un mismo domingo</string>
     <string name="achievement_flawless_week_name">Semana impecable</string>
     <string name="achievement_flawless_week_desc">Completa todos los hábitos programados durante una semana entera</string>
-    <string name="achievement_collector_name">Coleccionista</string>
-    <string name="achievement_collector_desc">Desbloquea niveles del resto de logros</string>
+    <string name="achievement_comeback_name">Renacer</string>
+    <string name="achievement_comeback_desc">Vuelve a completar un hábito tras saltártelo 3 veces seguidas</string>
+    <string name="achievement_task_total_name">Tachando la lista</string>
+    <string name="achievement_task_total_desc">Suma tareas completadas: cada check cuenta</string>
+    <string name="achievement_early_bird_name">Al alba</string>
+    <string name="achievement_early_bird_desc">Completa tareas antes de las 7:00</string>
+    <string name="achievement_on_time_name">Puntual</string>
+    <string name="achievement_on_time_desc">Completa tareas antes de su fecha límite</string>
+    <string name="achievement_productive_morning_name">Mañana productiva</string>
+    <string name="achievement_productive_morning_desc">Completa 3 tareas antes del mediodía en un mismo día</string>
 </resources>

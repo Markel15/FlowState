@@ -97,6 +97,9 @@
     <string name="achievement_level_chip">Level %1$d / %2$d</string>
     <string name="achievement_progress_format">%1$d / %2$d</string>
     <string name="achievement_max_level">Max level</string>
+    <string name="achievements_section_locked">To unlock</string>
+    <string name="achievements_section_in_progress">In progress</string>
+    <string name="achievements_section_completed">Completed</string>
     <string name="achievement_perfect_day_name">Perfect day</string>
     <string name="achievement_perfect_day_desc">Complete every habit scheduled on a single day</string>
     <string name="achievement_streak_name">On a streak</string>
@@ -111,6 +114,14 @@
     <string name="achievement_sunday_fun_day_desc">Complete several tasks on the same Sunday</string>
     <string name="achievement_flawless_week_name">Flawless week</string>
     <string name="achievement_flawless_week_desc">Complete every scheduled habit for a whole week</string>
-    <string name="achievement_collector_name">Collector</string>
-    <string name="achievement_collector_desc">Unlock levels in the other achievements</string>
+    <string name="achievement_comeback_name">Comeback</string>
+    <string name="achievement_comeback_desc">Return to a habit after missing it 3 times in a row</string>
+    <string name="achievement_task_total_name">Checking off the list</string>
+    <string name="achievement_task_total_desc">Rack up completed tasks: every check counts</string>
+    <string name="achievement_early_bird_name">Early bird</string>
+    <string name="achievement_early_bird_desc">Complete tasks before 7 AM</string>
+    <string name="achievement_on_time_name">On time</string>
+    <string name="achievement_on_time_desc">Complete tasks before their due date</string>
+    <string name="achievement_productive_morning_name">Productive morning</string>
+    <string name="achievement_productive_morning_desc">Check off 3 tasks before noon on the same day</string>
 </resources>

@@ -114,10 +114,81 @@ fun AchievementsScreen(
                 }
             }
 
-            items(achievements, key = { it.definition.id }) { progress ->
-                AchievementCard(progress, modifier = Modifier.animateItem())
+            // The list arrives pre-sorted as a level ladder from the ViewModel
+            val locked = achievements.filter { it.tierReached == 0 }
+            val inProgress = achievements.filter { !it.maxed && it.tierReached > 0 }
+            val completed = achievements.filter { it.maxed }
+
+            if (locked.isNotEmpty()) {
+                item(key = "header_locked", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(
+                        text = stringResource(R.string.achievements_section_locked),
+                        count = locked.size,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+                items(locked, key = { it.definition.id }) { progress ->
+                    AchievementCard(progress, modifier = Modifier.animateItem())
+                }
+            }
+
+            if (inProgress.isNotEmpty()) {
+                item(key = "header_in_progress", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(
+                        text = stringResource(R.string.achievements_section_in_progress),
+                        count = inProgress.size,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+                items(inProgress, key = { it.definition.id }) { progress ->
+                    AchievementCard(progress, modifier = Modifier.animateItem())
+                }
+            }
+
+            if (completed.isNotEmpty()) {
+                item(key = "header_completed", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(
+                        text = stringResource(R.string.achievements_section_completed),
+                        count = completed.size,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+                items(completed, key = { it.definition.id }) { progress ->
+                    AchievementCard(progress, modifier = Modifier.animateItem())
+                }
             }
         }
+    }
+}
+
+/**
+ * Small label + count that separates one tier band from the next, adding hierarchy anchors
+ */
+@Composable
+private fun SectionHeader(text: String, count: Int, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.padding(top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .background(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.10f),
+                    shape = CircleShape
+                )
+                .padding(horizontal = 8.dp, vertical = 1.dp)
+        )
     }
 }
 
@@ -137,9 +208,17 @@ private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
         R.drawable.check_circle_24px,
         R.string.achievement_unstoppable_name, R.string.achievement_unstoppable_desc
     )
+    AchievementId.TASK_TOTAL -> AchievementVisuals(
+        R.drawable.check_box_24px,
+        R.string.achievement_task_total_name, R.string.achievement_task_total_desc
+    )
     AchievementId.NIGHT_OWL -> AchievementVisuals(
         R.drawable.owl_24px,
         R.string.achievement_night_owl_name, R.string.achievement_night_owl_desc
+    )
+    AchievementId.EARLY_BIRD -> AchievementVisuals(
+        R.drawable.wb_twilight_24px,
+        R.string.achievement_early_bird_name, R.string.achievement_early_bird_desc
     )
     AchievementId.FLAWLESS_MONDAY -> AchievementVisuals(
         R.drawable.calendar_month_24px,
@@ -149,13 +228,22 @@ private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
         R.drawable.task_alt_24px,
         R.string.achievement_sunday_fun_day_name, R.string.achievement_sunday_fun_day_desc
     )
+    AchievementId.PRODUCTIVE_MORNING -> AchievementVisuals(
+        R.drawable.wb_sunny_24px,
+        R.string.achievement_productive_morning_name,
+        R.string.achievement_productive_morning_desc
+    )
+    AchievementId.ON_TIME -> AchievementVisuals(
+        R.drawable.event_available_24px,
+        R.string.achievement_on_time_name, R.string.achievement_on_time_desc
+    )
     AchievementId.FLAWLESS_WEEK -> AchievementVisuals(
         R.drawable.view_week_24px,
         R.string.achievement_flawless_week_name, R.string.achievement_flawless_week_desc
     )
-    AchievementId.COLLECTOR -> AchievementVisuals(
-        R.drawable.award_star_24px,
-        R.string.achievement_collector_name, R.string.achievement_collector_desc
+    AchievementId.COMEBACK -> AchievementVisuals(
+        R.drawable.restart_alt_24px,
+        R.string.achievement_comeback_name, R.string.achievement_comeback_desc
     )
 }
 
