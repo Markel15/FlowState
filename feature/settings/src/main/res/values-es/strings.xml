@@ -91,8 +91,8 @@
     <string name="categories_rename_title">Renombrar categoría</string>
     <string name="achievements_title">Logros</string>
     <string name="achievements_settings_description">Tus hitos y tu progreso</string>
-    <string name="achievements_hero_summary">Has desbloqueado %1$d de %2$d niveles</string>
-    <string name="achievements_hero_next">Te quedan %1$d para «%2$s»</string>
+    <string name="achievements_hero_label">Niveles desbloqueados</string>
+    <string name="achievements_hero_complete">★ Colección completa</string>
     <string name="achievements_hero_of">de %1$d</string>
     <string name="achievement_level_chip">Nivel %1$d / %2$d</string>
     <string name="achievement_progress_format">%1$d / %2$d</string>

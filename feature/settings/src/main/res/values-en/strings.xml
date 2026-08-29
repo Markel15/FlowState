@@ -91,8 +91,8 @@
     <string name="categories_rename_title">Rename category</string>
     <string name="achievements_title">Achievements</string>
     <string name="achievements_settings_description">Your milestones and progress</string>
-    <string name="achievements_hero_summary">You\'ve unlocked %1$d of %2$d levels</string>
-    <string name="achievements_hero_next">%1$d to go for «%2$s»</string>
+    <string name="achievements_hero_label">Unlocked levels</string>
+    <string name="achievements_hero_complete">★ Collection complete</string>
     <string name="achievements_hero_of">of %1$d</string>
     <string name="achievement_level_chip">Level %1$d / %2$d</string>
     <string name="achievement_progress_format">%1$d / %2$d</string>

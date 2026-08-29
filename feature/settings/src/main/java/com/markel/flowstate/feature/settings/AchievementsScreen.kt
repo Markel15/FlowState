@@ -2,7 +2,9 @@ package com.markel.flowstate.feature.settings
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,9 +12,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,7 +28,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
@@ -44,9 +47,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -180,79 +183,118 @@ private fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
+/**
+ * Hero: A giant cookie echoing the collection's overall level
+ * sits in the background (cropped by the card edges); the content is just
+ * the count of unlocked levels with a count-up and a thin gradient bar.
+ * No colored container: same surface as the grid cards.
+ *
+ * The background cookie follows the same shape ladder as the cards,
+ * driven by the overall collection level 0..3 — Square → Cookie4 →
+ * Cookie9 → SoftBurst. When the collection is complete the shape already
+ * becomes the "achieved" one.
+ */
 private fun HeroSummary(achievements: List<AchievementProgress>) {
     val unlocked = achievements.sumOf { it.tierReached }
     val total = achievements.sumOf { it.definition.tiers.size }
+    val fraction = if (total > 0) unlocked.toFloat() / total else 0f
 
-    // Animate the ring up from 0 when the screen opens / data changes.
+    // Collection complete: minimal celebration — the label switches and
+    // the background cookie brightens.
+    val complete = unlocked >= total
+
+    // Count-up + bar fill when the screen opens / data changes.
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { started = true }
-    val ringFraction by animateFloatAsState(
-        targetValue = if (started && total > 0) unlocked.toFloat() / total else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
-        label = "heroRing"
+    val animatedCount by animateIntAsState(
+        targetValue = if (started) unlocked else 0,
+        animationSpec = tween(durationMillis = 800),
+        label = "heroCount"
     )
+    val barFraction by animateFloatAsState(
+        targetValue = if (started) fraction else 0f,
+        animationSpec = tween(durationMillis = 800),
+        label = "heroBar"
+    )
+
+    // Overall collection level
+    val globalTier = if (total > 0) (unlocked * 3) / total else 0
+    val heroShape = shapeForTier(globalTier, totalTiers = 3)
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
         shape = RoundedCornerShape(26.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.achievements_hero_summary, unlocked, total),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                // Closest next level: the achievement missing the fewest units.
-                val nextUp = achievements
-                    .filter { it.nextTier != null }
-                    .minByOrNull { (it.nextTier ?: Int.MAX_VALUE) - it.current }
-                if (nextUp != null) {
-                    val name = stringResource(visualsFor(nextUp.definition.id).nameRes)
-                    Text(
-                        text = stringResource(
-                            R.string.achievements_hero_next,
-                            (nextUp.nextTier ?: 0) - nextUp.current,
-                            name
-                        ),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Giant cookie decoration, cropped by the card edges.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 30.dp, y = 28.dp)
+                    .size(170.dp)
+                    .graphicsLayer { alpha = if (complete) 0.14f else 0.07f }
+                    .background(
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 6.dp)
+                        shape = heroShape
                     )
-                }
-            }
+            )
 
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(84.dp)) {
-                CircularProgressIndicator(
-                    progress = { ringFraction },
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
-                    strokeCap = StrokeCap.Round,
-                    gapSize = 0.dp,
-                    modifier = Modifier.size(84.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+            ) {
+                Text(
+                    text = stringResource(
+                        if (complete) R.string.achievements_hero_complete
+                        else R.string.achievements_hero_label
+                    ).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.4.sp,
+                    color = if (complete) MaterialTheme.colorScheme.tertiary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = "$unlocked",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold
+                        text = "$animatedCount",
+                        style = MaterialTheme.typography.displayLarge,
+                        fontWeight = FontWeight.Black
                     )
                     Text(
                         text = stringResource(R.string.achievements_hero_of, total),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 8.dp, bottom = 10.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                            shape = CircleShape
+                        )
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(barFraction)
+                            .fillMaxHeight()
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary,
+                                        MaterialTheme.colorScheme.tertiary
+                                    )
+                                ),
+                                shape = CircleShape
+                            )
                     )
                 }
             }
@@ -280,13 +322,15 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
         else -> lerp(
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.primary,
-            0.25f
+            0.37f
         )
     }
     val onCookie: Color = when {
         locked -> MaterialTheme.colorScheme.surface
         maxed -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.primary
+        // Neutral on the lighter fills so the grid doesn't drown in
+        // primary: near-black in light theme, near-white in dark.
+        else -> MaterialTheme.colorScheme.onSurface
     }
     val accent: Color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
     else MaterialTheme.colorScheme.primary
