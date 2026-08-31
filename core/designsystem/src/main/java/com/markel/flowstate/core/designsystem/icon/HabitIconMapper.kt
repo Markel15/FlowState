@@ -37,7 +37,11 @@ object HabitIconMapper {
         "water" to R.drawable.water_drop_24px,
         "assignment" to R.drawable.assignment_24px,
         "pets" to R.drawable.pets_24px,
-        "washoku" to R.drawable.washoku_24px
+        "washoku" to R.drawable.washoku_24px,
+        "pool" to R.drawable.pool_24px,
+        "hiking" to R.drawable.hiking_24px,
+        "pill" to R.drawable.pill_24px,
+        "nature" to R.drawable.nature_24px
     )
 
     private val iconMap: Map<String, Int?> = iconList.toMap()
