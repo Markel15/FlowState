@@ -1,6 +1,6 @@
 # FlowState
 
-**Tasks, habits and notes — all in one place. Free, open-source, 100% offline.**
+**Tasks, habits and notes. Free, open-source, 100% offline.**
 
 No accounts, no ads, no tracking, no servers. Your data never leaves your phone.
 
@@ -10,7 +10,7 @@ No accounts, no ads, no tracking, no servers. Your data never leaves your phone.
 
 ## Download
 
-**Get the latest APK — no store, no sign-up:**
+**Get the latest APK :**
 
 [![Download FlowState APK](https://img.shields.io/badge/⬇_Download-FlowState_APK-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Markel15/FlowState/releases/latest/download/app-release.apk)
 
