@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -458,13 +460,16 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
                 )
             }
 
+            // Fixed-height text slots so every card measures exactly the same.
             Text(
                 text = stringResource(visuals.nameRes),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
                 color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
-                else Color.Unspecified
+                else Color.Unspecified,
+                modifier = Modifier.basicMarquee()
             )
             Text(
                 text = stringResource(visuals.descRes),
@@ -472,7 +477,9 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
                 color = MaterialTheme.colorScheme.onSurfaceVariant
                     .copy(alpha = if (locked) 0.55f else 0.8f),
                 textAlign = TextAlign.Center,
-                minLines = 2
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
 
             Text(
