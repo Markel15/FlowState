@@ -25,7 +25,7 @@ data class FlowStateExport(
 ) {
     companion object {
         /** Must match the Room database version so restores stay consistent. */
-        const val CURRENT_SCHEMA_VERSION = 19
+        const val CURRENT_SCHEMA_VERSION = 20
     }
 }
 
