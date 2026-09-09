@@ -327,10 +327,7 @@ fun HabitDetailScreen(
 
             // ── Weekly Bars ──────────────────────────────────────
             val selectedWeekData = run {
-                val data = when (state.weeklyBarsMode) {
-                    WeeklyBarsMode.EIGHT -> state.weeklyCompletions.takeLast(8)
-                    WeeklyBarsMode.SIXTEEN -> state.weeklyCompletions
-                }
+                val data = state.weeklyCompletions.takeLast(state.weeklyBarsRange.weeks)
                 val idx = state.selectedBarIndex ?: (data.size - 1)
                 data.getOrNull(idx)
             }
@@ -367,10 +364,10 @@ fun HabitDetailScreen(
                 WeeklyBarsCard(
                     weeklyCompletions = state.weeklyCompletions,
                     selectedIndex = state.selectedBarIndex,
-                    barsMode = state.weeklyBarsMode,
+                    barsRange = state.weeklyBarsRange,
                     habitColor = habitColor,
                     onBarSelected = { viewModel.selectBar(it) },
-                    onModeChanged = { viewModel.setWeeklyBarsMode(it) },
+                    onRangeChanged = { viewModel.setWeeklyBarsRange(it) },
                     modifier = Modifier.padding(16.dp)
                 )
             }

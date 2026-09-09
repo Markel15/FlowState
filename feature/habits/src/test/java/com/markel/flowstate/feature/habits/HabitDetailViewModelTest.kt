@@ -11,7 +11,7 @@ import com.markel.flowstate.core.domain.usecase.habits.GetNumericEntriesUseCase
 import com.markel.flowstate.core.testing.util.MainDispatcherRule
 import com.markel.flowstate.feature.habits.details.CalendarViewMode
 import com.markel.flowstate.feature.habits.details.HabitDetailViewModel
-import com.markel.flowstate.feature.habits.details.WeeklyBarsMode
+import com.markel.flowstate.feature.habits.details.WeeklyBarsRange
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -513,7 +513,7 @@ class HabitDetailViewModelTest {
     // ── Weekly Bars & Selection ───────────────────────────────────────────────
 
     @Test
-    fun setWeeklyBarsMode_updatesMode_andClearsSelection() = runTest {
+    fun setWeeklyBarsRange_updatesRange_andClearsSelection() = runTest {
         // GIVEN
         coEvery { getHabitById(1) } returns habit()
         coEvery { habitRepository.getEntriesForHabit(1) } returns flowOf(emptyList())
@@ -521,12 +521,12 @@ class HabitDetailViewModelTest {
         viewModel.selectBar(3) // Set a selection
 
         // WHEN
-        viewModel.setWeeklyBarsMode(WeeklyBarsMode.SIXTEEN)
+        viewModel.setWeeklyBarsRange(WeeklyBarsRange.ONE_YEAR)
 
         // THEN
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals(WeeklyBarsMode.SIXTEEN, state.weeklyBarsMode)
+            assertEquals(WeeklyBarsRange.ONE_YEAR, state.weeklyBarsRange)
             assertNull(state.selectedBarIndex)
         }
     }

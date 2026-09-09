@@ -76,8 +76,10 @@
     <string name="habit_monthly_label">Este mes (%1$s)</string>
     <string name="habit_deficit_label">Déficit acumulado: %1$s %2$s</string>
     <string name="habit_days_completed">%1$d/%2$d días cumplidos</string>
-    <string name="weekly_bars_8">8 semanas</string>
-    <string name="weekly_bars_16">16 semanas</string>
+    <string name="weekly_bars_2m">2 M</string>
+    <string name="weekly_bars_4m">4 M</string>
+    <string name="weekly_bars_8m">8 M</string>
+    <string name="weekly_bars_1y">1 A</string>
     <string-array name="motivational_keywords">
         <item>Constancia.</item>
         <item>Hoy.</item>

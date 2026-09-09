@@ -5,7 +5,12 @@ import com.markel.flowstate.core.domain.HabitType
 import java.time.LocalDate
 
 enum class CalendarViewMode { ONE_MONTH, THREE_MONTHS, ONE_YEAR }
-enum class WeeklyBarsMode { EIGHT, SIXTEEN }
+enum class WeeklyBarsRange(val weeks: Int) {
+    TWO_MONTHS(8),
+    FOUR_MONTHS(16),
+    EIGHT_MONTHS(32),
+    ONE_YEAR(52)
+}
 
 data class HabitDetailUiState(
     val habit: Habit? = null,
@@ -14,7 +19,7 @@ data class HabitDetailUiState(
     val allEntries: Set<Long> = emptySet(),  // boolean entries only
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
-    val weeklyCompletions: List<Pair<LocalDate, Int>> = emptyList(),  // last 8 weeks
+    val weeklyCompletions: List<Pair<LocalDate, Int>> = emptyList(),  // last 52 weeks (sliced by the selected WeeklyBarsRange)
     val dayOfWeekCompletions: Map<Int, Float> = emptyMap(), // 1=Mon..7=Sun -> completion rate (0..1)
 
     // For the numeric habits
@@ -28,7 +33,7 @@ data class HabitDetailUiState(
     val viewMode: CalendarViewMode = CalendarViewMode.ONE_MONTH,
     val displayYear: Int = LocalDate.now().year,
     val displayMonth: Int = LocalDate.now().monthValue - 1,  // 0-based
-    val weeklyBarsMode: WeeklyBarsMode = WeeklyBarsMode.EIGHT,
+    val weeklyBarsRange: WeeklyBarsRange = WeeklyBarsRange.TWO_MONTHS,
     val selectedBarIndex: Int? = null  // null = last week by default
 ){
     val isNumeric: Boolean get() = habit?.habitType == HabitType.NUMERIC

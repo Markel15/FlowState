@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.markel.flowstate.feature.habits.details.WeeklyBarsMode
+import com.markel.flowstate.feature.habits.details.WeeklyBarsRange
 import java.time.LocalDate
 import com.markel.flowstate.feature.habits.R
 
@@ -21,16 +21,13 @@ import com.markel.flowstate.feature.habits.R
 fun WeeklyBarsCard(
     weeklyCompletions: List<Pair<LocalDate, Int>>,
     selectedIndex: Int?,
-    barsMode: WeeklyBarsMode,
+    barsRange: WeeklyBarsRange,
     habitColor: Color,
     onBarSelected: (Int) -> Unit,
-    onModeChanged: (WeeklyBarsMode) -> Unit,
+    onRangeChanged: (WeeklyBarsRange) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val data = when (barsMode) {
-        WeeklyBarsMode.EIGHT -> weeklyCompletions.takeLast(8)
-        WeeklyBarsMode.SIXTEEN -> weeklyCompletions
-    }
+    val data = weeklyCompletions.takeLast(barsRange.weeks)
 
     val effectiveSelected = selectedIndex ?: (data.size - 1)
     val max = data
@@ -44,9 +41,27 @@ fun WeeklyBarsCard(
         blue = habitColor.blue * 0.55f
     )
 
-    val badgeSize = if (barsMode == WeeklyBarsMode.SIXTEEN) 16.dp else 24.dp
-    val badgeSizeTertiary = if (barsMode == WeeklyBarsMode.SIXTEEN) 13.dp else 20.dp
-    val barSpacing = if (barsMode == WeeklyBarsMode.SIXTEEN) 1.dp else 2.dp
+    // For long ranges (>= ~4 months) the bars get too thin to show a number,
+    // so we drop the per-bar count badges and rely on tap-to-select.
+    val showBadges = data.size <= 8
+    val badgeSize = when {
+        data.size <= 8 -> 24.dp
+        data.size <= 18 -> 16.dp
+        else -> 0.dp
+    }
+    val badgeSizeTertiary = when {
+        data.size <= 8 -> 20.dp
+        data.size <= 18 -> 13.dp
+        else -> 0.dp
+    }
+    val barSpacing = if (data.size <= 18) 2.dp else 1.dp
+
+    val options = listOf(
+        WeeklyBarsRange.TWO_MONTHS to stringResource(R.string.weekly_bars_2m),
+        WeeklyBarsRange.FOUR_MONTHS to stringResource(R.string.weekly_bars_4m),
+        WeeklyBarsRange.EIGHT_MONTHS to stringResource(R.string.weekly_bars_8m),
+        WeeklyBarsRange.ONE_YEAR to stringResource(R.string.weekly_bars_1y)
+    )
 
     Column(modifier = modifier) {
         Row(
@@ -57,16 +72,14 @@ fun WeeklyBarsCard(
                 ButtonGroupDefaults.ConnectedSpaceBetween
             )
         ) {
-            listOf(
-                WeeklyBarsMode.EIGHT to stringResource(R.string.weekly_bars_8),
-                WeeklyBarsMode.SIXTEEN to stringResource(R.string.weekly_bars_16)
-            ).forEachIndexed { i, (mode, label) ->
+            options.forEachIndexed { i, (range, label) ->
                 ToggleButton(
-                    checked = barsMode == mode,
-                    onCheckedChange = { onModeChanged(mode) },
+                    checked = barsRange == range,
+                    onCheckedChange = { if (it) onRangeChanged(range) },
                     shapes = when (i) {
                         0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                     },
                     modifier = Modifier.weight(1f),
                     colors = ToggleButtonDefaults.toggleButtonColors(
@@ -90,7 +103,7 @@ fun WeeklyBarsCard(
                 data.forEachIndexed { index, (_, count) ->
                     val isSelected = index == effectiveSelected
                     val isMax = count.toDouble() == max
-                    val isAboveHalf = count > (max / 2) && barsMode != WeeklyBarsMode.SIXTEEN
+                    val isAboveHalf = count > (max / 2) && showBadges
                     val barColor = if (isSelected) habitColor else habitColor.copy(alpha = 0.3f)
 
                     Box(
@@ -103,7 +116,7 @@ fun WeeklyBarsCard(
                             ),
                         contentAlignment = Alignment.BottomCenter
                     ) {
-                        // If count = 0  we don't draw the bar
+                        // If count = 0 we don't draw the bar
                         if (count > 0) {
                             val barHeight = ((count.toFloat() / max.toFloat()) * 140).dp
 
@@ -116,9 +129,9 @@ fun WeeklyBarsCard(
                                         shape = CircleShape
                                     )
                             ) {
-                                when {
-                                    isMax -> if (barsMode != WeeklyBarsMode.SIXTEEN) {
-                                        Box(
+                                if (showBadges) {
+                                    when {
+                                        isMax -> Box(
                                             modifier = Modifier
                                                 .align(Alignment.TopCenter)
                                                 .padding(top = 4.dp)
@@ -136,25 +149,27 @@ fun WeeklyBarsCard(
                                                 color = Color.White
                                             )
                                         }
+
+                                        isAboveHalf -> Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopCenter)
+                                                .padding(top = 4.dp)
+                                                .size(badgeSizeTertiary)
+                                                .background(
+                                                    color = badgeBgColor.copy(alpha = 0.7f),
+                                                    shape = MaterialShapes.Circle.toShape()
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = count.toString(),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White
+                                            )
+                                        }
+
+                                        else -> Unit
                                     }
-                                    isAboveHalf -> Box(
-                                        modifier = Modifier
-                                            .align(Alignment.TopCenter)
-                                            .padding(top = 4.dp)
-                                            .size(badgeSizeTertiary)
-                                            .background(
-                                                color = badgeBgColor.copy(alpha = 0.7f),
-                                                shape = MaterialShapes.Circle.toShape()
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = count.toString(),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White
-                                        )
-                                    }
-                                    else -> Unit
                                 }
                             }
                         }

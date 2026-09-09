@@ -187,8 +187,8 @@ class HabitDetailViewModel @AssistedInject constructor(
         }
     }
 
-    fun setWeeklyBarsMode(mode: WeeklyBarsMode) {
-        _uiState.update { it.copy(weeklyBarsMode = mode, selectedBarIndex = null) }
+    fun setWeeklyBarsRange(range: WeeklyBarsRange) {
+        _uiState.update { it.copy(weeklyBarsRange = range, selectedBarIndex = null) }
     }
 
     fun selectBar(index: Int) {
@@ -199,7 +199,7 @@ class HabitDetailViewModel @AssistedInject constructor(
 
     private fun calculateWeeklyCompletions(epochDays: Set<Long>): List<Pair<LocalDate, Int>> {
         val today = LocalDate.now()
-        val weeks = 16
+        val weeks = 52
         return (weeks - 1 downTo 0).map { weeksAgo ->
             val weekStart = today.with(DayOfWeek.MONDAY).minusWeeks(weeksAgo.toLong())
             val count = (0..6).count { day ->
