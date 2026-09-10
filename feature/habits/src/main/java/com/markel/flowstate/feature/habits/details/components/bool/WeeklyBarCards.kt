@@ -41,7 +41,7 @@ fun WeeklyBarsCard(
         blue = habitColor.blue * 0.55f
     )
 
-    // For long ranges (>= ~4 months) the bars get too thin to show a number,
+    // For long ranges (> 8 months) the bars get too thin to show a number,
     // so we drop the per-bar count badges and rely on tap-to-select.
     val showBadges = data.size <= 8
     val badgeSize = when {
