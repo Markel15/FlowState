@@ -1,7 +1,12 @@
 package com.markel.flowstate.feature.habits.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,9 +27,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -36,11 +44,17 @@ import java.time.format.TextStyle
  *    column (tap target) still spans the full width.
  *  - Tonal color: full color on goal reached (or any value when there is no goal),
  *    35% below the goal, 15% for values logged on non-scheduled days.
- *  - Selection: a ringed dot (white fill + habit-color ring) sits inside the bar,
- *    6dp under its top edge; when the bar is too short to host it, the dot
- *    overflows above the tip. For a selected day with no value, a plain
- *    habit-color dot is shown on the baseline. Nothing gets displaced.
- *  - Animations follow [MaterialTheme.motionScheme].
+ *  - The pill is always composed: clearing a value shrinks it to zero and fades it out
+ *  - Selection: a single ringed dot (white fill + habit-color ring). It sits
+ *    inside the bar, 6dp under its top edge, blending smoothly to floating 6dp
+ *    above the tip when the bar is too short to host it; on a selected day with
+ *    no value it rests on the baseline as a plain habit-color dot.
+ *  - The dot never pops in or out: it enters with a springy overshoot, exits
+ *    with a quick shrink+fade, glides between baseline and bar tip as values are
+ *    logged or cleared, and cross-fades between its two styles.
+ *  - Animations follow [MaterialTheme.motionScheme], with two deliberate
+ *    exceptions: the dot entrance uses a bouncier spring, and the dot exit is a fast
+ *    tween. Color always animates with effects specs
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -82,19 +96,68 @@ fun NumericWeekBar(
             safeValue >= targetValue -> color // goal reached
             else -> color.copy(alpha = 0.35f)  // below goal
         },
-        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec() ,
+        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
         label = "bar_color"
     )
 
     val maxHeight = 80.dp
     val minBarHeight = 8.dp
 
-    // Selection dot
+    // Selection dot geometry
     val dotSize = 7.dp
     val dotTopInset = 6.dp
 
     val isSelectable = isScheduled && !isFuture
     val isMarkedSelected = isSelected && isSelectable
+
+    // --- Dot visibility -----------------------------------------------------
+    val dotScale by animateFloatAsState(
+        targetValue = if (isMarkedSelected) 1f else 0f,
+        animationSpec = if (isMarkedSelected) {
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        } else {
+            tween(durationMillis = 150, easing = FastOutLinearInEasing)
+        },
+        label = "dot_scale"
+    )
+
+    // --- Dot position -------------------------------------------------------
+    val barHeight = (maxHeight * animatedFill).coerceAtLeast(if (hasValue) minBarHeight else 0.dp)
+
+    // The dot stays above the bar until the bar is tall enough to contain:
+    // 6dp bottom margin + 7dp dot + 6dp top margin.
+    val dotFitThreshold = dotTopInset + dotSize + dotTopInset
+
+    val targetDotOffset = if (barHeight < dotFitThreshold) {
+        // Dot sits 6dp above the bar.
+        barHeight + dotTopInset
+    } else {
+        // Dot sits inside the bar, with 6dp above it and 6dp below it.
+        barHeight - dotTopInset - dotSize
+    }
+
+    val dotBottomOffset by animateDpAsState(
+        targetValue = if (hasValue) targetDotOffset else 0.dp,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+        label = "dot_offset"
+    )
+
+    // --- Dot look -----------------------------------------------------------
+    // White core + habit-color ring on valued days, plain habit-color dot on
+    // empty ones; the two styles cross-fade .
+    val dotFillColor by animateColorAsState(
+        targetValue = if (hasValue) Color.White else color,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "dot_fill"
+    )
+    val dotRingColor by animateColorAsState(
+        targetValue = if (hasValue) color else Color.Transparent,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "dot_ring"
+    )
 
     Column(
         modifier = modifier.clickable(enabled = isSelectable, onClick = onClick),
@@ -108,42 +171,32 @@ fun NumericWeekBar(
                 .height(maxHeight),
             contentAlignment = Alignment.BottomCenter
         ) {
-            if (hasValue) {
-                val barHeight = (maxHeight * animatedFill).coerceAtLeast(minBarHeight)
+            // Pill fill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .height(barHeight)
+                    .background(barColor, CircleShape)
+            )
 
-                // Pill fill
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.88f)
-                        .height(barHeight)
-                        .background(barColor, CircleShape)  // paints the pill without clipping children, so the selection dot can overflow the tip.
-                )
-
-                if (isMarkedSelected) {
-                    // Dot inside the bar, 6dp below its top edge; if the bar is
-                    // too short to host it, is placed above.
-                    val dotBottomOffset =
-                        if (barHeight >= dotTopInset + dotSize) {
-                            barHeight - dotTopInset - dotSize
-                        } else {
-                            barHeight + dotTopInset
-                        }
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .offset(y = -dotBottomOffset)
-                            .size(dotSize)
-                            .background(Color.White, CircleShape)
-                            .border(1.5.dp, color, CircleShape)
-                    )
-                }
-            } else if (isMarkedSelected) {
-                // Selected day with no value -> dot on the baseline.
+            // Selection dot — composed while the day can ever show it.
+            if (isSelectable) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .offset {
+                            // Deferred read: position updates skip recomposition.
+                            IntOffset(x = 0, y = -dotBottomOffset.roundToPx())
+                        }
+                        .graphicsLayer {
+                            // Deferred read: scale/alpha updates skip recomposition.
+                            scaleX = dotScale
+                            scaleY = dotScale
+                            alpha = dotScale.coerceIn(0f, 1f)
+                        }
                         .size(dotSize)
-                        .background(color, CircleShape)
+                        .background(dotFillColor, CircleShape)
+                        .border(1.5.dp, dotRingColor, CircleShape)
                 )
             }
         }
