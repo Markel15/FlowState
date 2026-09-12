@@ -1,10 +1,13 @@
 package com.markel.flowstate.feature.habits.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -333,7 +336,6 @@ fun NumericHabitCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
             ) {
-                // Actual value (clickable to edit)
                 Surface(
                     onClick = { showInputDialog = true },
                     enabled = selectedDateIsScheduled,
@@ -341,25 +343,44 @@ fun NumericHabitCard(
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier
                         .height(42.dp)
-                        .width(120.dp)
+                        .width(130.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = formatFloat(selectedValue),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (habit.unit != null) {
-                            Text(
-                                text = " ${habit.unit}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .animateContentSize(
+                                        animationSpec = tween(durationMillis = 200)
+                                    )
+                                    .basicMarquee(repeatDelayMillis = 3500),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = formatFloat(selectedValue),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                                if (habit.unit != null) {
+                                    Text(
+                                        text = " ${habit.unit}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+                            }
                         }
                         Icon(
                             imageVector = ImageVector.vectorResource(DesignR.drawable.edit_24px),
@@ -387,12 +408,12 @@ fun NumericHabitCard(
                     FilledTonalIconButton(
                         onClick = {
                             scope.launch {
-                                decScale.snapTo(0.88f)
+                                decScale.snapTo(0.92f)
                                 decScale.animateTo(
                                     targetValue = 1f,
                                     animationSpec = spring(
-                                        dampingRatio = 0.20f,
-                                        stiffness = 200f
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
                                     )
                                 )
                             }
@@ -438,12 +459,12 @@ fun NumericHabitCard(
                     FilledTonalIconButton(
                         onClick = {
                             scope.launch {
-                                incScale.snapTo(0.88f)
+                                incScale.snapTo(0.92f)
                                 incScale.animateTo(
                                     targetValue = 1f,
                                     animationSpec = spring(
-                                        dampingRatio = 0.20f,
-                                        stiffness = 200f
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
                                     )
                                 )
                             }
