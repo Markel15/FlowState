@@ -225,7 +225,7 @@ fun NumericWeekBar(
             )
             Text(
                 text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
                 color = when {
                     isFuture || !isScheduled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
