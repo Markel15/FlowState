@@ -48,9 +48,11 @@ import java.time.format.TextStyle
  *    35% below the goal, 15% for values logged on non-scheduled days.
  *  - The pill is always composed: clearing a value shrinks it to zero and fades it out
  *  - Selection: a single ringed dot (white fill + habit-color ring). It sits
- *    inside the bar, 6dp under its top edge, blending smoothly to floating 6dp
- *    above the tip when the bar is too short to host it; on a selected day with
- *    no value it rests on the baseline as a plain habit-color dot.
+ *    inside the bar, 6dp under its top edge, or floats exactly 6dp above the
+ *    tip when the bar is too short to host it. Pose and resting point are pure
+ *    functions of the logged value (the bar's settled height): the fill and
+ *    dot springs run in parallel, never feeding each other. On a selected day
+ *    with no value it rests on the baseline as a plain habit-color dot.
  *  - The dot never pops in or out: it enters with a springy overshoot, exits
  *    with a quick shrink+fade, glides between baseline and bar tip as values are
  *    logged or cleared, and cross-fades between its two styles.
@@ -133,12 +135,14 @@ fun NumericWeekBar(
     // 6dp bottom margin + 7dp dot + 6dp top margin.
     val dotFitThreshold = dotTopInset + dotSize + dotTopInset
 
-    val targetDotOffset = if (barHeight < dotFitThreshold) {
+    val targetBarHeight = (maxHeight * fillRatio).coerceAtLeast(if (hasValue) minBarHeight else 0.dp)  // dot position comes from the bar's settled height
+
+    val targetDotOffset = if (targetBarHeight < dotFitThreshold) {
         // Dot sits 6dp above the bar.
-        barHeight + dotTopInset
+        targetBarHeight + dotTopInset
     } else {
         // Dot sits inside the bar, with 6dp above it and 6dp below it.
-        barHeight - dotTopInset - dotSize
+        targetBarHeight - dotTopInset - dotSize
     }
 
     val dotBottomOffset by animateDpAsState(
