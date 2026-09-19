@@ -162,6 +162,9 @@ fun HabitDetailScreen(
                     heatmapData = state.heatmapData,
                     targetValue = habit.targetValue,
                     habitColor = habitColor,
+                    unit = habit.unit,
+                    scheduledDays = habit.scheduledDays,
+                    createdAt = habit.createdAt,
                     modifier = Modifier.padding(16.dp)
                 )
             }

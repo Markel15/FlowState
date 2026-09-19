@@ -64,9 +64,12 @@
     <string name="habit_summary_days_suffix">días</string>
     <string name="habit_summary_consistency_label">Constancia</string>
     <string name="habit_heatmap">Mapa de calor</string>
-    <string name="habit_heatmap_weeks">Actividad · %d semanas</string>
+    <string name="habit_heatmap_weeks">%d semanas</string>
     <string name="habit_heatmap_less">Menos</string>
     <string name="habit_heatmap_more">Más</string>
+    <string name="habit_heatmap_unscheduled">No programado</string>
+    <string name="habit_heatmap_day_cd">%1$s: %2$s</string>
+    <string name="habit_heatmap_day_empty_cd">%1$s: sin datos</string>
     <string name="habit_dist_title">Media de valores </string>
     <string name="habit_dist_no_data">No hay datos suficientes </string>
     <string name="habit_dist_recorded_amounts">Cantidades registradas %1$s</string>
