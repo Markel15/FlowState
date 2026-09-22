@@ -132,3 +132,10 @@ Contributions are welcome!
 ## License
 
 FlowState is open-source software licensed under the [Apache License 2.0](LICENSE).
+
+## Security
+
+You can verify the downloaded APK with this SHA-256 signing certificate fingerprint:
+```text
+96:D8:09:A2:9E:23:CA:55:F8:A3:45:A5:12:50:6B:63:05:96:B1:25:CE:6F:7E:B5:1E:A5:53:98:4F:80:E6:FD
+```
