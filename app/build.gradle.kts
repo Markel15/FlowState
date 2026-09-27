@@ -15,7 +15,7 @@ android {
         applicationId = "com.markel.flowstate"
         minSdk = 31 // Android 12
         targetSdk = 36
-        versionCode = 1
+        versionCode = 3_005_002
         versionName = "3.5.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
