@@ -1,11 +1,11 @@
 package com.markel.flowstate.core.data.local
 
-import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.markel.flowstate.core.domain.Category
 
 /**
  * This is the main database class.
@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [TaskEntity::class, SubTaskEntity::class, IdeaEntity::class, CheckListEntity::class, CheckListItemEntity::class, HabitEntity::class, HabitEntryEntity::class, HabitNumericEntryEntity::class, CategoryEntity::class], // List of all tables
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 @TypeConverters(HabitConverters::class)
@@ -365,6 +365,64 @@ abstract class FlowStateDatabase : RoomDatabase() {
                     "INSERT INTO sqlite_sequence (name, seq) " +
                             "SELECT 'habits', COALESCE(MAX(id), 0) FROM habits"
                 )
+            }
+        }
+
+        /**
+         * Ensures that the built-in General category exists at id 1.
+         *
+         * A normal fresh installation has an empty categories table. The extra
+         * branch handles the rare case where a v20 database was created while
+         * General was missing and the user created another category that took
+         * id 1 before updating.
+         */
+        private fun ensureGeneralCategory(db: SupportSQLiteDatabase) {
+            val categoryAtGeneralId = db.query(
+                "SELECT name FROM categories WHERE id = ${Category.GENERAL_ID} LIMIT 1"
+            ).use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+
+            if (categoryAtGeneralId != null &&
+                !categoryAtGeneralId.equals("General", ignoreCase = true)
+            ) {
+                // Free id 1 without temporary primary-key collisions.
+                db.execSQL("UPDATE categories SET id = -id")
+                db.execSQL("UPDATE categories SET id = -id + 1")
+                db.execSQL("UPDATE tasks SET categoryId = categoryId + 1 WHERE categoryId IS NOT NULL")
+                db.execSQL("UPDATE ideas SET categoryId = categoryId + 1 WHERE categoryId IS NOT NULL")
+                db.execSQL("UPDATE checklists SET categoryId = categoryId + 1 WHERE categoryId IS NOT NULL")
+            }
+
+            db.execSQL(
+                "INSERT OR IGNORE INTO categories (id, name, position) " +
+                        "VALUES (${Category.GENERAL_ID}, 'General', 0)"
+            )
+        }
+
+        /**
+         * Seeds the built-in General category on a brand-new database.
+         * Room does not run migrations when it creates the latest schema
+         * directly, so MIGRATION_18_19 alone cannot create General for new
+         * installations.
+         */
+        val SEED_DEFAULT_DATA = object : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                ensureGeneralCategory(db)
+            }
+        }
+
+        /**
+         * v20 → v21: repairs databases created directly at v20.
+         *
+         * Existing users who installed while General was missing need the
+         * same seed as a fresh installation. INSERT OR IGNORE also makes this
+         * migration safe for databases that already contain the row.
+         */
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                ensureGeneralCategory(db)
             }
         }
     }
