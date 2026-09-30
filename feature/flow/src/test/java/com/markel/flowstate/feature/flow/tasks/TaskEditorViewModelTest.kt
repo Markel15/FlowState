@@ -12,10 +12,13 @@ import com.markel.flowstate.core.domain.usecase.tasks.DeleteTaskUseCase
 import com.markel.flowstate.core.domain.usecase.tasks.ToggleTaskUseCase
 import com.markel.flowstate.core.notifications.ReminderScheduler
 import com.markel.flowstate.core.testing.util.MainDispatcherRule
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -129,7 +132,6 @@ class TaskEditorViewModelTest {
 
         // WHEN - User edits the task
         viewModel.updateTask(
-            originalTask = original,
             newTitle = "New title",
             newDescription = "New desc",
             newPriority = Priority.HIGH,
@@ -159,7 +161,7 @@ class TaskEditorViewModelTest {
 
 
         // WHEN - Trying to save with a blank title
-        viewModel.updateTask(original, "   ", "", Priority.NOTHING, null, null, emptyList())
+        viewModel.updateTask("   ", "", Priority.NOTHING, null, null, emptyList())
 
         // THEN - Repository must NOT be called
         coVerify(exactly = 0) { repository.upsertTask(any()) }
@@ -173,6 +175,11 @@ class TaskEditorViewModelTest {
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
         viewModel.loadTask(1)
+        coEvery { toggleTaskUseCase(task) } returns task.copy(
+            isDone = true,
+            completedAt = 1234L,
+            reminderTime = null
+        )
 
         // WHEN
         viewModel.toggleDone()
@@ -257,6 +264,7 @@ class TaskEditorViewModelTest {
 
     // ── toggleDone with subtask alarms ────────────────────────────────────────
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun toggleDone_completing_cancels_task_alarm_and_subtask_alarms_with_reminders() = runTest {
         val sub1 = SubTask(id = "s1", title = "Sub1", reminderTime = System.currentTimeMillis() + 60_000L)
@@ -265,9 +273,20 @@ class TaskEditorViewModelTest {
         every { repository.getTasks() } returns flowOf(listOf(task))
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
+        coEvery { toggleTaskUseCase(task) } returns task.copy(
+            isDone = true,
+            completedAt = 1234L,
+            reminderTime = null,
+            subTasks = task.subTasks.map {
+                it.copy(reminderTime = null)
+            }
+        )
+
         viewModel.loadTask(10)
+        advanceUntilIdle()
 
         viewModel.toggleDone()
+        advanceUntilIdle()
 
         coVerify { reminderScheduler.cancel(10) }
         coVerify { reminderScheduler.cancelSubTask("s1") }
@@ -301,7 +320,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(5)
 
         // Update: remove the subtask
-        viewModel.updateTask(original, "Updated", "", Priority.NOTHING, null, null, emptyList())
+        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, emptyList())
 
         coVerify { reminderScheduler.cancelSubTask("s1") }
     }
@@ -317,7 +336,7 @@ class TaskEditorViewModelTest {
         val futureTime = System.currentTimeMillis() + 60_000L
         val newSub = SubTask(id = "s-new", title = "New Sub", reminderTime = futureTime)
 
-        viewModel.updateTask(original, "Updated", "", Priority.NOTHING, null, null, listOf(newSub))
+        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
 
         coVerify { reminderScheduler.scheduleSubTask("s-new", "New Sub", futureTime) }
     }
@@ -333,7 +352,7 @@ class TaskEditorViewModelTest {
         val pastTime = System.currentTimeMillis() - 60_000L
         val newSub = SubTask(id = "s-old", title = "Old Sub", reminderTime = pastTime)
 
-        viewModel.updateTask(original, "Updated", "", Priority.NOTHING, null, null, listOf(newSub))
+        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
 
         coVerify(exactly = 0) { reminderScheduler.scheduleSubTask(any(), any(), any()) }
     }
@@ -349,7 +368,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(5)
 
         // Update with same subtask, same reminder → no cancel, no schedule
-        viewModel.updateTask(original, "Updated", "", Priority.NOTHING, null, null, listOf(sub))
+        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(sub))
 
         coVerify(exactly = 0) { reminderScheduler.cancelSubTask(any()) }
         coVerify(exactly = 0) { reminderScheduler.scheduleSubTask(any(), any(), any()) }
@@ -368,7 +387,7 @@ class TaskEditorViewModelTest {
         val newTime = System.currentTimeMillis() + 90_000L
         val subUpdated = SubTask(id = "s1", title = "Sub1", reminderTime = newTime)
 
-        viewModel.updateTask(original, "Updated", "", Priority.NOTHING, null, null, listOf(subUpdated))
+        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(subUpdated))
 
         coVerify { reminderScheduler.cancelSubTask("s1") }
         coVerify { reminderScheduler.scheduleSubTask("s1", "Sub1", newTime) }
@@ -464,6 +483,48 @@ class TaskEditorViewModelTest {
         coVerify {
             repository.upsertTask(match { t ->
                 t.id == 10 && t.categoryId == 2 && t.title == "T"
+            })
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_usesLatestCategoryAfterCategoryChange() = runTest {
+        val original = Task(
+            id = 10,
+            title = "Original",
+            isDone = false,
+            categoryId = Category.GENERAL_ID
+        )
+        every { repository.getTasks() } returns flowOf(listOf(original))
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+        viewModel.updateCategory(2)
+        advanceUntilIdle()
+
+        // Simulate a later autosave after editing the title.
+        viewModel.updateTask(
+            newTitle = "Edited",
+            newDescription = "",
+            newPriority = Priority.NOTHING,
+            newDueDate = null,
+            newReminderTime = null,
+            newSubTasks = emptyList()
+        )
+        advanceUntilIdle()
+
+        coVerify {
+            repository.upsertTask(match {
+                it.title == "Edited" && it.categoryId == 2
             })
         }
     }

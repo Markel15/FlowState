@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 /**
@@ -54,6 +56,14 @@ class TaskEditorViewModel @Inject constructor(
 
     private val _editor = MutableStateFlow(TaskEditorState())
     val editor: StateFlow<TaskEditorState> = _editor.asStateFlow()
+
+    /**
+     * Serializes task writes coming from autosave and immediate actions such
+     * as changing a category or reminder. Each write reads the latest editor
+     * snapshot while holding the lock, so a stale composable callback cannot
+     * overwrite a newer field.
+     */
+    private val taskMutationMutex = Mutex()
 
     /** User categories, exposed so the editor can populate the category selector. */
     val categories: StateFlow<List<Category>> = categoryRepository.getCategories()
@@ -89,8 +99,13 @@ class TaskEditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Saves the latest draft fields on top of the canonical task snapshot
+     * held by this ViewModel. The composable deliberately does not pass an
+     * "original task" back here because that object may be stale after an
+     * immediate mutation such as a category change.
+     */
     fun updateTask(
-        originalTask: Task,
         newTitle: String,
         newDescription: String,
         newPriority: Priority,
@@ -99,22 +114,50 @@ class TaskEditorViewModel @Inject constructor(
         newSubTasks: List<SubTask>
     ) {
         if (newTitle.isBlank()) return
+
         viewModelScope.launch {
-            val updatedTask = originalTask.copy(
-                title = newTitle,
-                description = newDescription,
-                priority = newPriority,
-                dueDate = newDueDate,
-                reminderTime = newReminderTime,
-                subTasks = newSubTasks
-            )
-            repository.upsertTask(updatedTask)
-            reconcileSubTaskAlarms(original = originalTask, updated = updatedTask)
+            taskMutationMutex.withLock {
+                val state = _editor.value
+                val currentTask = state.task ?: return@withLock
+                val updatedTask = currentTask.copy(
+                    title = newTitle,
+                    description = newDescription,
+                    priority = newPriority,
+                    dueDate = newDueDate,
+                    reminderTime = newReminderTime,
+                    categoryId = state.categoryId ?: Category.GENERAL_ID,
+                    isDone = state.isDone,
+                    subTasks = newSubTasks
+                )
+
+                repository.upsertTask(updatedTask)
+                reconcileSubTaskAlarms(original = currentTask, updated = updatedTask)
+                _editor.update {
+                    it.copy(
+                        task = updatedTask,
+                        priority = updatedTask.priority,
+                        dueDate = updatedTask.dueDate,
+                        reminderTime = updatedTask.reminderTime,
+                        categoryId = updatedTask.categoryId
+                    )
+                }
+            }
         }
     }
 
-    fun updatePriority(value: Priority) = _editor.update { it.copy(priority = value) }
-    fun updateDueDate(value: Long?) = _editor.update { it.copy(dueDate = value) }
+    fun updatePriority(value: Priority) = _editor.update { state ->
+        state.copy(
+            priority = value,
+            task = state.task?.copy(priority = value)
+        )
+    }
+
+    fun updateDueDate(value: Long?) = _editor.update { state ->
+        state.copy(
+            dueDate = value,
+            task = state.task?.copy(dueDate = value)
+        )
+    }
 
     /**
      * Moves the task being edited to a different category.
@@ -124,42 +167,75 @@ class TaskEditorViewModel @Inject constructor(
      * updated so the selector reflects the new value.
      */
     fun updateCategory(categoryId: Int?) {
-        val task = _editor.value.task ?: return
-        _editor.update { it.copy(categoryId = categoryId) }
+        val normalizedCategoryId = categoryId ?: Category.GENERAL_ID
+        _editor.update { state ->
+            state.copy(
+                categoryId = normalizedCategoryId,
+                task = state.task?.copy(categoryId = normalizedCategoryId)
+            )
+        }
+
         viewModelScope.launch {
-            repository.upsertTask(task.copy(categoryId = categoryId ?: Category.GENERAL_ID))
+            taskMutationMutex.withLock {
+                val task = _editor.value.task ?: return@withLock
+                repository.upsertTask(task)
+            }
         }
     }
 
     fun updateReminderTime(value: Long?) {
-        val task = _editor.value.task ?: return
         val effectiveValue = if (value != null && value > System.currentTimeMillis()) value else null
-
-        _editor.update { it.copy(reminderTime = effectiveValue) }
+        _editor.update { state ->
+            state.copy(
+                reminderTime = effectiveValue,
+                task = state.task?.copy(reminderTime = effectiveValue)
+            )
+        }
 
         viewModelScope.launch {
-            // Cancel the old alarm regardless of whether we're setting a new one.
-            reminderScheduler.cancel(task.id)
+            taskMutationMutex.withLock {
+                val task = _editor.value.task ?: return@withLock
 
-            val updated = task.copy(reminderTime = value)
-            repository.upsertTask(updated)
+                // Cancel the old alarm regardless of whether we're setting a new one.
+                reminderScheduler.cancel(task.id)
+                repository.upsertTask(task)
 
-            if (effectiveValue != null) {
-                reminderScheduler.schedule(task.id, task.title, task.description, effectiveValue)
+                if (effectiveValue != null) {
+                    reminderScheduler.schedule(
+                        task.id,
+                        task.title,
+                        task.description,
+                        effectiveValue
+                    )
+                }
             }
         }
     }
 
     fun toggleDone() {
-        val current = _editor.value.task ?: return
-        val newIsDone = !_editor.value.isDone
-        _editor.update { it.copy(isDone = newIsDone) }
+        if (_editor.value.task == null) return
+
         viewModelScope.launch {
-            toggleTaskUseCase(current)
-            if (newIsDone) {
-                reminderScheduler.cancel(current.id)
-                current.subTasks.filter { it.reminderTime != null }.forEach { subTask ->
-                    reminderScheduler.cancelSubTask(subTask.id)
+            taskMutationMutex.withLock {
+                val current = _editor.value.task ?: return@withLock
+                val updatedTask = toggleTaskUseCase(current)
+
+                _editor.update {
+                    it.copy(
+                        task = updatedTask,
+                        isDone = updatedTask.isDone,
+                        reminderTime = updatedTask.reminderTime,
+                        categoryId = updatedTask.categoryId
+                    )
+                }
+
+                if (updatedTask.isDone) {
+                    reminderScheduler.cancel(updatedTask.id)
+                    current.subTasks
+                        .filter { it.reminderTime != null }
+                        .forEach { subTask ->
+                            reminderScheduler.cancelSubTask(subTask.id)
+                        }
                 }
             }
         }

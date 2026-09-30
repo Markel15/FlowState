@@ -80,7 +80,12 @@ fun TaskEditorScreen(
                     onReminderTimeChange = { viewModel.updateReminderTime(it) },
                     onAutoUpdate = { title, desc, prio, date, remTime, subTasks ->
                         viewModel.updateTask(
-                            task, title, desc, prio, date, remTime,subTasks,
+                            newTitle = title,
+                            newDescription = desc,
+                            newPriority = prio,
+                            newDueDate = date,
+                            newReminderTime = remTime,
+                            newSubTasks = subTasks,
                         )
                     },
                     categories = categories,

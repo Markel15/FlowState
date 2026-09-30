@@ -7,7 +7,7 @@ import javax.inject.Inject
 class ToggleTaskUseCase @Inject constructor(
     private val repository: TaskRepository
 ) {
-    suspend operator fun invoke(task: Task) {
+    suspend operator fun invoke(task: Task): Task {
         val newIsDone = !task.isDone
         val newCompletedAt = if (newIsDone) System.currentTimeMillis() else null
 
@@ -19,6 +19,13 @@ class ToggleTaskUseCase @Inject constructor(
             task.subTasks
         }
 
-        repository.upsertTask(task.copy(isDone = newIsDone, completedAt = newCompletedAt, reminderTime = updatedReminderTime, subTasks = updatedSubTasks))
+        val updatedTask = task.copy(
+            isDone = newIsDone,
+            completedAt = newCompletedAt,
+            reminderTime = updatedReminderTime,
+            subTasks = updatedSubTasks
+        )
+        repository.upsertTask(updatedTask)
+        return updatedTask
     }
 }
