@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -560,4 +561,153 @@ class TaskEditorViewModelTest {
         coVerify(exactly = 0) { repository.upsertTask(any()) }
     }
 
+    // ── Editor consistency tests ────────────────────────────────
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun categoryChange_followedImmediatelyByAutosave_neverPersistsPreviousCategory() = runTest {
+        // GIVEN — A task loaded in category GENERAL_ID
+        val original = Task(
+            id = 10,
+            title = "Original",
+            isDone = false,
+            categoryId = Category.GENERAL_ID
+        )
+        val persistedTasks = mutableListOf<Task>()
+        every { repository.getTasks() } returns flowOf(listOf(original))
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 10L
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+
+        // WHEN — Category changes to 2 and an autosave is triggered immediately
+        viewModel.updateCategory(2)
+        viewModel.updateTask(
+            newTitle = "Edited",
+            newDescription = "",
+            newPriority = Priority.NOTHING,
+            newDueDate = null,
+            newReminderTime = null,
+            newSubTasks = emptyList()
+        )
+        advanceUntilIdle()
+
+        // THEN — The state and all persisted copies use category 2
+        assertEquals(2, viewModel.editor.value.task?.categoryId)
+        assertTrue(persistedTasks.isNotEmpty())
+        assertTrue(persistedTasks.all { it.categoryId == 2 })
+        assertTrue(persistedTasks.any { it.title == "Edited" })
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun rapidCategoryChanges_latestCategoryWins() = runTest {
+        // GIVEN — A loaded task in category 1
+        val original = Task(id = 10, title = "Task", isDone = false, categoryId = 1)
+        val persistedTasks = mutableListOf<Task>()
+        every { repository.getTasks() } returns flowOf(listOf(original))
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 10L
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+
+        // WHEN — Rapid consecutive category updates occur
+        viewModel.updateCategory(2)
+        viewModel.updateCategory(3)
+        advanceUntilIdle()
+
+        // THEN — Only the latest category snapshot (3) is persisted and held in state
+        assertEquals(3, viewModel.editor.value.task?.categoryId)
+        assertTrue(persistedTasks.isNotEmpty())
+        assertEquals(3, persistedTasks.last().categoryId)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun pastReminder_isNormalizedToNullInStateAndPersistence() = runTest {
+        // GIVEN — A task with a future reminder loaded in the editor
+        val futureReminder = System.currentTimeMillis() + 60_000L
+        val original = Task(
+            id = 10,
+            title = "Task",
+            isDone = false,
+            reminderTime = futureReminder
+        )
+        every { repository.getTasks() } returns flowOf(listOf(original))
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+
+        // WHEN — The reminder is updated to a time in the past
+        viewModel.updateReminderTime(System.currentTimeMillis() - 1_000L)
+        advanceUntilIdle()
+
+        // THEN — The reminder is normalized to null in state and repository, and no alarm is scheduled
+        assertNull(viewModel.editor.value.task?.reminderTime)
+        coVerify { repository.upsertTask(match { it.id == 10 && it.reminderTime == null }) }
+        coVerify(exactly = 0) { reminderScheduler.schedule(any(), any(), any(), any()) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun toggleFollowedImmediatelyByAutosave_preservesCompletedState() = runTest {
+        // GIVEN — A task loaded in the editor
+        val original = Task(id = 10, title = "Task", isDone = false)
+        val completed = original.copy(
+            isDone = true,
+            completedAt = 1_234L,
+            reminderTime = null
+        )
+        val persistedTasks = mutableListOf<Task>()
+        every { repository.getTasks() } returns flowOf(listOf(original))
+        coEvery { toggleTaskUseCase(original) } returns completed
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 10L
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+
+        // WHEN — The task is toggled done and immediately followed by an autosave update
+        viewModel.toggleDone()
+        viewModel.updateTask(
+            newTitle = "Edited after toggle",
+            newDescription = "",
+            newPriority = Priority.NOTHING,
+            newDueDate = null,
+            newReminderTime = null,
+            newSubTasks = emptyList()
+        )
+        advanceUntilIdle()
+
+        // THEN — The completed state is preserved in state and in the persisted updates
+        assertEquals(true, viewModel.editor.value.task?.isDone)
+        assertTrue(persistedTasks.any { it.title == "Edited after toggle" && it.isDone })
+    }
 }
