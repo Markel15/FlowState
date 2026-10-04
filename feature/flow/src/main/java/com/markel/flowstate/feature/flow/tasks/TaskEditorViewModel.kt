@@ -37,12 +37,7 @@ import javax.inject.Inject
  * With a dedicated ViewModel per screen, each lives and dies with its NavBackStackEntry and solves that problem.
  */
 data class TaskEditorState(
-    val task: Task? = null,
-    val priority: Priority = Priority.NOTHING,
-    val dueDate: Long? = null,
-    val reminderTime: Long? = null,
-    val isDone: Boolean = false,
-    val categoryId: Int? = Category.GENERAL_ID
+    val task: Task? = null
 )
 @HiltViewModel
 class TaskEditorViewModel @Inject constructor(
@@ -87,14 +82,7 @@ class TaskEditorViewModel @Inject constructor(
                 .firstOrNull { it.id == taskId }
 
             if (task != null) {
-                _editor.value = TaskEditorState(
-                    task = task,
-                    priority = task.priority,
-                    dueDate = task.dueDate,
-                    reminderTime = task.reminderTime,
-                    isDone = task.isDone,
-                    categoryId = task.categoryId
-                )
+                _editor.value = TaskEditorState(task = task)
             }
         }
     }
@@ -117,46 +105,31 @@ class TaskEditorViewModel @Inject constructor(
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
-                val state = _editor.value
-                val currentTask = state.task ?: return@withLock
+                val currentTask = _editor.value.task ?: return@withLock
                 val updatedTask = currentTask.copy(
                     title = newTitle,
                     description = newDescription,
                     priority = newPriority,
                     dueDate = newDueDate,
                     reminderTime = newReminderTime,
-                    categoryId = state.categoryId ?: Category.GENERAL_ID,
-                    isDone = state.isDone,
+                    categoryId = currentTask.categoryId ?: Category.GENERAL_ID,
+                    isDone = currentTask.isDone,
                     subTasks = newSubTasks
                 )
 
                 repository.upsertTask(updatedTask)
                 reconcileSubTaskAlarms(original = currentTask, updated = updatedTask)
-                _editor.update {
-                    it.copy(
-                        task = updatedTask,
-                        priority = updatedTask.priority,
-                        dueDate = updatedTask.dueDate,
-                        reminderTime = updatedTask.reminderTime,
-                        categoryId = updatedTask.categoryId
-                    )
-                }
+                _editor.update { it.copy(task = updatedTask) }
             }
         }
     }
 
     fun updatePriority(value: Priority) = _editor.update { state ->
-        state.copy(
-            priority = value,
-            task = state.task?.copy(priority = value)
-        )
+        state.copy(task = state.task?.copy(priority = value))
     }
 
     fun updateDueDate(value: Long?) = _editor.update { state ->
-        state.copy(
-            dueDate = value,
-            task = state.task?.copy(dueDate = value)
-        )
+        state.copy(task = state.task?.copy(dueDate = value))
     }
 
     /**
@@ -169,10 +142,7 @@ class TaskEditorViewModel @Inject constructor(
     fun updateCategory(categoryId: Int?) {
         val normalizedCategoryId = categoryId ?: Category.GENERAL_ID
         _editor.update { state ->
-            state.copy(
-                categoryId = normalizedCategoryId,
-                task = state.task?.copy(categoryId = normalizedCategoryId)
-            )
+            state.copy(task = state.task?.copy(categoryId = normalizedCategoryId))
         }
 
         viewModelScope.launch {
@@ -186,26 +156,24 @@ class TaskEditorViewModel @Inject constructor(
     fun updateReminderTime(value: Long?) {
         val effectiveValue = if (value != null && value > System.currentTimeMillis()) value else null
         _editor.update { state ->
-            state.copy(
-                reminderTime = effectiveValue,
-                task = state.task?.copy(reminderTime = effectiveValue)
-            )
+            state.copy(task = state.task?.copy(reminderTime = effectiveValue))
         }
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
                 val task = _editor.value.task ?: return@withLock
+                val currentReminderTime = task.reminderTime
 
                 // Cancel the old alarm regardless of whether we're setting a new one.
                 reminderScheduler.cancel(task.id)
                 repository.upsertTask(task)
 
-                if (effectiveValue != null) {
+                if (currentReminderTime != null) {
                     reminderScheduler.schedule(
                         task.id,
                         task.title,
                         task.description,
-                        effectiveValue
+                        currentReminderTime
                     )
                 }
             }
@@ -220,14 +188,7 @@ class TaskEditorViewModel @Inject constructor(
                 val current = _editor.value.task ?: return@withLock
                 val updatedTask = toggleTaskUseCase(current)
 
-                _editor.update {
-                    it.copy(
-                        task = updatedTask,
-                        isDone = updatedTask.isDone,
-                        reminderTime = updatedTask.reminderTime,
-                        categoryId = updatedTask.categoryId
-                    )
-                }
+                _editor.update { it.copy(task = updatedTask) }
 
                 if (updatedTask.isDone) {
                     reminderScheduler.cancel(updatedTask.id)

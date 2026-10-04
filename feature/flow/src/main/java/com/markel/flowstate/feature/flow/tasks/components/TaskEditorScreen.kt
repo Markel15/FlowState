@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.designsystem.ui.TaskSharedKeys
+import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.designsystem.ui.sharedDetailBounds
 import com.markel.flowstate.feature.flow.tasks.TaskEditorViewModel
 import com.markel.flowstate.feature.flow.tasks.components.TaskEditorSheetContent
@@ -51,9 +52,9 @@ fun TaskEditorScreen(
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TaskEditorTopBar(
-                priority = editor.priority,
+                priority = editor.task?.priority ?: Priority.NOTHING,
                 onPriorityChange = { viewModel.updatePriority(it) },
-                isDone = editor.isDone,
+                isDone = editor.task?.isDone == true,
                 onComplete = { viewModel.toggleDone() },
                 onDelete = {
                     viewModel.deleteTask(editor.task!!)
@@ -73,9 +74,9 @@ fun TaskEditorScreen(
             editor.task?.let { task ->
                 TaskEditorSheetContent(
                     task = task,
-                    priority = editor.priority,
-                    dueDate = editor.dueDate,
-                    remTime = editor.reminderTime,
+                    priority = task.priority,
+                    dueDate = task.dueDate,
+                    remTime = task.reminderTime,
                     onDueDateChange = { viewModel.updateDueDate(it) },
                     onReminderTimeChange = { viewModel.updateReminderTime(it) },
                     onAutoUpdate = { title, desc, prio, date, remTime, subTasks ->
@@ -90,7 +91,7 @@ fun TaskEditorScreen(
                     },
                     categories = categories,
                     categoriesEnabled = categoriesEnabled,
-                    categoryId = editor.categoryId,
+                    categoryId = task.categoryId,
                     onCategoryChange = { viewModel.updateCategory(it) },
                     generalCategoryName = generalCategoryName
                 )

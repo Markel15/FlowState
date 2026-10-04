@@ -48,8 +48,6 @@ class TaskEditorViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.task)
-            assertEquals(Priority.NOTHING, state.priority)
-            assertNull(state.dueDate)
         }
     }
 
@@ -68,9 +66,9 @@ class TaskEditorViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertEquals(task, state.task)
-            assertEquals(Priority.HIGH, state.priority)
-            assertEquals(1000L, state.dueDate)
-            assertEquals(false, state.isDone)
+            assertEquals(Priority.HIGH, state.task?.priority)
+            assertEquals(1000L, state.task?.dueDate)
+            assertEquals(false, state.task?.isDone)
         }
     }
 
@@ -93,32 +91,38 @@ class TaskEditorViewModelTest {
     }
 
     @Test
-    fun updatePriority_updatesStateCorrectly() = runTest {
+    fun updatePriority_updatesTaskSnapshotCorrectly() = runTest {
         // GIVEN
+        val task = Task(id = 1, title = "Task", isDone = false)
+        every { repository.getTasks() } returns flowOf(listOf(task))
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
-
+        viewModel.loadTask(1)
+        advanceUntilIdle()
 
         // WHEN
         viewModel.updatePriority(Priority.MEDIUM)
 
-        // THEN
+        // THEN - the task snapshot is the only source of truth
         viewModel.editor.test {
-            assertEquals(Priority.MEDIUM, awaitItem().priority)
+            assertEquals(Priority.MEDIUM, awaitItem().task?.priority)
         }
     }
 
     @Test
-    fun updateDueDate_updatesStateCorrectly() = runTest {
+    fun updateDueDate_updatesTaskSnapshotCorrectly() = runTest {
         // GIVEN
+        val task = Task(id = 1, title = "Task", isDone = false)
+        every { repository.getTasks() } returns flowOf(listOf(task))
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
-
+        viewModel.loadTask(1)
+        advanceUntilIdle()
 
         // WHEN
         viewModel.updateDueDate(9999L)
 
-        // THEN
+        // THEN - the task snapshot is the only source of truth
         viewModel.editor.test {
-            assertEquals(9999L, awaitItem().dueDate)
+            assertEquals(9999L, awaitItem().task?.dueDate)
         }
     }
 
@@ -187,7 +191,7 @@ class TaskEditorViewModelTest {
 
         // THEN - State updates optimistically
         viewModel.editor.test {
-            assertEquals(true, awaitItem().isDone)
+            assertEquals(true, awaitItem().task?.isDone)
         }
         // AND - Use case is called
         coVerify { toggleTaskUseCase(task) }
@@ -431,7 +435,7 @@ class TaskEditorViewModelTest {
         // THEN — the editor state reflects the task's category
         viewModel.editor.test {
             val state = awaitItem()
-            assertEquals(5, state.categoryId)
+            assertEquals(5, state.task?.categoryId)
         }
     }
 
@@ -446,7 +450,7 @@ class TaskEditorViewModelTest {
 
         viewModel.editor.test {
             val state = awaitItem()
-            assertEquals(Category.GENERAL_ID, state.categoryId)
+            assertEquals(Category.GENERAL_ID, state.task?.categoryId)
         }
     }
 
@@ -464,7 +468,7 @@ class TaskEditorViewModelTest {
         // THEN — the editor state reflects the new category synchronously
         viewModel.editor.test {
             val state = awaitItem()
-            assertEquals(2, state.categoryId)
+            assertEquals(2, state.task?.categoryId)
         }
     }
 
