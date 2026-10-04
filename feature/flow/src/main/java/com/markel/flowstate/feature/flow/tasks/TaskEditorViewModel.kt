@@ -13,11 +13,12 @@ import com.markel.flowstate.core.domain.usecase.tasks.DeleteTaskUseCase
 import com.markel.flowstate.core.domain.usecase.tasks.ToggleTaskUseCase
 import com.markel.flowstate.core.notifications.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -36,9 +37,16 @@ import javax.inject.Inject
  *
  * With a dedicated ViewModel per screen, each lives and dies with its NavBackStackEntry and solves that problem.
  */
-data class TaskEditorState(
-    val task: Task? = null
-)
+sealed interface TaskEditorState {
+    data object Loading : TaskEditorState
+    data class Ready(val task: Task) : TaskEditorState
+    data object NotFound : TaskEditorState
+    data class Error(val cause: Throwable) : TaskEditorState
+}
+
+val TaskEditorState.taskOrNull: Task?
+    get() = (this as? TaskEditorState.Ready)?.task
+
 @HiltViewModel
 class TaskEditorViewModel @Inject constructor(
     private val repository: TaskRepository,
@@ -49,8 +57,10 @@ class TaskEditorViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
-    private val _editor = MutableStateFlow(TaskEditorState())
+    private val _editor = MutableStateFlow<TaskEditorState>(TaskEditorState.Loading)
     val editor: StateFlow<TaskEditorState> = _editor.asStateFlow()
+
+    private var loadTaskJob: Job? = null
 
     /**
      * Serializes task writes coming from autosave and immediate actions such
@@ -71,18 +81,22 @@ class TaskEditorViewModel @Inject constructor(
     val generalCategoryName: StateFlow<String?> = userPreferencesRepository.generalCategoryName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /**
-     * Loads the task from the repository by ID.
-     * Uses .first() to get the current Flow value without staying subscribed.
-     */
+    /** Loads one task and represents every outcome explicitly in editor state. */
     fun loadTask(taskId: Int) {
-        viewModelScope.launch {
-            val task = repository.getTasks()
-                .first()
-                .firstOrNull { it.id == taskId }
-
-            if (task != null) {
-                _editor.value = TaskEditorState(task = task)
+        loadTaskJob?.cancel()
+        _editor.value = TaskEditorState.Loading
+        loadTaskJob = viewModelScope.launch {
+            try {
+                val task = repository.getTaskById(taskId)
+                _editor.value = if (task == null) {
+                    TaskEditorState.NotFound
+                } else {
+                    TaskEditorState.Ready(task)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (cause: Throwable) {
+                _editor.value = TaskEditorState.Error(cause)
             }
         }
     }
@@ -105,7 +119,7 @@ class TaskEditorViewModel @Inject constructor(
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
-                val currentTask = _editor.value.task ?: return@withLock
+                val currentTask = _editor.value.taskOrNull ?: return@withLock
                 val updatedTask = currentTask.copy(
                     title = newTitle,
                     description = newDescription,
@@ -119,18 +133,14 @@ class TaskEditorViewModel @Inject constructor(
 
                 repository.upsertTask(updatedTask)
                 reconcileSubTaskAlarms(original = currentTask, updated = updatedTask)
-                _editor.update { it.copy(task = updatedTask) }
+                updateReadyTask { updatedTask }
             }
         }
     }
 
-    fun updatePriority(value: Priority) = _editor.update { state ->
-        state.copy(task = state.task?.copy(priority = value))
-    }
+    fun updatePriority(value: Priority) = updateReadyTask { it.copy(priority = value) }
 
-    fun updateDueDate(value: Long?) = _editor.update { state ->
-        state.copy(task = state.task?.copy(dueDate = value))
-    }
+    fun updateDueDate(value: Long?) = updateReadyTask { it.copy(dueDate = value) }
 
     /**
      * Moves the task being edited to a different category.
@@ -141,13 +151,11 @@ class TaskEditorViewModel @Inject constructor(
      */
     fun updateCategory(categoryId: Int?) {
         val normalizedCategoryId = categoryId ?: Category.GENERAL_ID
-        _editor.update { state ->
-            state.copy(task = state.task?.copy(categoryId = normalizedCategoryId))
-        }
+        updateReadyTask { it.copy(categoryId = normalizedCategoryId) }
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
-                val task = _editor.value.task ?: return@withLock
+                val task = _editor.value.taskOrNull ?: return@withLock
                 repository.upsertTask(task)
             }
         }
@@ -155,13 +163,11 @@ class TaskEditorViewModel @Inject constructor(
 
     fun updateReminderTime(value: Long?) {
         val effectiveValue = if (value != null && value > System.currentTimeMillis()) value else null
-        _editor.update { state ->
-            state.copy(task = state.task?.copy(reminderTime = effectiveValue))
-        }
+        updateReadyTask { it.copy(reminderTime = effectiveValue) }
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
-                val task = _editor.value.task ?: return@withLock
+                val task = _editor.value.taskOrNull ?: return@withLock
                 val currentReminderTime = task.reminderTime
 
                 // Cancel the old alarm regardless of whether we're setting a new one.
@@ -181,14 +187,14 @@ class TaskEditorViewModel @Inject constructor(
     }
 
     fun toggleDone() {
-        if (_editor.value.task == null) return
+        if (_editor.value.taskOrNull == null) return
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
-                val current = _editor.value.task ?: return@withLock
+                val current = _editor.value.taskOrNull ?: return@withLock
                 val updatedTask = toggleTaskUseCase(current)
 
-                _editor.update { it.copy(task = updatedTask) }
+                updateReadyTask { updatedTask }
 
                 if (updatedTask.isDone) {
                     reminderScheduler.cancel(updatedTask.id)
@@ -211,6 +217,16 @@ class TaskEditorViewModel @Inject constructor(
 
 
     // ── Internal ──────────────────────────────────────────────────────────────
+
+    private fun updateReadyTask(transform: (Task) -> Task) {
+        _editor.update { state ->
+            if (state is TaskEditorState.Ready) {
+                state.copy(task = transform(state.task))
+            } else {
+                state
+            }
+        }
+    }
 
     /**
      * Diffs old vs new subtask list to cancel removed alarms and schedule new ones.

@@ -64,4 +64,7 @@
     <!-- Task editor: metadata chips row -->
     <string name="task_meta_add_date">Date</string>
     <string name="task_meta_add_reminder">Reminder</string>
+    <string name="task_editor_not_found">Task not found</string>
+    <string name="task_editor_load_error">Could not load the task</string>
+    <string name="retry">Retry</string>
 </resources>
