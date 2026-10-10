@@ -16,6 +16,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -37,6 +38,26 @@ class TaskEditorViewModelTest {
     private val categoryRepository: CategoryRepository = mockk(relaxed = true)
     private val userPreferencesRepository: UserPreferencesRepository = mockk(relaxed = true)
     private lateinit var viewModel: TaskEditorViewModel
+
+    /** Drives the same field-level API used by Compose, then requests a save. */
+    private fun updateTaskDraft(
+        newTitle: String,
+        newDescription: String,
+        newPriority: Priority,
+        newDueDate: Long?,
+        newReminderTime: Long?,
+        newSubTasks: List<SubTask>
+    ) {
+        viewModel.updateTitle(newTitle)
+        viewModel.updateDescription(newDescription)
+        viewModel.updatePriority(newPriority)
+        viewModel.updateDueDate(newDueDate)
+        if (viewModel.editor.value.taskOrNull?.reminderTime != newReminderTime) {
+            viewModel.updateReminderTime(newReminderTime)
+        }
+        viewModel.updateSubTasks(newSubTasks)
+        viewModel.saveTask()
+    }
 
     @Test
     fun initialState_isEmpty() = runTest {
@@ -159,7 +180,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(5)
 
         // WHEN - User edits the task
-        viewModel.updateTask(
+        updateTaskDraft(
             newTitle = "New title",
             newDescription = "New desc",
             newPriority = Priority.HIGH,
@@ -186,10 +207,11 @@ class TaskEditorViewModelTest {
         val original = Task(id = 1, title = "Original", isDone = false)
         coEvery { repository.getTaskById(any()) } returns original
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
-
+        viewModel.loadTask(1)
+        advanceUntilIdle()
 
         // WHEN - Trying to save with a blank title
-        viewModel.updateTask("   ", "", Priority.NOTHING, null, null, emptyList())
+        updateTaskDraft("   ", "", Priority.NOTHING, null, null, emptyList())
 
         // THEN - Repository must NOT be called
         coVerify(exactly = 0) { repository.upsertTask(any()) }
@@ -348,7 +370,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(5)
 
         // Update: remove the subtask
-        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, emptyList())
+        updateTaskDraft("Updated", "", Priority.NOTHING, null, null, emptyList())
 
         coVerify { reminderScheduler.cancelSubTask("s1") }
     }
@@ -364,7 +386,7 @@ class TaskEditorViewModelTest {
         val futureTime = System.currentTimeMillis() + 60_000L
         val newSub = SubTask(id = "s-new", title = "New Sub", reminderTime = futureTime)
 
-        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
+        updateTaskDraft("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
 
         coVerify { reminderScheduler.scheduleSubTask("s-new", "New Sub", futureTime) }
     }
@@ -380,7 +402,7 @@ class TaskEditorViewModelTest {
         val pastTime = System.currentTimeMillis() - 60_000L
         val newSub = SubTask(id = "s-old", title = "Old Sub", reminderTime = pastTime)
 
-        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
+        updateTaskDraft("Updated", "", Priority.NOTHING, null, null, listOf(newSub))
 
         coVerify(exactly = 0) { reminderScheduler.scheduleSubTask(any(), any(), any()) }
     }
@@ -396,7 +418,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(5)
 
         // Update with same subtask, same reminder → no cancel, no schedule
-        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(sub))
+        updateTaskDraft("Updated", "", Priority.NOTHING, null, null, listOf(sub))
 
         coVerify(exactly = 0) { reminderScheduler.cancelSubTask(any()) }
         coVerify(exactly = 0) { reminderScheduler.scheduleSubTask(any(), any(), any()) }
@@ -415,7 +437,7 @@ class TaskEditorViewModelTest {
         val newTime = System.currentTimeMillis() + 90_000L
         val subUpdated = SubTask(id = "s1", title = "Sub1", reminderTime = newTime)
 
-        viewModel.updateTask("Updated", "", Priority.NOTHING, null, null, listOf(subUpdated))
+        updateTaskDraft("Updated", "", Priority.NOTHING, null, null, listOf(subUpdated))
 
         coVerify { reminderScheduler.cancelSubTask("s1") }
         coVerify { reminderScheduler.scheduleSubTask("s1", "Sub1", newTime) }
@@ -540,7 +562,7 @@ class TaskEditorViewModelTest {
         advanceUntilIdle()
 
         // Simulate a later autosave after editing the title.
-        viewModel.updateTask(
+        updateTaskDraft(
             newTitle = "Edited",
             newDescription = "",
             newPriority = Priority.NOTHING,
@@ -616,7 +638,7 @@ class TaskEditorViewModelTest {
 
         // WHEN — Category changes to 2 and an autosave is triggered immediately
         viewModel.updateCategory(2)
-        viewModel.updateTask(
+        updateTaskDraft(
             newTitle = "Edited",
             newDescription = "",
             newPriority = Priority.NOTHING,
@@ -723,7 +745,7 @@ class TaskEditorViewModelTest {
 
         // WHEN — The task is toggled done and immediately followed by an autosave update
         viewModel.toggleDone()
-        viewModel.updateTask(
+        updateTaskDraft(
             newTitle = "Edited after toggle",
             newDescription = "",
             newPriority = Priority.NOTHING,
@@ -736,5 +758,35 @@ class TaskEditorViewModelTest {
         // THEN — The completed state is preserved in state and in the persisted updates
         assertEquals(true, viewModel.editor.value.taskOrNull?.isDone)
         assertTrue(persistedTasks.any { it.title == "Edited after toggle" && it.isDone })
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun saveCompletingAfterNewEdit_doesNotReplaceNewerDraft() = runTest {
+        val original = Task(id = 10, title = "Original", isDone = false)
+        val allowSaveToFinish = CompletableDeferred<Unit>()
+        coEvery { repository.getTaskById(10) } returns original
+        coEvery { repository.upsertTask(match { it.title == "First edit" }) } coAnswers {
+            allowSaveToFinish.await()
+            10L
+        }
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(10)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("First edit")
+        viewModel.saveTask() // Suspends inside the repository.
+        viewModel.updateTitle("Newer edit")
+        allowSaveToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("Newer edit", viewModel.editor.value.taskOrNull?.title)
     }
 }

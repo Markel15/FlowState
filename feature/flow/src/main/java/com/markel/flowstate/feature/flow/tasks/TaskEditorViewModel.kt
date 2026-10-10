@@ -39,7 +39,11 @@ import javax.inject.Inject
  */
 sealed interface TaskEditorState {
     data object Loading : TaskEditorState
-    data class Ready(val task: Task) : TaskEditorState
+    data class Ready(
+        val task: Task,
+        /** Increments only for fields handled by the debounced autosave. */
+        val autosaveRevision: Long = 0
+    ) : TaskEditorState
     data object NotFound : TaskEditorState
     data class Error(val cause: Throwable) : TaskEditorState
 }
@@ -70,6 +74,9 @@ class TaskEditorViewModel @Inject constructor(
      */
     private val taskMutationMutex = Mutex()
 
+    /** Last snapshot successfully written, used as the alarm reconciliation baseline. */
+    private var persistedTask: Task? = null
+
     /** User categories, exposed so the editor can populate the category selector. */
     val categories: StateFlow<List<Category>> = categoryRepository.getCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -84,13 +91,16 @@ class TaskEditorViewModel @Inject constructor(
     /** Loads one task and represents every outcome explicitly in editor state. */
     fun loadTask(taskId: Int) {
         loadTaskJob?.cancel()
+        persistedTask = null
         _editor.value = TaskEditorState.Loading
         loadTaskJob = viewModelScope.launch {
             try {
                 val task = repository.getTaskById(taskId)
                 _editor.value = if (task == null) {
+                    persistedTask = null
                     TaskEditorState.NotFound
                 } else {
+                    persistedTask = task
                     TaskEditorState.Ready(task)
                 }
             } catch (cancellation: CancellationException) {
@@ -101,46 +111,24 @@ class TaskEditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Saves the latest draft fields on top of the canonical task snapshot
-     * held by this ViewModel. The composable deliberately does not pass an
-     * "original task" back here because that object may be stale after an
-     * immediate mutation such as a category change.
-     */
-    fun updateTask(
-        newTitle: String,
-        newDescription: String,
-        newPriority: Priority,
-        newDueDate: Long?,
-        newReminderTime: Long?,
-        newSubTasks: List<SubTask>
-    ) {
-        if (newTitle.isBlank()) return
-
-        viewModelScope.launch {
-            taskMutationMutex.withLock {
-                val currentTask = _editor.value.taskOrNull ?: return@withLock
-                val updatedTask = currentTask.copy(
-                    title = newTitle,
-                    description = newDescription,
-                    priority = newPriority,
-                    dueDate = newDueDate,
-                    reminderTime = newReminderTime,
-                    categoryId = currentTask.categoryId ?: Category.GENERAL_ID,
-                    isDone = currentTask.isDone,
-                    subTasks = newSubTasks
-                )
-
-                repository.upsertTask(updatedTask)
-                reconcileSubTaskAlarms(original = currentTask, updated = updatedTask)
-                updateReadyTask { updatedTask }
-            }
-        }
+    /** Persists the latest draft owned by this ViewModel. */
+    fun saveTask() {
+        viewModelScope.launch { persistCurrentDraft() }
     }
 
-    fun updatePriority(value: Priority) = updateReadyTask { it.copy(priority = value) }
+    fun updateTitle(value: String) = updateReadyTask(autosave = true) { it.copy(title = value) }
 
-    fun updateDueDate(value: Long?) = updateReadyTask { it.copy(dueDate = value) }
+    fun updateDescription(value: String) =
+        updateReadyTask(autosave = true) { it.copy(description = value) }
+
+    fun updatePriority(value: Priority) =
+        updateReadyTask(autosave = true) { it.copy(priority = value) }
+
+    fun updateDueDate(value: Long?) =
+        updateReadyTask(autosave = true) { it.copy(dueDate = value) }
+
+    fun updateSubTasks(value: List<SubTask>) =
+        updateReadyTask(autosave = true) { it.copy(subTasks = value) }
 
     /**
      * Moves the task being edited to a different category.
@@ -153,37 +141,14 @@ class TaskEditorViewModel @Inject constructor(
         val normalizedCategoryId = categoryId ?: Category.GENERAL_ID
         updateReadyTask { it.copy(categoryId = normalizedCategoryId) }
 
-        viewModelScope.launch {
-            taskMutationMutex.withLock {
-                val task = _editor.value.taskOrNull ?: return@withLock
-                repository.upsertTask(task)
-            }
-        }
+        viewModelScope.launch { persistCurrentDraft() }
     }
 
     fun updateReminderTime(value: Long?) {
         val effectiveValue = if (value != null && value > System.currentTimeMillis()) value else null
         updateReadyTask { it.copy(reminderTime = effectiveValue) }
 
-        viewModelScope.launch {
-            taskMutationMutex.withLock {
-                val task = _editor.value.taskOrNull ?: return@withLock
-                val currentReminderTime = task.reminderTime
-
-                // Cancel the old alarm regardless of whether we're setting a new one.
-                reminderScheduler.cancel(task.id)
-                repository.upsertTask(task)
-
-                if (currentReminderTime != null) {
-                    reminderScheduler.schedule(
-                        task.id,
-                        task.title,
-                        task.description,
-                        currentReminderTime
-                    )
-                }
-            }
-        }
+        viewModelScope.launch { persistCurrentDraft() }
     }
 
     fun toggleDone() {
@@ -194,6 +159,7 @@ class TaskEditorViewModel @Inject constructor(
                 val current = _editor.value.taskOrNull ?: return@withLock
                 val updatedTask = toggleTaskUseCase(current)
 
+                persistedTask = updatedTask
                 updateReadyTask { updatedTask }
 
                 if (updatedTask.isDone) {
@@ -218,13 +184,58 @@ class TaskEditorViewModel @Inject constructor(
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
-    private fun updateReadyTask(transform: (Task) -> Task) {
+    private fun updateReadyTask(
+        autosave: Boolean = false,
+        transform: (Task) -> Task
+    ) {
         _editor.update { state ->
-            if (state is TaskEditorState.Ready) {
-                state.copy(task = transform(state.task))
-            } else {
-                state
-            }
+            if (state !is TaskEditorState.Ready) return@update state
+            val updated = transform(state.task)
+            if (updated == state.task) state else state.copy(
+                task = updated,
+                autosaveRevision = if (autosave) {
+                    state.autosaveRevision + 1
+                } else {
+                    state.autosaveRevision
+                }
+            )
+        }
+    }
+
+    /**
+     * Reads the draft after acquiring the lock. Persistence never publishes
+     * its snapshot back into editor state, so an older save cannot replace an
+     * edit made while Room was suspended.
+     */
+    private suspend fun persistCurrentDraft() {
+        taskMutationMutex.withLock {
+            val task = _editor.value.taskOrNull ?: return@withLock
+            if (task.title.isBlank()) return@withLock
+            val original = persistedTask ?: task
+
+            repository.upsertTask(task)
+            reconcileTaskAlarm(original = original, updated = task)
+            reconcileSubTaskAlarms(original = original, updated = task)
+            persistedTask = task
+        }
+    }
+
+    /** Replaces the task alarm when its time or displayed content changed. */
+    private fun reconcileTaskAlarm(original: Task, updated: Task) {
+        val alarmChanged = original.reminderTime != updated.reminderTime ||
+            original.title != updated.title ||
+            original.description != updated.description
+        if (!alarmChanged) return
+
+        reminderScheduler.cancel(updated.id)
+        val reminderTime = updated.reminderTime
+        if (!updated.isDone && reminderTime != null && reminderTime > System.currentTimeMillis()) {
+            reminderScheduler.schedule(
+                updated.id,
+                updated.title,
+                updated.description,
+                reminderTime
+            )
         }
     }
 

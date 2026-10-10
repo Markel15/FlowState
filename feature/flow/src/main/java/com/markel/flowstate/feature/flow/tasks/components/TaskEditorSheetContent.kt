@@ -21,8 +21,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
@@ -45,11 +43,12 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TaskEditorSheetContent(
-    task: Task?,
-    priority: Priority, // Get it from the parent
-    dueDate: Long?,
-    remTime: Long?,
-    onAutoUpdate: (String, String, Priority, Long?, Long?, List<SubTask>) -> Unit,
+    task: Task,
+    autosaveRevision: Long,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onSubTasksChange: (List<SubTask>) -> Unit,
+    onAutoUpdate: () -> Unit,
     onDueDateChange: (Long?) -> Unit = {},
     onReminderTimeChange: (Long?) -> Unit = {},
     categories: List<Category> = emptyList(),
@@ -58,13 +57,18 @@ fun TaskEditorSheetContent(
     onCategoryChange: (Int?) -> Unit = {},
     generalCategoryName: String? = null
 ) {
-    val isNewTask = remember { task == null }
-    var title by remember { mutableStateOf(task?.title ?: "") }
-    var description by remember { mutableStateOf(task?.description ?: "") }
-    val subTasks = remember {
-        mutableStateListOf<SubTask>().apply {
-            addAll(task?.subTasks ?: emptyList())
-        }
+    val subTasks = task.subTasks
+
+    fun replaceSubTask(updated: SubTask) {
+        onSubTasksChange(subTasks.map { if (it.id == updated.id) updated else it })
+    }
+
+    fun toggleSubTask(subTask: SubTask) {
+        replaceSubTask(subTask.copy(isDone = !subTask.isDone))
+    }
+
+    fun removeSubTask(subTaskId: String) {
+        onSubTasksChange(subTasks.filterNot { it.id == subTaskId })
     }
 
     // Track which subtask is expanded for inline editing
@@ -87,74 +91,25 @@ fun TaskEditorSheetContent(
     var draftSubDueDate by rememberSaveable { mutableStateOf<Long?>(null) }
     var draftSubReminder by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    // Checkpoints to track what was actually last saved
-    var lastSavedTitle by remember { mutableStateOf(title) }
-    var lastSavedDesc by remember { mutableStateOf(description) }
-    var lastSavedPriority by remember { mutableStateOf(priority) }
-    var lastSavedDueDate by remember { mutableStateOf(dueDate) }
-    var lastSavedReminder by remember { mutableStateOf(remTime) }
-    var lastSavedSubTasksHash by remember { mutableIntStateOf(subTasks.toList().hashCode()) }
-
-    val focusRequester = remember { FocusRequester() }
-
-    val currentPriority by rememberUpdatedState(priority)
-    val currentDueDate by rememberUpdatedState(dueDate)
-    val currentReminder by rememberUpdatedState(remTime)
-    val currentTitle by rememberUpdatedState(title)
-    val currentDescription by rememberUpdatedState(description)
-    val currentSubTasksList by rememberUpdatedState(subTasks.toList())
+    // Compose only tracks whether a revision still needs to be flushed
+    var lastSavedRevision by remember { mutableLongStateOf(autosaveRevision) }
+    val currentRevision by rememberUpdatedState(autosaveRevision)
+    val currentOnAutoUpdate by rememberUpdatedState(onAutoUpdate)
 
     // TIME-BASED AUTOSAVE (DEBOUNCE)
-    if (!isNewTask) {
-        LaunchedEffect(title, description, priority, dueDate, remTime, subTasks.toList().hashCode()) {
-            val currentSubTasksHash = subTasks.toList().hashCode()
-
-            val hasChanges = title != lastSavedTitle ||
-                    description != lastSavedDesc ||
-                    priority != lastSavedPriority ||
-                    dueDate != lastSavedDueDate ||
-                    remTime != lastSavedReminder ||
-                    currentSubTasksHash != lastSavedSubTasksHash
-
-            if (hasChanges && title.isNotBlank()) {
-                delay(600)
-                // Save
-                onAutoUpdate(title, description, priority, dueDate, remTime, subTasks.toList())
-                // Update references
-                lastSavedTitle = title
-                lastSavedDesc = description
-                lastSavedPriority = priority
-                lastSavedDueDate = dueDate
-                lastSavedReminder = remTime
-                lastSavedSubTasksHash = currentSubTasksHash
-            }
+    LaunchedEffect(autosaveRevision) {
+        if (autosaveRevision != lastSavedRevision) {
+            delay(600)
+            currentOnAutoUpdate()
+            lastSavedRevision = autosaveRevision
         }
     }
 
-    // EMERGENCY SAVE ON CLOSE (DISPOSE)
-    // This runs if the user closes the sheet before the delay finishes
+    // Flush a revision whose debounce did not finish before leaving the screen.
     DisposableEffect(Unit) {
         onDispose {
-            // Only autosave on exit if it's an ALREADY EXISTING task (Editing)
-            if (!isNewTask) {
-                val currentSubTasksHash = currentSubTasksList.hashCode()
-                val hasPendingChanges = currentTitle != lastSavedTitle ||
-                        currentDescription != lastSavedDesc ||
-                        currentPriority != lastSavedPriority ||
-                        currentDueDate != lastSavedDueDate ||
-                        currentReminder != lastSavedReminder ||
-                        currentSubTasksHash != lastSavedSubTasksHash
-
-                if (hasPendingChanges && currentTitle.isNotBlank()) {
-                    onAutoUpdate(
-                        currentTitle,
-                        currentDescription,
-                        currentPriority,
-                        currentDueDate,
-                        currentReminder,
-                        currentSubTasksList
-                    )
-                }
+            if (currentRevision != lastSavedRevision) {
+                currentOnAutoUpdate()
             }
         }
     }
@@ -206,7 +161,7 @@ fun TaskEditorSheetContent(
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
         ) {
-            if (title.isEmpty()) {
+            if (task.title.isEmpty()) {
                 Text(
                     text = stringResource(R.string.edit_task_placeholder),
                     style = MaterialTheme.typography.headlineSmall.copy(
@@ -218,11 +173,9 @@ fun TaskEditorSheetContent(
                 )
             }
             BasicTextField(
-                value = title,
-                onValueChange = { title = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                value = task.title,
+                onValueChange = onTitleChange,
+                modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontSize = 23.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -243,7 +196,7 @@ fun TaskEditorSheetContent(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
         ) {
-            if (description.isEmpty()) {
+            if (task.description.isEmpty()) {
                 Text(
                     text = stringResource(R.string.edit_task_desc_placeholder),
                     style = MaterialTheme.typography.bodyLarge,
@@ -251,8 +204,8 @@ fun TaskEditorSheetContent(
                 )
             }
             BasicTextField(
-                value = description,
-                onValueChange = { description = it },
+                value = task.description,
+                onValueChange = onDescriptionChange,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     lineHeight = 22.sp,
@@ -268,19 +221,19 @@ fun TaskEditorSheetContent(
         // ── Metadata: due date · reminder as outlined chips ───────────
         Spacer(modifier = Modifier.height(10.dp))
         TaskMetadataChips(
-            dueDate = dueDate,
+            dueDate = task.dueDate,
             onDueDateChange = onDueDateChange,
-            reminderTime = remTime,
+            reminderTime = task.reminderTime,
             onReminderTimeChange = onReminderTimeChange
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // SUBTASKS — computed lists & completed-chevron state
-        val pendingSubTasks = remember(subTasks.toList()) {
+        val pendingSubTasks = remember(subTasks) {
             subTasks.filter { !it.isDone }
         }
-        val completedSubTasks = remember(subTasks.toList()) {
+        val completedSubTasks = remember(subTasks) {
             subTasks.filter { it.isDone }
         }
 
@@ -335,23 +288,10 @@ fun TaskEditorSheetContent(
                     onExpandChange = { shouldExpand ->
                         expandedSubTaskId = if (shouldExpand) subTask.id else null
                     },
-                    onUpdate = { updatedSubTask ->
-                        val realIndex = subTasks.indexOfFirst { it.id == updatedSubTask.id }
-                        if (realIndex != -1) {
-                            subTasks[realIndex] = updatedSubTask
-                        }
-                    },
-                    onCheckedChange = {
-                        // We need to find the index in the REAL list, not the visible list
-                        val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                        if (realIndex != -1) {
-                            subTasks[realIndex] = subTask.copy(isDone = !subTask.isDone)
-                        }
-                    },
+                    onUpdate = ::replaceSubTask,
+                    onCheckedChange = { toggleSubTask(subTask) },
                     onDelete = {
-                        val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                        if (realIndex != -1) subTasks.removeAt(realIndex)
-                        // Close expansion if this was the expanded item
+                        removeSubTask(subTask.id)
                         if (expandedSubTaskId == subTask.id) expandedSubTaskId = null
                     }
                 )
@@ -451,21 +391,10 @@ fun TaskEditorSheetContent(
                             onExpandChange = { shouldExpand ->
                                 expandedSubTaskId = if (shouldExpand) subTask.id else null
                             },
-                            onUpdate = { updatedSubTask ->
-                                val realIndex = subTasks.indexOfFirst { it.id == updatedSubTask.id }
-                                if (realIndex != -1) {
-                                    subTasks[realIndex] = updatedSubTask
-                                }
-                            },
-                            onCheckedChange = {
-                                val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                                if (realIndex != -1) {
-                                    subTasks[realIndex] = subTask.copy(isDone = !subTask.isDone)
-                                }
-                            },
+                            onUpdate = ::replaceSubTask,
+                            onCheckedChange = { toggleSubTask(subTask) },
                             onDelete = {
-                                val realIndex = subTasks.indexOfFirst { it.id == subTask.id }
-                                if (realIndex != -1) subTasks.removeAt(realIndex)
+                                removeSubTask(subTask.id)
                                 if (expandedSubTaskId == subTask.id) expandedSubTaskId = null
                             }
                         )
@@ -506,7 +435,7 @@ fun TaskEditorSheetContent(
                         position = subTasks.size,
                         reminderTime = reminder
                     )
-                    subTasks.add(newSubTask)
+                    onSubTasksChange(subTasks + newSubTask)
 
                     draftSubTitle = ""
                     draftSubDescription = ""
@@ -517,11 +446,6 @@ fun TaskEditorSheetContent(
                 }
             )
         }
-    }
-
-    LaunchedEffect(Unit) {
-        delay(100)
-        if (isNewTask) focusRequester.requestFocus()
     }
 
     // ── Category selector bottom sheet ───────────────────────────────────────
