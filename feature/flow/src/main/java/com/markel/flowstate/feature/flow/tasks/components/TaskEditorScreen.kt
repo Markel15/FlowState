@@ -96,6 +96,7 @@ fun TaskEditorScreen(
                 is TaskEditorState.Ready -> TaskEditorSheetContent(
                     task = state.task,
                     autosaveRevision = state.autosaveRevision,
+                    savedRevision = state.savedRevision,
                     onTitleChange = viewModel::updateTitle,
                     onDescriptionChange = viewModel::updateDescription,
                     onSubTasksChange = viewModel::updateSubTasks,

@@ -37,7 +37,6 @@ import com.markel.flowstate.core.domain.SubTask
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.feature.flow.components.CategorySelectorSheet
 import com.markel.flowstate.feature.tasks.R
-import kotlinx.coroutines.delay
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -45,6 +44,7 @@ import java.util.UUID
 fun TaskEditorSheetContent(
     task: Task,
     autosaveRevision: Long,
+    savedRevision: Long,
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onSubTasksChange: (List<SubTask>) -> Unit,
@@ -91,24 +91,16 @@ fun TaskEditorSheetContent(
     var draftSubDueDate by rememberSaveable { mutableStateOf<Long?>(null) }
     var draftSubReminder by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    // Compose only tracks whether a revision still needs to be flushed
-    var lastSavedRevision by remember { mutableLongStateOf(autosaveRevision) }
+    // The ViewModel owns the debounce. Keep only a temporary best-effort fallback
+    // for a dirty revision when this content leaves composition. A later mini-phase
+    // will replace this with an awaited flush before navigation.
     val currentRevision by rememberUpdatedState(autosaveRevision)
+    val currentSavedRevision by rememberUpdatedState(savedRevision)
     val currentOnAutoUpdate by rememberUpdatedState(onAutoUpdate)
 
-    // TIME-BASED AUTOSAVE (DEBOUNCE)
-    LaunchedEffect(autosaveRevision) {
-        if (autosaveRevision != lastSavedRevision) {
-            delay(600)
-            currentOnAutoUpdate()
-            lastSavedRevision = autosaveRevision
-        }
-    }
-
-    // Flush a revision whose debounce did not finish before leaving the screen.
     DisposableEffect(Unit) {
         onDispose {
-            if (currentRevision != lastSavedRevision) {
+            if (currentRevision > currentSavedRevision) {
                 currentOnAutoUpdate()
             }
         }

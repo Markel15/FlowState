@@ -18,7 +18,9 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -762,12 +764,50 @@ class TaskEditorViewModelTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun fieldEdits_areDebouncedByViewModel_andPersistOnlyLatestDraft() = runTest {
+        val original = Task(id = 11, title = "Original", isDone = false)
+        val persistedTasks = mutableListOf<Task>()
+        coEvery { repository.getTaskById(11) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 11L
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+
+        viewModel.loadTask(11)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("First edit")
+        advanceTimeBy(300)
+        runCurrent()
+        viewModel.updateTitle("Latest edit")
+        advanceTimeBy(599)
+        runCurrent()
+
+        coVerify(exactly = 0) { repository.upsertTask(any()) }
+
+        advanceTimeBy(1)
+        runCurrent()
+
+        assertEquals(listOf("Latest edit"), persistedTasks.map { it.title })
+        assertEquals(2L, (viewModel.editor.value as TaskEditorState.Ready).savedRevision)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun saveCompletingAfterNewEdit_doesNotReplaceNewerDraft() = runTest {
         val original = Task(id = 10, title = "Original", isDone = false)
         val allowSaveToFinish = CompletableDeferred<Unit>()
+        val persistedTasks = mutableListOf<Task>()
         coEvery { repository.getTaskById(10) } returns original
-        coEvery { repository.upsertTask(match { it.title == "First edit" }) } coAnswers {
-            allowSaveToFinish.await()
+        coEvery { repository.upsertTask(capture(persistedTasks)) } coAnswers {
+            if (persistedTasks.last().title == "First edit") {
+                allowSaveToFinish.await()
+            }
             10L
         }
         viewModel = TaskEditorViewModel(
@@ -788,5 +828,6 @@ class TaskEditorViewModelTest {
         advanceUntilIdle()
 
         assertEquals("Newer edit", viewModel.editor.value.taskOrNull?.title)
+        assertEquals("Newer edit", persistedTasks.last().title)
     }
 }

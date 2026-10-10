@@ -15,6 +15,7 @@ import com.markel.flowstate.core.notifications.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,7 +43,9 @@ sealed interface TaskEditorState {
     data class Ready(
         val task: Task,
         /** Increments only for fields handled by the debounced autosave. */
-        val autosaveRevision: Long = 0
+        val autosaveRevision: Long = 0,
+        /** Highest autosave revision confirmed by the repository. */
+        val savedRevision: Long = 0
     ) : TaskEditorState
     data object NotFound : TaskEditorState
     data class Error(val cause: Throwable) : TaskEditorState
@@ -65,6 +68,7 @@ class TaskEditorViewModel @Inject constructor(
     val editor: StateFlow<TaskEditorState> = _editor.asStateFlow()
 
     private var loadTaskJob: Job? = null
+    private var autosaveJob: Job? = null
 
     /**
      * Serializes task writes coming from autosave and immediate actions such
@@ -91,6 +95,8 @@ class TaskEditorViewModel @Inject constructor(
     /** Loads one task and represents every outcome explicitly in editor state. */
     fun loadTask(taskId: Int) {
         loadTaskJob?.cancel()
+        autosaveJob?.cancel()
+        autosaveJob = null
         persistedTask = null
         _editor.value = TaskEditorState.Loading
         loadTaskJob = viewModelScope.launch {
@@ -111,8 +117,13 @@ class TaskEditorViewModel @Inject constructor(
         }
     }
 
-    /** Persists the latest draft owned by this ViewModel. */
+    /**
+     * Requests an immediate save. The debounce itself is owned by this ViewModel;
+     * this entry point remains temporarily for the screen's best-effort dispose flush.
+     */
     fun saveTask() {
+        autosaveJob?.cancel()
+        autosaveJob = null
         viewModelScope.launch { persistCurrentDraft() }
     }
 
@@ -141,14 +152,14 @@ class TaskEditorViewModel @Inject constructor(
         val normalizedCategoryId = categoryId ?: Category.GENERAL_ID
         updateReadyTask { it.copy(categoryId = normalizedCategoryId) }
 
-        viewModelScope.launch { persistCurrentDraft() }
+        saveTask()
     }
 
     fun updateReminderTime(value: Long?) {
         val effectiveValue = if (value != null && value > System.currentTimeMillis()) value else null
         updateReadyTask { it.copy(reminderTime = effectiveValue) }
 
-        viewModelScope.launch { persistCurrentDraft() }
+        saveTask()
     }
 
     fun toggleDone() {
@@ -188,17 +199,32 @@ class TaskEditorViewModel @Inject constructor(
         autosave: Boolean = false,
         transform: (Task) -> Task
     ) {
+        var changed = false
         _editor.update { state ->
             if (state !is TaskEditorState.Ready) return@update state
             val updated = transform(state.task)
-            if (updated == state.task) state else state.copy(
+            if (updated == state.task) return@update state
+
+            changed = true
+            state.copy(
                 task = updated,
-                autosaveRevision = if (autosave) {
-                    state.autosaveRevision + 1
-                } else {
-                    state.autosaveRevision
-                }
+                autosaveRevision = if (autosave) state.autosaveRevision + 1 else state.autosaveRevision
             )
+        }
+
+        // Keep coroutine scheduling outside update(), whose reducer may retry.
+        if (autosave && changed) scheduleAutosave()
+    }
+
+    /** Restarts the debounce so rapid edits result in one save of the latest draft. */
+    private fun scheduleAutosave() {
+        autosaveJob?.cancel()
+        autosaveJob = viewModelScope.launch {
+            delay(AUTOSAVE_DEBOUNCE_MS)
+            // Clear the debounce handle before I/O so a new edit does not cancel
+            // an upsert that has already started.
+            autosaveJob = null
+            persistCurrentDraft()
         }
     }
 
@@ -209,7 +235,9 @@ class TaskEditorViewModel @Inject constructor(
      */
     private suspend fun persistCurrentDraft() {
         taskMutationMutex.withLock {
-            val task = _editor.value.taskOrNull ?: return@withLock
+            val ready = _editor.value as? TaskEditorState.Ready ?: return@withLock
+            val task = ready.task
+            val revision = ready.autosaveRevision
             if (task.title.isBlank()) return@withLock
             val original = persistedTask ?: task
 
@@ -217,6 +245,16 @@ class TaskEditorViewModel @Inject constructor(
             reconcileTaskAlarm(original = original, updated = task)
             reconcileSubTaskAlarms(original = original, updated = task)
             persistedTask = task
+
+            // Mark only the revision represented by this persisted snapshot. If
+            // the user edited during the Room write, the newer draft stays dirty.
+            _editor.update { current ->
+                if (current is TaskEditorState.Ready && current.task.id == task.id) {
+                    current.copy(savedRevision = maxOf(current.savedRevision, revision))
+                } else {
+                    current
+                }
+            }
         }
     }
 
@@ -268,4 +306,7 @@ class TaskEditorViewModel @Inject constructor(
         }
     }
 
+    private companion object {
+        const val AUTOSAVE_DEBOUNCE_MS = 600L
+    }
 }
