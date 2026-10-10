@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.flow.tasks.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +30,7 @@ import com.markel.flowstate.feature.flow.tasks.TaskEditorState
 import com.markel.flowstate.feature.flow.tasks.TaskEditorViewModel
 import com.markel.flowstate.feature.flow.tasks.taskOrNull
 import com.markel.flowstate.feature.tasks.R
+import kotlinx.coroutines.launch
 
 /**
  * Full screen for task editing.
@@ -54,11 +58,37 @@ fun TaskEditorScreen(
     val generalCategoryName by viewModel.generalCategoryName.collectAsStateWithLifecycle()
     val task = editor.taskOrNull
 
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val saveErrorMessage = stringResource(R.string.task_editor_save_error)
+    var isFlushing by remember { mutableStateOf(false) }
+
+    val requestBack: () -> Unit = {
+        if (!isFlushing) {
+            isFlushing = true
+            scope.launch {
+                try {
+                    if (viewModel.flushPendingChanges()) {
+                        onBack()
+                    } else {
+                        // Let the user retry by pressing Back again after the message.
+                        isFlushing = false
+                        snackbarHostState.showSnackbar(saveErrorMessage)
+                    }
+                } finally {
+                    isFlushing = false
+                }
+            }
+        }
+    }
+    BackHandler(onBack = requestBack)
+
     Scaffold(
         modifier = Modifier.sharedDetailBounds(
             key = TaskSharedKeys.container(taskId)
         ),
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TaskEditorTopBar(
                 priority = task?.priority ?: Priority.NOTHING,
@@ -71,8 +101,8 @@ fun TaskEditorScreen(
                         onBack()
                     }
                 },
-                onBack = onBack,
-                actionsEnabled = task != null
+                onBack = requestBack,
+                actionsEnabled = task != null && !isFlushing
             )
         },
         containerColor = MaterialTheme.colorScheme.surface

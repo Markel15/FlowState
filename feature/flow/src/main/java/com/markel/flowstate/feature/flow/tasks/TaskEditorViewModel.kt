@@ -15,6 +15,7 @@ import com.markel.flowstate.core.notifications.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -127,6 +128,42 @@ class TaskEditorViewModel @Inject constructor(
         viewModelScope.launch { persistCurrentDraft() }
     }
 
+    /**
+     * Cancels the pending debounce, waits for any write already in progress, and
+     * persists the latest draft before a normal back navigation.
+     *
+     * Returns false on persistence failure so the UI can remain in the editor.
+     */
+    suspend fun flushPendingChanges(): Boolean {
+        return try {
+            while (true) {
+                cancelPendingAutosave()
+
+                val flushed = taskMutationMutex.withLock {
+                    val task = _editor.value.taskOrNull ?: return@withLock true
+                    // A blank title is not persisted.
+                    if (task.title.isBlank() || task == persistedTask) {
+                        return@withLock true
+                    }
+
+                    persistCurrentDraftLocked()
+
+                    // An edit may have arrived while the repository write was suspended.
+                    // Loop and save that newer snapshot before allowing navigation.
+                    val latestTask = _editor.value.taskOrNull
+                    latestTask == null || latestTask.title.isBlank() || latestTask == persistedTask
+                }
+
+                if (flushed) break
+            }
+            true
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun updateTitle(value: String) = updateReadyTask(autosave = true) { it.copy(title = value) }
 
     fun updateDescription(value: String) =
@@ -234,28 +271,38 @@ class TaskEditorViewModel @Inject constructor(
      * edit made while Room was suspended.
      */
     private suspend fun persistCurrentDraft() {
-        taskMutationMutex.withLock {
-            val ready = _editor.value as? TaskEditorState.Ready ?: return@withLock
-            val task = ready.task
-            val revision = ready.autosaveRevision
-            if (task.title.isBlank()) return@withLock
-            val original = persistedTask ?: task
+        taskMutationMutex.withLock { persistCurrentDraftLocked() }
+    }
 
-            repository.upsertTask(task)
-            reconcileTaskAlarm(original = original, updated = task)
-            reconcileSubTaskAlarms(original = original, updated = task)
-            persistedTask = task
+    /** Must be called while holding [taskMutationMutex]. */
+    private suspend fun persistCurrentDraftLocked() {
+        val ready = _editor.value as? TaskEditorState.Ready ?: return
+        val task = ready.task
+        val revision = ready.autosaveRevision
+        if (task.title.isBlank()) return
+        val original = persistedTask ?: task
 
-            // Mark only the revision represented by this persisted snapshot. If
-            // the user edited during the Room write, the newer draft stays dirty.
-            _editor.update { current ->
-                if (current is TaskEditorState.Ready && current.task.id == task.id) {
-                    current.copy(savedRevision = maxOf(current.savedRevision, revision))
-                } else {
-                    current
-                }
+        repository.upsertTask(task)
+        reconcileTaskAlarm(original = original, updated = task)
+        reconcileSubTaskAlarms(original = original, updated = task)
+        persistedTask = task
+
+        // Mark only the revision represented by this persisted snapshot. If
+        // the user edited during the Room write, the newer draft stays dirty.
+        _editor.update { current ->
+            if (current is TaskEditorState.Ready && current.task.id == task.id) {
+                current.copy(savedRevision = maxOf(current.savedRevision, revision))
+            } else {
+                current
             }
         }
+    }
+
+    /** Cancels only a pending debounce; an active write is awaited through the Mutex. */
+    private suspend fun cancelPendingAutosave() {
+        val pendingJob = autosaveJob
+        autosaveJob = null
+        pendingJob?.cancelAndJoin()
     }
 
     /** Replaces the task alarm when its time or displayed content changed. */

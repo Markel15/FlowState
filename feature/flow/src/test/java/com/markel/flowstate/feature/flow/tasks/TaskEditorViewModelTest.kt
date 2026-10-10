@@ -18,11 +18,14 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -795,6 +798,103 @@ class TaskEditorViewModelTest {
 
         assertEquals(listOf("Latest edit"), persistedTasks.map { it.title })
         assertEquals(2L, (viewModel.editor.value as TaskEditorState.Ready).savedRevision)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun flushPendingChanges_savesImmediately_andCancelsPendingDebounce() = runTest {
+        val original = Task(id = 12, title = "Original", isDone = false)
+        val persistedTasks = mutableListOf<Task>()
+        coEvery { repository.getTaskById(12) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 12L
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(12)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("Edited before leaving")
+
+        assertTrue(viewModel.flushPendingChanges())
+        assertEquals(listOf("Edited before leaving"), persistedTasks.map { it.title })
+
+        // The cancelled 600 ms timer must not issue a duplicate upsert.
+        advanceTimeBy(600)
+        runCurrent()
+        assertEquals(1, persistedTasks.size)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun flushPendingChanges_waitsForInFlightWrite_andSavesNewerDraft() = runTest {
+        val original = Task(id = 13, title = "Original", isDone = false)
+        val allowFirstWriteToFinish = CompletableDeferred<Unit>()
+        val persistedTasks = mutableListOf<Task>()
+        coEvery { repository.getTaskById(13) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } coAnswers {
+            if (persistedTasks.last().title == "First edit") {
+                allowFirstWriteToFinish.await()
+            }
+            13L
+        }
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(13)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("First edit")
+        advanceTimeBy(600)
+        runCurrent() // The first upsert is now suspended in the repository.
+        viewModel.updateTitle("Latest edit")
+
+        val flushDeferred = async {
+            viewModel.flushPendingChanges()
+        }
+        runCurrent()
+        assertFalse(flushDeferred.isCompleted)
+
+        allowFirstWriteToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(flushDeferred.await())
+        assertEquals(listOf("First edit", "Latest edit"), persistedTasks.map { it.title })
+        assertEquals(2L, (viewModel.editor.value as TaskEditorState.Ready).savedRevision)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun flushPendingChanges_onRepositoryFailure_returnsFalseAndKeepsRevisionDirty() = runTest {
+        val original = Task(id = 14, title = "Original", isDone = false)
+        coEvery { repository.getTaskById(14) } returns original
+        coEvery { repository.upsertTask(any()) } throws IllegalStateException("Database unavailable")
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(14)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("Unsaved edit")
+
+        assertFalse(viewModel.flushPendingChanges())
+        val ready = viewModel.editor.value as TaskEditorState.Ready
+        assertEquals(1L, ready.autosaveRevision)
+        assertEquals(0L, ready.savedRevision)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
