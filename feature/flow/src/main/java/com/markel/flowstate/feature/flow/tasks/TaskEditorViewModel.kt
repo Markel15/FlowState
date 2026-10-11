@@ -82,6 +82,8 @@ class TaskEditorViewModel @Inject constructor(
     /** Last snapshot successfully written, used as the alarm reconciliation baseline. */
     private var persistedTask: Task? = null
 
+    private var isDeleted = false
+
     /** User categories, exposed so the editor can populate the category selector. */
     val categories: StateFlow<List<Category>> = categoryRepository.getCategories()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -98,6 +100,7 @@ class TaskEditorViewModel @Inject constructor(
         loadTaskJob?.cancel()
         autosaveJob?.cancel()
         autosaveJob = null
+        isDeleted = false
         persistedTask = null
         _editor.value = TaskEditorState.Loading
         loadTaskJob = viewModelScope.launch {
@@ -136,6 +139,7 @@ class TaskEditorViewModel @Inject constructor(
      */
     suspend fun flushPendingChanges(): Boolean {
         return try {
+            if (isDeleted) return true
             while (true) {
                 cancelPendingAutosave()
 
@@ -200,10 +204,12 @@ class TaskEditorViewModel @Inject constructor(
     }
 
     fun toggleDone() {
+        if (isDeleted) return  // avoids to recreate a task if is deleted
         if (_editor.value.taskOrNull == null) return
 
         viewModelScope.launch {
             taskMutationMutex.withLock {
+                if (isDeleted) return@withLock  // double safeguard if the task was deleted waiting for lock
                 val current = _editor.value.taskOrNull ?: return@withLock
                 val updatedTask = toggleTaskUseCase(current)
 
@@ -221,12 +227,37 @@ class TaskEditorViewModel @Inject constructor(
             }
         }
     }
-    fun deleteTask(task: Task) {
-        viewModelScope.launch {
-            reminderScheduler.cancel(task.id)
-            task.subTasks.forEach { reminderScheduler.cancelSubTask(it.id) }  // Cancel all subtask alarms
-            deleteTaskUseCase(task)
+
+    /** Leaves Ready, cancels the debounce, and serializes deletion with task writes. */
+    suspend fun deleteCurrentTask(): Boolean {
+        val ready = _editor.value as? TaskEditorState.Ready ?: return false
+
+        return try {
+            cancelPendingAutosave()
+            taskMutationMutex.withLock {
+                val task = _editor.value.taskOrNull ?: return@withLock false
+                reminderScheduler.cancel(task.id)
+                (task.subTasks + persistedTask?.subTasks.orEmpty())
+                    .distinctBy { it.id }
+                    .forEach { reminderScheduler.cancelSubTask(it.id) }
+
+                deleteTaskUseCase(task)
+                persistedTask = null
+                isDeleted = true
+            }
+            true
+        } catch (cancellation: CancellationException) {
+            restoreAfterDeleteFailure(ready)
+            throw cancellation
+        } catch (_: Exception) {
+            restoreAfterDeleteFailure(ready)
+            false
         }
+    }
+
+    private fun restoreAfterDeleteFailure(ready: TaskEditorState.Ready) {
+        val task = _editor.value.taskOrNull ?: return
+        if (task != persistedTask) scheduleAutosave()
     }
 
 
@@ -276,6 +307,7 @@ class TaskEditorViewModel @Inject constructor(
 
     /** Must be called while holding [taskMutationMutex]. */
     private suspend fun persistCurrentDraftLocked() {
+        if (isDeleted) return
         val ready = _editor.value as? TaskEditorState.Ready ?: return
         val task = ready.task
         val revision = ready.autosaveRevision

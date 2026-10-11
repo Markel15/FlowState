@@ -61,22 +61,23 @@ fun TaskEditorScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val saveErrorMessage = stringResource(R.string.task_editor_save_error)
-    var isFlushing by remember { mutableStateOf(false) }
+    val deleteErrorMessage = stringResource(R.string.task_editor_delete_error)
+    var isExitInProgress by remember { mutableStateOf(false) }
 
     val requestBack: () -> Unit = {
-        if (!isFlushing) {
-            isFlushing = true
+        if (!isExitInProgress) {
+            isExitInProgress = true
             scope.launch {
                 try {
                     if (viewModel.flushPendingChanges()) {
                         onBack()
                     } else {
                         // Let the user retry by pressing Back again after the message.
-                        isFlushing = false
+                        isExitInProgress = false
                         snackbarHostState.showSnackbar(saveErrorMessage)
                     }
                 } finally {
-                    isFlushing = false
+                    isExitInProgress = false
                 }
             }
         }
@@ -96,13 +97,24 @@ fun TaskEditorScreen(
                 isDone = task?.isDone == true,
                 onComplete = viewModel::toggleDone,
                 onDelete = {
-                    task?.let {
-                        viewModel.deleteTask(it)
-                        onBack()
+                    if (!isExitInProgress) {
+                        isExitInProgress = true
+                        scope.launch {
+                            try {
+                                if (viewModel.deleteCurrentTask()) {
+                                    onBack()
+                                } else {
+                                    isExitInProgress = false
+                                    snackbarHostState.showSnackbar(deleteErrorMessage)
+                                }
+                            } finally {
+                                isExitInProgress = false
+                            }
+                        }
                     }
                 },
                 onBack = requestBack,
-                actionsEnabled = task != null && !isFlushing
+                actionsEnabled = task != null && !isExitInProgress
             )
         },
         containerColor = MaterialTheme.colorScheme.surface

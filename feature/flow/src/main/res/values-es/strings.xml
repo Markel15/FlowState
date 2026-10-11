@@ -67,5 +67,6 @@
     <string name="task_editor_not_found">Tarea no encontrada</string>
     <string name="task_editor_load_error">No se pudo cargar la tarea</string>
     <string name="task_editor_save_error">No se pudieron guardar los cambios. Inténtalo de nuevo.</string>
+    <string name="task_editor_delete_error">No se pudo eliminar la tarea. Inténtalo de nuevo.</string>
     <string name="retry">Reintentar</string>
 </resources>

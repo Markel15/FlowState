@@ -67,5 +67,6 @@
     <string name="task_editor_not_found">Task not found</string>
     <string name="task_editor_load_error">Could not load the task</string>
     <string name="task_editor_save_error">Could not save your changes. Please try again.</string>
+    <string name="task_editor_delete_error">Could not delete the task. Please try again.</string>
     <string name="retry">Retry</string>
 </resources>

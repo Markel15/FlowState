@@ -19,7 +19,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -247,6 +246,7 @@ class TaskEditorViewModelTest {
         coVerify { toggleTaskUseCase(task) }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun deleteTask_cancelsAlarmsAndCallsDeleteUseCase() = runTest {
         // GIVEN
@@ -255,13 +255,93 @@ class TaskEditorViewModelTest {
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
         viewModel.loadTask(3)
+        advanceUntilIdle()
 
         // WHEN
-        viewModel.deleteTask(task)
+        assertTrue(viewModel.deleteCurrentTask())
 
         // THEN
         coVerify { reminderScheduler.cancel(3) }
         coVerify { deleteTaskUseCase(task) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun delete_waitsForInFlightWrite_andPreventsLaterUpsert() = runTest {
+        val original = Task(id = 15, title = "Original", isDone = false)
+        val allowWriteToFinish = CompletableDeferred<Unit>()
+        val persistedTasks = mutableListOf<Task>()
+        val deletedTasks = mutableListOf<Task>()
+        val operations = mutableListOf<String>()
+        coEvery { repository.getTaskById(15) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } coAnswers {
+            val savedTask = persistedTasks.last()
+            operations += "upsert:${savedTask.title}"
+            if (savedTask.title == "Pending edit") allowWriteToFinish.await()
+            15L
+        }
+        coEvery { deleteTaskUseCase(capture(deletedTasks)) } coAnswers {
+            operations += "delete"
+            Unit
+        }
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(15)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("Pending edit")
+        advanceTimeBy(600)
+        runCurrent() // The autosave is now suspended inside the repository.
+        viewModel.updateTitle("Newest draft") // Its debounce must be canceled by deletion.
+
+        val deleteDeferred = async { viewModel.deleteCurrentTask() }
+        runCurrent()
+        assertFalse(deleteDeferred.isCompleted)
+
+        allowWriteToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(deleteDeferred.await())
+        assertEquals(listOf("upsert:Pending edit", "delete"), operations)
+        assertEquals("Newest draft", deletedTasks.single().title)
+        assertTrue(viewModel.editor.value is TaskEditorState.Ready)
+
+        // Matches the editor's disposal fallback: it must not recreate the deleted task.
+        viewModel.saveTask()
+        advanceUntilIdle()
+        assertEquals(listOf("upsert:Pending edit", "delete"), operations)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun deleteFailure_restoresEditorAndReschedulesUnsavedDraft() = runTest {
+        val original = Task(id = 16, title = "Original", isDone = false)
+        val persistedTasks = mutableListOf<Task>()
+        coEvery { repository.getTaskById(16) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } returns 16L
+        coEvery { deleteTaskUseCase(any()) } throws IllegalStateException("Delete failed")
+        viewModel = TaskEditorViewModel(
+            repository,
+            toggleTaskUseCase,
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+        viewModel.loadTask(16)
+        advanceUntilIdle()
+        viewModel.updateTitle("Unsaved edit")
+
+        assertFalse(viewModel.deleteCurrentTask())
+        assertEquals("Unsaved edit", viewModel.editor.value.taskOrNull?.title)
+        advanceUntilIdle()
+        assertEquals(listOf("Unsaved edit"), persistedTasks.map { it.title })
     }
 
     // ── updateReminderTime tests ──────────────────────────────────────────────
@@ -450,6 +530,7 @@ class TaskEditorViewModelTest {
 
     // ── deleteTask with subtask alarms ────────────────────────────────────────
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun deleteTask_cancels_task_alarm_and_all_subtask_alarms() = runTest {
         val sub1 = SubTask(id = "s1", title = "Sub1", reminderTime = System.currentTimeMillis() + 60_000L)
@@ -459,8 +540,9 @@ class TaskEditorViewModelTest {
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
         viewModel.loadTask(10)
+        advanceUntilIdle()
 
-        viewModel.deleteTask(task)
+        assertTrue(viewModel.deleteCurrentTask())
 
         coVerify { reminderScheduler.cancel(10) }
         // deleteTask cancels ALL subtask alarms (not just ones with reminders)
@@ -823,7 +905,7 @@ class TaskEditorViewModelTest {
         assertTrue(viewModel.flushPendingChanges())
         assertEquals(listOf("Edited before leaving"), persistedTasks.map { it.title })
 
-        // The cancelled 600 ms timer must not issue a duplicate upsert.
+        // The canceled 600 ms timer must not issue a duplicate upsert.
         advanceTimeBy(600)
         runCurrent()
         assertEquals(1, persistedTasks.size)
