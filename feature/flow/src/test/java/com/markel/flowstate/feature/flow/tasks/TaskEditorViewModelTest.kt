@@ -404,7 +404,13 @@ class TaskEditorViewModelTest {
     fun toggleDone_completing_cancels_task_alarm_and_subtask_alarms_with_reminders() = runTest {
         val sub1 = SubTask(id = "s1", title = "Sub1", reminderTime = System.currentTimeMillis() + 60_000L)
         val sub2 = SubTask(id = "s2", title = "Sub2", reminderTime = null) // no reminder → should NOT be canceled
-        val task = Task(id = 10, title = "Task", isDone = false, subTasks = listOf(sub1, sub2))
+        val task = Task(
+            id = 10,
+            title = "Task",
+            isDone = false,
+            reminderTime = System.currentTimeMillis() + 60_000L,
+            subTasks = listOf(sub1, sub2)
+        )
         coEvery { repository.getTaskById(any()) } returns task
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
@@ -429,15 +435,81 @@ class TaskEditorViewModelTest {
         coVerify(exactly = 0) { reminderScheduler.cancelSubTask("s2") }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun toggleDone_waitsForInFlightAutosave_andPersistsItsDraft() = runTest {
+        val reminderTime = System.currentTimeMillis() + 60_000L
+        val subTask = SubTask(id = "s1", title = "Subtask", reminderTime = reminderTime)
+        val original = Task(
+            id = 17,
+            title = "Original",
+            isDone = false,
+            reminderTime = reminderTime,
+            subTasks = listOf(subTask)
+        )
+        val allowAutosaveToFinish = CompletableDeferred<Unit>()
+        val persistedTasks = mutableListOf<Task>()
+        val operations = mutableListOf<String>()
+        coEvery { repository.getTaskById(17) } returns original
+        coEvery { repository.upsertTask(capture(persistedTasks)) } coAnswers {
+            val task = persistedTasks.last()
+            operations += if (task.isDone) "toggle:${task.title}" else "autosave:${task.title}"
+            if (task.title == "Edited before toggle" && !task.isDone) {
+                allowAutosaveToFinish.await()
+            }
+            17L
+        }
+        viewModel = TaskEditorViewModel(
+            repository,
+            ToggleTaskUseCase(repository),
+            deleteTaskUseCase,
+            reminderScheduler,
+            categoryRepository,
+            userPreferencesRepository
+        )
+
+        viewModel.loadTask(17)
+        advanceUntilIdle()
+
+        viewModel.updateTitle("Edited before toggle")
+        advanceTimeBy(600)
+        runCurrent() // The autosave is now suspended inside the repository.
+        assertEquals(listOf("autosave:Edited before toggle"), operations)
+
+        viewModel.toggleDone()
+        runCurrent() // The toggle must wait for the in-flight autosave's mutex.
+        assertEquals(listOf("autosave:Edited before toggle"), operations)
+
+        allowAutosaveToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("autosave:Edited before toggle", "toggle:Edited before toggle"),
+            operations
+        )
+        assertEquals(2, persistedTasks.size)
+        val completedTask = persistedTasks.last()
+        assertEquals("Edited before toggle", completedTask.title)
+        assertTrue(completedTask.isDone)
+        assertNull(completedTask.reminderTime)
+        assertNull(completedTask.subTasks.single().reminderTime)
+        assertTrue(viewModel.editor.value.taskOrNull?.isDone == true)
+        coVerify { reminderScheduler.cancel(17) }
+        coVerify { reminderScheduler.cancelSubTask("s1") }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun toggleDone_uncompleting_does_not_cancel_alarms() = runTest {
         val task = Task(id = 10, title = "Done task", isDone = true)
-        coEvery { repository.getTaskById(any()) } returns task
+        coEvery { toggleTaskUseCase(task) } returns task.copy(isDone = false, completedAt = null)
         viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
 
         viewModel.loadTask(10)
+        advanceUntilIdle()
 
         viewModel.toggleDone()
+        advanceUntilIdle()
 
         coVerify(exactly = 0) { reminderScheduler.cancel(any()) }
         coVerify(exactly = 0) { reminderScheduler.cancelSubTask(any()) }

@@ -211,19 +211,13 @@ class TaskEditorViewModel @Inject constructor(
             taskMutationMutex.withLock {
                 if (isDeleted) return@withLock  // double safeguard if the task was deleted waiting for lock
                 val current = _editor.value.taskOrNull ?: return@withLock
+                val original = persistedTask ?: current
                 val updatedTask = toggleTaskUseCase(current)
 
                 persistedTask = updatedTask
                 updateReadyTask { updatedTask }
-
-                if (updatedTask.isDone) {
-                    reminderScheduler.cancel(updatedTask.id)
-                    current.subTasks
-                        .filter { it.reminderTime != null }
-                        .forEach { subTask ->
-                            reminderScheduler.cancelSubTask(subTask.id)
-                        }
-                }
+                reconcileTaskAlarm(original = original, updated = updatedTask)
+                reconcileSubTaskAlarms(original = original, updated = updatedTask)
             }
         }
     }
