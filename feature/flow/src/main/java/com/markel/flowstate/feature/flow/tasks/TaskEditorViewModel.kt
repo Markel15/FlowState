@@ -144,6 +144,9 @@ class TaskEditorViewModel @Inject constructor(
                 cancelPendingAutosave()
 
                 val flushed = taskMutationMutex.withLock {
+                    // Deletion may have completed while this flush waited for the mutex.
+                    if (isDeleted) return@withLock true
+
                     val task = _editor.value.taskOrNull ?: return@withLock true
                     // A blank title is not persisted.
                     if (task.title.isBlank() || task == persistedTask) {
