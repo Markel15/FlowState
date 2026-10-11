@@ -137,14 +137,11 @@ fun TaskEditorScreen(
                 )
                 is TaskEditorState.Ready -> TaskEditorSheetContent(
                     task = state.task,
-                    autosaveRevision = state.autosaveRevision,
-                    savedRevision = state.savedRevision,
                     onTitleChange = viewModel::updateTitle,
                     onDescriptionChange = viewModel::updateDescription,
                     onSubTasksChange = viewModel::updateSubTasks,
                     onDueDateChange = viewModel::updateDueDate,
                     onReminderTimeChange = viewModel::updateReminderTime,
-                    onAutoUpdate = viewModel::saveTask,
                     categories = categories,
                     categoriesEnabled = categoriesEnabled,
                     categoryId = state.task.categoryId,

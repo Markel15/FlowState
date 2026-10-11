@@ -121,10 +121,7 @@ class TaskEditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Requests an immediate save. The debounce itself is owned by this ViewModel;
-     * this entry point remains temporarily for the screen's best-effort dispose flush.
-     */
+    /** Immediately persists editor changes that are not handled by the autosave debounce. */
     fun saveTask() {
         autosaveJob?.cancel()
         autosaveJob = null

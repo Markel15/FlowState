@@ -43,12 +43,9 @@ import java.util.UUID
 @Composable
 fun TaskEditorSheetContent(
     task: Task,
-    autosaveRevision: Long,
-    savedRevision: Long,
     onTitleChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onSubTasksChange: (List<SubTask>) -> Unit,
-    onAutoUpdate: () -> Unit,
     onDueDateChange: (Long?) -> Unit = {},
     onReminderTimeChange: (Long?) -> Unit = {},
     categories: List<Category> = emptyList(),
@@ -90,21 +87,6 @@ fun TaskEditorSheetContent(
     var draftSubPriority by rememberSaveable { mutableStateOf(Priority.NOTHING) }
     var draftSubDueDate by rememberSaveable { mutableStateOf<Long?>(null) }
     var draftSubReminder by rememberSaveable { mutableStateOf<Long?>(null) }
-
-    // The ViewModel owns the debounce. Keep only a temporary best-effort fallback
-    // for a dirty revision when this content leaves composition. A later mini-phase
-    // will replace this with an awaited flush before navigation.
-    val currentRevision by rememberUpdatedState(autosaveRevision)
-    val currentSavedRevision by rememberUpdatedState(savedRevision)
-    val currentOnAutoUpdate by rememberUpdatedState(onAutoUpdate)
-
-    DisposableEffect(Unit) {
-        onDispose {
-            if (currentRevision > currentSavedRevision) {
-                currentOnAutoUpdate()
-            }
-        }
-    }
 
     Column (
         modifier = Modifier
