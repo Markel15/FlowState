@@ -1,23 +1,36 @@
 package com.markel.flowstate.feature.flow.tasks.components
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.designsystem.ui.TaskSharedKeys
+import com.markel.flowstate.core.domain.Priority
 import com.markel.flowstate.core.designsystem.ui.sharedDetailBounds
+import com.markel.flowstate.feature.flow.tasks.TaskEditorState
 import com.markel.flowstate.feature.flow.tasks.TaskEditorViewModel
-import com.markel.flowstate.feature.flow.tasks.components.TaskEditorSheetContent
-import com.markel.flowstate.feature.flow.tasks.components.TaskEditorTopBar
+import com.markel.flowstate.feature.flow.tasks.taskOrNull
+import com.markel.flowstate.feature.tasks.R
+import kotlinx.coroutines.launch
 
 /**
  * Full screen for task editing.
@@ -43,23 +56,65 @@ fun TaskEditorScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val categoriesEnabled by viewModel.categoriesEnabled.collectAsStateWithLifecycle()
     val generalCategoryName by viewModel.generalCategoryName.collectAsStateWithLifecycle()
+    val task = editor.taskOrNull
+
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val saveErrorMessage = stringResource(R.string.task_editor_save_error)
+    val deleteErrorMessage = stringResource(R.string.task_editor_delete_error)
+    var isExitInProgress by remember { mutableStateOf(false) }
+
+    val requestBack: () -> Unit = {
+        if (!isExitInProgress) {
+            isExitInProgress = true
+            scope.launch {
+                try {
+                    if (viewModel.flushPendingChanges()) {
+                        onBack()
+                    } else {
+                        // Let the user retry by pressing Back again after the message.
+                        isExitInProgress = false
+                        snackbarHostState.showSnackbar(saveErrorMessage)
+                    }
+                } finally {
+                    isExitInProgress = false
+                }
+            }
+        }
+    }
+    BackHandler(onBack = requestBack)
 
     Scaffold(
         modifier = Modifier.sharedDetailBounds(
             key = TaskSharedKeys.container(taskId)
         ),
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TaskEditorTopBar(
-                priority = editor.priority,
-                onPriorityChange = { viewModel.updatePriority(it) },
-                isDone = editor.isDone,
-                onComplete = { viewModel.toggleDone() },
+                priority = task?.priority ?: Priority.NOTHING,
+                onPriorityChange = viewModel::updatePriority,
+                isDone = task?.isDone == true,
+                onComplete = viewModel::toggleDone,
                 onDelete = {
-                    viewModel.deleteTask(editor.task!!)
-                    onBack()
+                    if (!isExitInProgress) {
+                        isExitInProgress = true
+                        scope.launch {
+                            try {
+                                if (viewModel.deleteCurrentTask()) {
+                                    onBack()
+                                } else {
+                                    isExitInProgress = false
+                                    snackbarHostState.showSnackbar(deleteErrorMessage)
+                                }
+                            } finally {
+                                isExitInProgress = false
+                            }
+                        }
+                    }
                 },
-                onBack = onBack
+                onBack = requestBack,
+                actionsEnabled = task != null && !isExitInProgress
             )
         },
         containerColor = MaterialTheme.colorScheme.surface
@@ -70,31 +125,51 @@ fun TaskEditorScreen(
             .imePadding()
             .navigationBarsPadding()
         ) {
-            editor.task?.let { task ->
-                TaskEditorSheetContent(
-                    task = task,
-                    priority = editor.priority,
-                    dueDate = editor.dueDate,
-                    remTime = editor.reminderTime,
-                    onDueDateChange = { viewModel.updateDueDate(it) },
-                    onReminderTimeChange = { viewModel.updateReminderTime(it) },
-                    onAutoUpdate = { title, desc, prio, date, remTime, subTasks ->
-                        viewModel.updateTask(
-                            newTitle = title,
-                            newDescription = desc,
-                            newPriority = prio,
-                            newDueDate = date,
-                            newReminderTime = remTime,
-                            newSubTasks = subTasks,
-                        )
-                    },
+            when (val state = editor) {
+                TaskEditorState.Loading -> EditorLoading()
+                TaskEditorState.NotFound -> EditorLoadFailure(
+                    message = stringResource(R.string.task_editor_not_found),
+                    onRetry = { viewModel.loadTask(taskId) }
+                )
+                is TaskEditorState.Error -> EditorLoadFailure(
+                    message = stringResource(R.string.task_editor_load_error),
+                    onRetry = { viewModel.loadTask(taskId) }
+                )
+                is TaskEditorState.Ready -> TaskEditorSheetContent(
+                    task = state.task,
+                    onTitleChange = viewModel::updateTitle,
+                    onDescriptionChange = viewModel::updateDescription,
+                    onSubTasksChange = viewModel::updateSubTasks,
+                    onDueDateChange = viewModel::updateDueDate,
+                    onReminderTimeChange = viewModel::updateReminderTime,
                     categories = categories,
                     categoriesEnabled = categoriesEnabled,
-                    categoryId = editor.categoryId,
-                    onCategoryChange = { viewModel.updateCategory(it) },
+                    categoryId = state.task.categoryId,
+                    onCategoryChange = viewModel::updateCategory,
                     generalCategoryName = generalCategoryName
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun EditorLoading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun EditorLoadFailure(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = message, style = MaterialTheme.typography.bodyLarge)
+        Button(onClick = onRetry) {
+            Text(stringResource(R.string.retry))
         }
     }
 }

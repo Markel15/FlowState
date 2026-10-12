@@ -44,7 +44,8 @@ fun TaskEditorTopBar(
     isDone: Boolean,
     onComplete: () -> Unit,
     onDelete: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    actionsEnabled: Boolean = true
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -63,15 +64,18 @@ fun TaskEditorTopBar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {
-                    val nextPriority = when (priority) {
-                        Priority.NOTHING -> Priority.LOW
-                        Priority.LOW -> Priority.MEDIUM
-                        Priority.MEDIUM -> Priority.HIGH
-                        Priority.HIGH -> Priority.NOTHING
+                IconButton(
+                    enabled = actionsEnabled,
+                    onClick = {
+                        val nextPriority = when (priority) {
+                            Priority.NOTHING -> Priority.LOW
+                            Priority.LOW -> Priority.MEDIUM
+                            Priority.MEDIUM -> Priority.HIGH
+                            Priority.HIGH -> Priority.NOTHING
+                        }
+                        onPriorityChange(nextPriority)
                     }
-                    onPriorityChange(nextPriority)
-                }) {
+                ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(priority.flagIconRes()),
                         contentDescription = "Priority",
@@ -81,7 +85,10 @@ fun TaskEditorTopBar(
                 }
 
                 Box {
-                    IconButton(onClick = { menuExpanded = true }) {
+                    IconButton(
+                        enabled = actionsEnabled,
+                        onClick = { menuExpanded = true }
+                    ) {
                         Icon(
                             imageVector = ImageVector.vectorResource(R.drawable.more_vert_24px),
                             contentDescription = "More options"
