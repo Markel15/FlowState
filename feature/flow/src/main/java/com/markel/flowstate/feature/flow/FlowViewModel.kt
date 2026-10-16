@@ -324,50 +324,57 @@ class FlowViewModel @Inject constructor(
 
     // ── Reorder ────────────────────────────────────────────────────────
 
-    fun onTaskReorder(fromIndex: Int, toIndex: Int) {
-        val current = (_uiState.value as? FlowUiState.Success)?.tasks?.toMutableList() ?: return
+    /**
+     * Applies a drag between two rows of the flat [FlowItem] list.
+     *
+     * The move is only applied when both rows belong to the same non-null
+     * [FlowItem.Section]: headers and the reminder banner are fixed chrome, and
+     * a card may not jump between the CheckLists and Ideas sections. When the
+     * guard rejects the move the row simply snaps back to its original slot.
+     *
+     * Note this is called on every item crossing during a drag, so it writes to
+     * the database on each one — same as the carousel did. Persisting a single
+     * time on drop is a follow-up.
+     */
+    fun onItemReorder(fromIndex: Int, toIndex: Int) {
+        val state = _uiState.value as? FlowUiState.Success ?: return
+        val items = state.items.toMutableList()
 
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
+        val from = items.getOrNull(fromIndex) ?: return
+        val to = items.getOrNull(toIndex) ?: return
 
-        val updated = current.mapIndexed { i, t -> t.copy(position = i) }
+        val section = from.section ?: return
+        if (section != to.section) return
 
-        _uiState.value = (_uiState.value as FlowUiState.Success).copy(tasks = updated)
+        val moved = items.removeAt(fromIndex)
+        items.add(toIndex, moved)
 
-        viewModelScope.launch {
-            taskRepository.updateTasksOrder(updated)
+        val updated = state.withItems(items)
+
+        // `position` is the column the DAOs sort by, so the reordered section has
+        // to be renumbered 0..n-1 before it is written. Without this the next
+        // database emission (ORDER BY position ASC) would restore the previous
+        // order and the card would visibly snap back to where it started.
+        val renumbered = when (section) {
+            FlowItem.Section.TASKS -> updated.copy(
+                tasks = updated.tasks.mapIndexed { index, task -> task.copy(position = index) }
+            )
+            FlowItem.Section.CHECKLISTS -> updated.copy(
+                checkLists = updated.checkLists.mapIndexed { index, list -> list.copy(position = index) }
+            )
+            FlowItem.Section.IDEAS -> updated.copy(
+                ideas = updated.ideas.mapIndexed { index, idea -> idea.copy(position = index) }
+            )
         }
-    }
 
-    fun onIdeaReorder(fromIndex: Int, toIndex: Int) {
-        val currentState = _uiState.value as? FlowUiState.Success ?: return
-        val list = currentState.ideas.toMutableList()
-
-        val item = list.removeAt(fromIndex)
-        list.add(toIndex, item)
-
-        val updated = list.mapIndexed { i, idea -> idea.copy(position = i) }
-
-        _uiState.value = currentState.copy(ideas = updated)
+        _uiState.value = renumbered
 
         viewModelScope.launch {
-            ideaRepository.updateIdeasOrder(updated)
-        }
-    }
-
-    fun onCheckListReorder(fromIndex: Int, toIndex: Int) {
-        val currentState = _uiState.value as? FlowUiState.Success ?: return
-        val list = currentState.checkLists.toMutableList()
-
-        val item = list.removeAt(fromIndex)
-        list.add(toIndex, item)
-
-        val updated = list.mapIndexed { i, cl -> cl.copy(position = i) }
-
-        _uiState.value = currentState.copy(checkLists = updated)
-
-        viewModelScope.launch {
-            checkListRepository.updateCheckListsOrder(updated)
+            when (section) {
+                FlowItem.Section.TASKS -> taskRepository.updateTasksOrder(renumbered.tasks)
+                FlowItem.Section.CHECKLISTS -> checkListRepository.updateCheckListsOrder(renumbered.checkLists)
+                FlowItem.Section.IDEAS -> ideaRepository.updateIdeasOrder(renumbered.ideas)
+            }
         }
     }
 

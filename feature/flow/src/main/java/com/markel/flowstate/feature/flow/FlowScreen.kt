@@ -2,8 +2,8 @@ package com.markel.flowstate.feature.flow
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridState
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -73,12 +73,12 @@ fun FlowScreen(
     val currentTabId = selectedCategoryId ?: Category.GENERAL_ID
 
     // Registry of each tab's LazyListState so the FAB can read the active list state from a single variable
-    val tabListStates = remember { mutableStateMapOf<Int, LazyListState>() }
+    val tabGridStates = remember { mutableStateMapOf<Int, LazyStaggeredGridState>() }
 
     // ── FAB ──────────
-    val activeListState = tabListStates[currentTabId] ?: rememberLazyListState()
+    val activeGridState = tabGridStates[currentTabId] ?: rememberLazyStaggeredGridState()
     val fabVisible by rememberFabVisibilityState(
-        lazyListState = activeListState,
+        gridState = activeGridState,
         forceVisible = allEmpty
     )
 
@@ -107,27 +107,24 @@ fun FlowScreen(
                 }
 
                 saveableStateHolder.SaveableStateProvider(currentTabId) {
-                    val tabListState = rememberLazyListState()
+                    val tabGridState = rememberLazyStaggeredGridState()
 
-                    // Publish this tab's LazyListState to the shared registry
-                    // so the FAB (outside SaveableStateProvider) can read it.
-                    SideEffect { tabListStates[currentTabId] = tabListState }
+                    // Publish this tab's grid state to the shared registry so the
+                    // FAB (outside SaveableStateProvider) can read it.
+                    SideEffect { tabGridStates[currentTabId] = tabGridState }
 
                     SectionedFlowView(
                         uiState = flowUiState,
                         onScrolled = { isHeaderMinimized = true },
+                        onItemReorder = { from, to -> flowViewModel.onItemReorder(from, to) },
                         onTaskClick = { onNavigateToTaskEditor(it.id) },
                         onTaskDelete = { task -> flowViewModel.onTaskSwiped(task) },
                         onTaskToggle = { taskViewModel.toggleTaskDone(it) },
-                        onTaskReorder = { from, to -> flowViewModel.onTaskReorder(from, to) },
                         onIdeaClick = { onNavigateToIdeaEditor(it.id) },
-                        onIdeaReorder = { from, to -> flowViewModel.onIdeaReorder(from, to) },
                         onCheckListClick = { onNavigateToCheckListEditor(it.id, it.categoryId) },
-                        onCheckListReorder = { from, to -> flowViewModel.onCheckListReorder(from, to) },
                         showPermissionBanner = showPermissionBanner,
                         taskDeleteVersions = taskDeleteVersions,
-                        categoriesEnabled = categoriesEnabled,
-                        outerListState = tabListState,
+                        gridState = tabGridState,
                     )
                 }
             }

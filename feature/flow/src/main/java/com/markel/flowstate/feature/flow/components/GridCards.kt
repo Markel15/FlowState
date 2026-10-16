@@ -33,6 +33,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Cap on the idea body before it is truncated with an ellipsis.
+ *
+ * The card sizes itself to its content, so this is what bounds the height.
+ * `heightIn(max = …)` would clip the text instead, which is why it is not used.
+ */
+private const val IDEA_CONTENT_MAX_LINES = 8
+
+/** Pending items rendered inside a checklist card before the "+N more" line. */
+private const val CHECK_LIST_VISIBLE_ITEMS = 5
+
 // ── Idea ──────────────────────────────────────────────────────────────────────
 
 @Composable
@@ -74,7 +85,7 @@ fun IdeaGridCard(
                     text = idea.content,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 6,
+                    maxLines = IDEA_CONTENT_MAX_LINES,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -122,7 +133,7 @@ fun CheckListGridCard(
             )
             Spacer(Modifier.height(6.dp))
             val pendingItems = checkList.items.filter { !it.isDone }
-            val visibleItems = pendingItems.take(4)
+            val visibleItems = pendingItems.take(CHECK_LIST_VISIBLE_ITEMS)
             visibleItems.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -139,10 +150,10 @@ fun CheckListGridCard(
                     )
                 }
             }
-            if (pendingItems.size > 5) {
+            if (pendingItems.size > visibleItems.size) {
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    text = "+${pendingItems.size - 4} " + stringResource(com.markel.flowstate.feature.tasks.R.string.more),
+                    text = "+${pendingItems.size - visibleItems.size} " + stringResource(com.markel.flowstate.feature.tasks.R.string.more),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )

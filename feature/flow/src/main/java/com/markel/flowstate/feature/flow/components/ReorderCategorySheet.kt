@@ -173,7 +173,7 @@ private fun ReorderableCategoryRow(
             }
             .zIndex(if (isDragging) 1f else 0f)
     ) {
-        // Drag handle (long-press to start dragging, mirrors ReorderableCarousel)
+        // Drag handle (long-press to start dragging, mirrors the Flow grid)
         Icon(
             imageVector = ImageVector.vectorResource(R.drawable.drag_handle_24px),
             contentDescription = null,
