@@ -41,6 +41,10 @@ import androidx.core.net.toUri
  *
  * The visibility check (hasTasksWithReminder && !canScheduleExactAlarms) is done
  * by the caller (SectionedFlowView or equivalent) so this composable stays dumb.
+ *
+ * Horizontal insets are also the caller's responsibility: the Flow grid already
+ * provides them (12dp contentPadding + 8dp on the row), so the banner must not
+ * add its own horizontal padding, or it ends up narrower than the task rows.
  */
 @Composable
 fun ReminderPermissionBanner(
@@ -58,7 +62,7 @@ fun ReminderPermissionBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 10.dp)
+                .padding(top = 4.dp, bottom = 10.dp)
                 .background(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(16.dp)

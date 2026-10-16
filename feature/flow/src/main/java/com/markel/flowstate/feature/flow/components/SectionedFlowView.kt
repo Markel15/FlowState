@@ -63,6 +63,14 @@ private const val GRID_EDGE_DP = 12
 private const val ROW_EXTRA_INSET_DP = 8
 /** Bottom room for the FAB. */
 private const val GRID_BOTTOM_DP = 96
+/**
+ * Vertical gap between grid cards (checklists / ideas).
+ *
+ * The grid itself uses `verticalItemSpacing = 0` because that value applies to
+ * *every* row — including the task rows, which must stay tightly grouped
+ * Cards get this gap via bottom padding instead.
+ */
+private const val CARD_VERTICAL_SPACING_DP = 9
 
 /**
  * Main view for the Flow screen: a single staggered grid.
@@ -141,7 +149,7 @@ fun SectionedFlowView(
             bottom = GRID_BOTTOM_DP.dp,
         ),
         horizontalArrangement = Arrangement.spacedBy(GRID_SPACING_DP.dp),
-        verticalItemSpacing = 9.dp,
+        verticalItemSpacing = 0.dp,
     ) {
         itemsIndexed(
             items = uiState.items,
@@ -203,7 +211,8 @@ fun SectionedFlowView(
                 ) {
                     CheckListGridCard(
                         checkList = item.checkList,
-                        onClick = { onCheckListClick(item.checkList) }
+                        onClick = { onCheckListClick(item.checkList) },
+                        modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
                     )
                 }
 
@@ -214,7 +223,8 @@ fun SectionedFlowView(
                 ) {
                     IdeaGridCard(
                         idea = item.idea,
-                        onClick = { onIdeaClick(item.idea) }
+                        onClick = { onIdeaClick(item.idea) },
+                        modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
                     )
                 }
             }
