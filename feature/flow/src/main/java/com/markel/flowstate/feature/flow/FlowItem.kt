@@ -65,6 +65,13 @@ sealed interface FlowItem {
         override val section: Section? get() = Section.IDEAS
         override val spanAllColumns: Boolean get() = false
     }
+
+    // ── Chrome ────────────────────────────────────────────────────────────────
+
+    /**
+     * Empty room after the last section so the FAB never covers content.
+     */
+    data object BottomSpacer : FlowItem
 }
 
 /**
@@ -88,4 +95,5 @@ internal fun FlowItem.stableKey(taskDeleteVersions: Map<Int, Int> = emptyMap()):
         is FlowItem.CheckListCard -> "cl_${checkList.id}"
         FlowItem.IdeasHeader -> "ideas_header"
         is FlowItem.IdeaCard -> "idea_${idea.id}"
+        FlowItem.BottomSpacer -> "bottom_spacer"
     }

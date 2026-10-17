@@ -60,6 +60,7 @@ class FlowItemTest {
                 FlowItem.CheckListCard(checkList(1)),
                 FlowItem.IdeasHeader,
                 FlowItem.IdeaCard(idea(1)),
+                FlowItem.BottomSpacer,
             ),
             items
         )
@@ -70,12 +71,17 @@ class FlowItemTest {
         assertEquals(emptyList<FlowItem>(), state().items)
 
         assertEquals(
-            listOf(FlowItem.TasksHeader, FlowItem.ReminderBanner, FlowItem.TaskRow(task(1))),
+            listOf(
+                FlowItem.TasksHeader,
+                FlowItem.ReminderBanner,
+                FlowItem.TaskRow(task(1)),
+                FlowItem.BottomSpacer,
+            ),
             state(tasks = listOf(task(1))).items
         )
 
         assertEquals(
-            listOf(FlowItem.IdeasHeader, FlowItem.IdeaCard(idea(1))),
+            listOf(FlowItem.IdeasHeader, FlowItem.IdeaCard(idea(1)), FlowItem.BottomSpacer),
             state(ideas = listOf(idea(1))).items
         )
     }
@@ -88,10 +94,10 @@ class FlowItemTest {
     @Test
     fun rows_isRecomputedAfterCopy() {
         val original = state(tasks = listOf(task(1)), ideas = listOf(idea(1)))
-        assertEquals(5, original.items.size)
+        assertEquals(6, original.items.size)
 
         val withoutIdeas = original.copy(ideas = emptyList())
-        assertEquals(3, withoutIdeas.items.size)
+        assertEquals(4, withoutIdeas.items.size)
 
         val withCheckLists = withoutIdeas.copy(checkLists = listOf(checkList(1)))
         assertEquals(
@@ -101,6 +107,7 @@ class FlowItemTest {
                 FlowItem.TaskRow(task(1)),
                 FlowItem.CheckListsHeader,
                 FlowItem.CheckListCard(checkList(1)),
+                FlowItem.BottomSpacer,
             ),
             withCheckLists.items
         )
@@ -118,6 +125,7 @@ class FlowItemTest {
             FlowItem.CheckListCard(checkList(1)),
             FlowItem.IdeasHeader,
             FlowItem.IdeaCard(idea(1)),
+            FlowItem.BottomSpacer,
         )
 
         assertEquals(items.size, items.map { it.stableKey() }.toSet().size)
@@ -218,6 +226,7 @@ class FlowItemTest {
         assertNull(FlowItem.ReminderBanner.section)
         assertNull(FlowItem.CheckListsHeader.section)
         assertNull(FlowItem.IdeasHeader.section)
+        assertNull(FlowItem.BottomSpacer.section)
 
         assertEquals(FlowItem.Section.TASKS, FlowItem.TaskRow(task(1)).section)
         assertEquals(FlowItem.Section.CHECKLISTS, FlowItem.CheckListCard(checkList(1)).section)
@@ -231,6 +240,7 @@ class FlowItemTest {
         assertTrue(FlowItem.CheckListsHeader.spanAllColumns)
         assertTrue(FlowItem.IdeasHeader.spanAllColumns)
         assertTrue(FlowItem.TaskRow(task(1)).spanAllColumns)
+        assertTrue(FlowItem.BottomSpacer.spanAllColumns)
 
         assertFalse(FlowItem.CheckListCard(checkList(1)).spanAllColumns)
         assertFalse(FlowItem.IdeaCard(idea(1)).spanAllColumns)

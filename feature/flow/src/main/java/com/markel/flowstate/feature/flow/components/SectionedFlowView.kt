@@ -11,10 +11,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridItemScope
@@ -59,9 +61,11 @@ import sh.calvin.reorderable.rememberReorderableLazyStaggeredGridState
 private const val GRID_MIN_COLUMN_DP = 170
 private const val GRID_SPACING_DP = 10
 private const val GRID_EDGE_DP = 12
+/** Top breathing room, applied to the first row instead of the container (see below). */
+private const val GRID_TOP_DP = 8
 /** Extra inset for full-width rows so tasks keep today's 20dp margins (12 + 8). */
 private const val ROW_EXTRA_INSET_DP = 8
-/** Bottom room for the FAB. */
+/** Bottom room for the FAB, rendered as [FlowItem.BottomSpacer] (see below). */
 private const val GRID_BOTTOM_DP = 96
 /**
  * Vertical gap between grid cards (checklists / ideas).
@@ -142,11 +146,10 @@ fun SectionedFlowView(
         columns = StaggeredGridCells.Adaptive(minSize = GRID_MIN_COLUMN_DP.dp),
         state = gridState,
         modifier = modifier.fillMaxSize(),
+        // ── Keep the *main-axis* (top / bottom) content padding at 0 ─────────────
         contentPadding = PaddingValues(
             start = GRID_EDGE_DP.dp,
             end = GRID_EDGE_DP.dp,
-            top = 8.dp,
-            bottom = GRID_BOTTOM_DP.dp,
         ),
         horizontalArrangement = Arrangement.spacedBy(GRID_SPACING_DP.dp),
         verticalItemSpacing = 0.dp,
@@ -158,33 +161,41 @@ fun SectionedFlowView(
                 if (item.spanAllColumns) StaggeredGridItemSpan.FullLine
                 else StaggeredGridItemSpan.SingleLane
             },
-        ) { _, item ->
+        ) { index, item ->
             val animateItemModifier = Modifier.animateItem(
                 fadeInSpec = itemFadeInSpec,
                 placementSpec = itemPlacementSpec,
                 fadeOutSpec = itemFadeOutSpec
             )
 
+            // Top gap of the whole grid, applied to its first row (always a header)
+            // instead of to contentPadding. See the comment on contentPadding above.
+            val topInsetModifier =
+                if (index == 0) Modifier.padding(top = GRID_TOP_DP.dp) else Modifier
+            val itemModifier = animateItemModifier.then(topInsetModifier)
+
             when (item) {
                 FlowItem.TasksHeader -> SectionHeader(
                     title = stringResource(R.string.tasks_m),
-                    modifier = animateItemModifier
+                    modifier = itemModifier
                         .padding(horizontal = ROW_EXTRA_INSET_DP.dp, vertical = 8.dp)
                 )
                 FlowItem.ReminderBanner -> ReminderPermissionBanner(
                     visible = showPermissionBanner,
-                    modifier = Modifier.padding(horizontal = ROW_EXTRA_INSET_DP.dp) // Deliberately WITHOUT animateItem: the banner owns its enter/exit animation through its internal AnimatedVisibility
+                    modifier = Modifier
+                        .padding(horizontal = ROW_EXTRA_INSET_DP.dp)
+                        .then(topInsetModifier) // Deliberately WITHOUT animateItem: the banner owns its enter/exit animation through its internal AnimatedVisibility
                 )
 
                 FlowItem.CheckListsHeader -> SectionHeader(
                     title = stringResource(R.string.checklists_m),
-                    modifier = animateItemModifier
+                    modifier = itemModifier
                         .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
                 )
 
                 FlowItem.IdeasHeader -> SectionHeader(
                     title = stringResource(R.string.ideas_notes_m),
-                    modifier = animateItemModifier
+                    modifier = itemModifier
                         .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
                 )
 
@@ -193,7 +204,7 @@ fun SectionedFlowView(
                     TaskRowContent(
                         reorderState = reorderState,
                         key = item.stableKey(taskDeleteVersions),
-                        animateItemModifier = animateItemModifier,
+                        animateItemModifier = itemModifier,
                         task = item.task,
                         shape = taskRowShape(taskIndex, uiState.tasks.size),
                         onDelete = { onTaskDelete(item.task) },
@@ -205,7 +216,7 @@ fun SectionedFlowView(
                 is FlowItem.CheckListCard -> ReorderableCard(
                     reorderState = reorderState,
                     key = item.stableKey(taskDeleteVersions),
-                    animateItemModifier = animateItemModifier,
+                    animateItemModifier = itemModifier,
                 ) {
                     CheckListGridCard(
                         checkList = item.checkList,
@@ -217,7 +228,7 @@ fun SectionedFlowView(
                 is FlowItem.IdeaCard -> ReorderableCard(
                     reorderState = reorderState,
                     key = item.stableKey(taskDeleteVersions),
-                    animateItemModifier = animateItemModifier,
+                    animateItemModifier = itemModifier,
                 ) {
                     IdeaGridCard(
                         idea = item.idea,
@@ -225,6 +236,14 @@ fun SectionedFlowView(
                         modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
                     )
                 }
+
+                // No animateItem: an empty spacer has nothing to animate, and
+                // keeping it out of the animator makes the bottom bound stable.
+                FlowItem.BottomSpacer -> Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(GRID_BOTTOM_DP.dp)
+                )
             }
         }
     }

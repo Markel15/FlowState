@@ -34,6 +34,9 @@ sealed interface FlowUiState {
                 add(FlowItem.IdeasHeader)
                 ideas.forEach { add(FlowItem.IdeaCard(it)) }
             }
+            // Only when there is something to scroll: an empty screen shows
+            // EmptyStateView and must keep `items.isEmpty()` true.
+            if (isNotEmpty()) add(FlowItem.BottomSpacer)
         }
     }
 }
