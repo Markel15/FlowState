@@ -23,7 +23,6 @@ sealed interface FlowUiState {
         val items: List<FlowItem> = buildList {
             if (tasks.isNotEmpty()) {
                 add(FlowItem.TasksHeader)
-                add(FlowItem.ReminderBanner)
                 tasks.forEach { add(FlowItem.TaskRow(it)) }
             }
             if (checkLists.isNotEmpty()) {
@@ -50,8 +49,8 @@ sealed interface FlowUiState {
  * (tasks → checkLists → ideas) matches how [FlowUiState.Success.items] is built,
  * so the resulting `items` mirrors the list that was passed in.
  *
- * Chrome items (headers, banner) are dropped — they are re-emitted by `items` in
- * their canonical position. As a side effect a cross-section move (which the
+ * Chrome items (headers) are dropped — they are re-emitted by `items` in their
+ * canonical position. As a side effect a cross-section move (which the
  * caller rejects anyway) degrades safely instead of corrupting a typed list.
  */
 internal fun FlowUiState.Success.withItems(items: List<FlowItem>): FlowUiState.Success = copy(

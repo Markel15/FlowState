@@ -7,15 +7,15 @@ import com.markel.flowstate.core.domain.Task
 /**
  * Flat item model for the Flow screen.
  *
- * Every item the screen renders — including section headers and the reminder
- * banner — is one of these. That makes the index reported by the `reorderable`
- * library (`from.index` / `to.index`) map 1:1 onto `items[index]`, which removes
- * the hardcoded `headerOffset` arithmetic that `SectionedFlowView` needs while
- * headers are emitted as independent `item { }` blocks.
+ * Every row the grid renders — including the section headers — is one of these.
+ * That makes the index reported by the `reorderable` library (`from.index` /
+ * `to.index`) map 1:1 onto `items[index]`, which removes the hardcoded
+ * `headerOffset` arithmetic that `SectionedFlowView` needs while headers are
+ * emitted as independent `item { }` blocks.
  *
  * Reordering is scoped to a single [Section]: a move is only valid when the
  * dragged item and the target item share the same non-null [section]. Items whose
- * [section] is `null` (headers, banner) are fixed chrome and never move.
+ * [section] is `null` (headers) are fixed chrome and never move.
  *
  * Adding a future item type (drawings, recordings, …) means adding a variant
  * here plus its card composable — the grid, the reorder state and the span
@@ -41,8 +41,6 @@ sealed interface FlowItem {
     // ── Tasks ─────────────────────────────────────────────────────────────────
 
     data object TasksHeader : FlowItem
-
-    data object ReminderBanner : FlowItem
 
     data class TaskRow(val task: Task) : FlowItem {
         override val section: Section? get() = Section.TASKS
@@ -89,7 +87,6 @@ sealed interface FlowItem {
 internal fun FlowItem.stableKey(taskDeleteVersions: Map<Int, Int> = emptyMap()): Any =
     when (this) {
         FlowItem.TasksHeader -> "tasks_header"
-        FlowItem.ReminderBanner -> "reminder_banner"
         is FlowItem.TaskRow -> Pair(task.id, taskDeleteVersions[task.id] ?: 0)
         FlowItem.CheckListsHeader -> "checklists_header"
         is FlowItem.CheckListCard -> "cl_${checkList.id}"

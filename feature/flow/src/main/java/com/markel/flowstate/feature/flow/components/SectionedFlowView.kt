@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -142,108 +143,109 @@ fun SectionedFlowView(
     val itemFadeInSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
     val itemFadeOutSpec = tween<Float>(durationMillis = 130, easing = FastOutLinearInEasing)
 
-    LazyVerticalStaggeredGrid(
-        columns = StaggeredGridCells.Adaptive(minSize = GRID_MIN_COLUMN_DP.dp),
-        state = gridState,
-        modifier = modifier.fillMaxSize(),
-        // ── Keep the *main-axis* (top / bottom) content padding at 0 ─────────────
-        contentPadding = PaddingValues(
-            start = GRID_EDGE_DP.dp,
-            end = GRID_EDGE_DP.dp,
-        ),
-        horizontalArrangement = Arrangement.spacedBy(GRID_SPACING_DP.dp),
-        verticalItemSpacing = 0.dp,
-    ) {
-        itemsIndexed(
-            items = uiState.items,
-            key = { _, item -> item.stableKey(taskDeleteVersions) },
-            span = { _, item ->
-                if (item.spanAllColumns) StaggeredGridItemSpan.FullLine
-                else StaggeredGridItemSpan.SingleLane
-            },
-        ) { index, item ->
-            val animateItemModifier = Modifier.animateItem(
-                fadeInSpec = itemFadeInSpec,
-                placementSpec = itemPlacementSpec,
-                fadeOutSpec = itemFadeOutSpec
-            )
+    Column(modifier = modifier.fillMaxSize()) {
+        // ── The banner is pinned above the grid, not an item of it ───────────────
+        ReminderPermissionBanner(
+            visible = showPermissionBanner,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+        )
 
-            // Top gap of the whole grid, applied to its first row (always a header)
-            // instead of to contentPadding. See the comment on contentPadding above.
-            val topInsetModifier =
-                if (index == 0) Modifier.padding(top = GRID_TOP_DP.dp) else Modifier
-            val itemModifier = animateItemModifier.then(topInsetModifier)
-
-            when (item) {
-                FlowItem.TasksHeader -> SectionHeader(
-                    title = stringResource(R.string.tasks_m),
-                    modifier = itemModifier
-                        .padding(horizontal = ROW_EXTRA_INSET_DP.dp, vertical = 8.dp)
-                )
-                FlowItem.ReminderBanner -> ReminderPermissionBanner(
-                    visible = showPermissionBanner,
-                    modifier = Modifier
-                        .padding(horizontal = ROW_EXTRA_INSET_DP.dp)
-                        .then(topInsetModifier) // Deliberately WITHOUT animateItem: the banner owns its enter/exit animation through its internal AnimatedVisibility
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Adaptive(minSize = GRID_MIN_COLUMN_DP.dp),
+            state = gridState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            // ── Keep the *main-axis* (top / bottom) content padding at 0 ─────────────
+            contentPadding = PaddingValues(
+                start = GRID_EDGE_DP.dp,
+                end = GRID_EDGE_DP.dp,
+            ),
+            horizontalArrangement = Arrangement.spacedBy(GRID_SPACING_DP.dp),
+            verticalItemSpacing = 0.dp,
+        ) {
+            itemsIndexed(
+                items = uiState.items,
+                key = { _, item -> item.stableKey(taskDeleteVersions) },
+                span = { _, item ->
+                    if (item.spanAllColumns) StaggeredGridItemSpan.FullLine
+                    else StaggeredGridItemSpan.SingleLane
+                },
+            ) { index, item ->
+                val animateItemModifier = Modifier.animateItem(
+                    fadeInSpec = itemFadeInSpec,
+                    placementSpec = itemPlacementSpec,
+                    fadeOutSpec = itemFadeOutSpec
                 )
 
-                FlowItem.CheckListsHeader -> SectionHeader(
-                    title = stringResource(R.string.checklists_m),
-                    modifier = itemModifier
-                        .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
-                )
+                // Top gap of the whole grid, applied to its first row (always a header)
+                // instead of to contentPadding. See the comment on contentPadding above.
+                val topInsetModifier =
+                    if (index == 0) Modifier.padding(top = GRID_TOP_DP.dp) else Modifier
+                val itemModifier = animateItemModifier.then(topInsetModifier)
 
-                FlowItem.IdeasHeader -> SectionHeader(
-                    title = stringResource(R.string.ideas_notes_m),
-                    modifier = itemModifier
-                        .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
-                )
+                when (item) {
+                    FlowItem.TasksHeader -> SectionHeader(
+                        title = stringResource(R.string.tasks_m),
+                        modifier = itemModifier
+                            .padding(horizontal = ROW_EXTRA_INSET_DP.dp, vertical = 8.dp)
+                    )
+                    FlowItem.CheckListsHeader -> SectionHeader(
+                        title = stringResource(R.string.checklists_m),
+                        modifier = itemModifier
+                            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+                    )
 
-                is FlowItem.TaskRow -> {
-                    val taskIndex = taskPositions[item.task.id] ?: 0
-                    TaskRowContent(
+                    FlowItem.IdeasHeader -> SectionHeader(
+                        title = stringResource(R.string.ideas_notes_m),
+                        modifier = itemModifier
+                            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+                    )
+
+                    is FlowItem.TaskRow -> {
+                        val taskIndex = taskPositions[item.task.id] ?: 0
+                        TaskRowContent(
+                            reorderState = reorderState,
+                            key = item.stableKey(taskDeleteVersions),
+                            animateItemModifier = itemModifier,
+                            task = item.task,
+                            shape = taskRowShape(taskIndex, uiState.tasks.size),
+                            onDelete = { onTaskDelete(item.task) },
+                            onComplete = { onTaskToggle(item.task) },
+                            onContentClick = { onTaskClick(item.task) },
+                        )
+                    }
+
+                    is FlowItem.CheckListCard -> ReorderableCard(
                         reorderState = reorderState,
                         key = item.stableKey(taskDeleteVersions),
                         animateItemModifier = itemModifier,
-                        task = item.task,
-                        shape = taskRowShape(taskIndex, uiState.tasks.size),
-                        onDelete = { onTaskDelete(item.task) },
-                        onComplete = { onTaskToggle(item.task) },
-                        onContentClick = { onTaskClick(item.task) },
+                    ) {
+                        CheckListGridCard(
+                            checkList = item.checkList,
+                            onClick = { onCheckListClick(item.checkList) },
+                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
+                        )
+                    }
+
+                    is FlowItem.IdeaCard -> ReorderableCard(
+                        reorderState = reorderState,
+                        key = item.stableKey(taskDeleteVersions),
+                        animateItemModifier = itemModifier,
+                    ) {
+                        IdeaGridCard(
+                            idea = item.idea,
+                            onClick = { onIdeaClick(item.idea) },
+                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
+                        )
+                    }
+
+                    // No animateItem: an empty spacer has nothing to animate, and
+                    // keeping it out of the animator makes the bottom bound stable.
+                    FlowItem.BottomSpacer -> Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(GRID_BOTTOM_DP.dp)
                     )
                 }
-
-                is FlowItem.CheckListCard -> ReorderableCard(
-                    reorderState = reorderState,
-                    key = item.stableKey(taskDeleteVersions),
-                    animateItemModifier = itemModifier,
-                ) {
-                    CheckListGridCard(
-                        checkList = item.checkList,
-                        onClick = { onCheckListClick(item.checkList) },
-                        modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
-                    )
-                }
-
-                is FlowItem.IdeaCard -> ReorderableCard(
-                    reorderState = reorderState,
-                    key = item.stableKey(taskDeleteVersions),
-                    animateItemModifier = itemModifier,
-                ) {
-                    IdeaGridCard(
-                        idea = item.idea,
-                        onClick = { onIdeaClick(item.idea) },
-                        modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
-                    )
-                }
-
-                // No animateItem: an empty spacer has nothing to animate, and
-                // keeping it out of the animator makes the bottom bound stable.
-                FlowItem.BottomSpacer -> Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(GRID_BOTTOM_DP.dp)
-                )
             }
         }
     }

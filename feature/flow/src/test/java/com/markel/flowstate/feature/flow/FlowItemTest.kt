@@ -53,7 +53,6 @@ class FlowItemTest {
         assertEquals(
             listOf(
                 FlowItem.TasksHeader,
-                FlowItem.ReminderBanner,
                 FlowItem.TaskRow(task(1)),
                 FlowItem.TaskRow(task(2)),
                 FlowItem.CheckListsHeader,
@@ -73,7 +72,6 @@ class FlowItemTest {
         assertEquals(
             listOf(
                 FlowItem.TasksHeader,
-                FlowItem.ReminderBanner,
                 FlowItem.TaskRow(task(1)),
                 FlowItem.BottomSpacer,
             ),
@@ -94,16 +92,15 @@ class FlowItemTest {
     @Test
     fun rows_isRecomputedAfterCopy() {
         val original = state(tasks = listOf(task(1)), ideas = listOf(idea(1)))
-        assertEquals(6, original.items.size)
+        assertEquals(5, original.items.size)
 
         val withoutIdeas = original.copy(ideas = emptyList())
-        assertEquals(4, withoutIdeas.items.size)
+        assertEquals(3, withoutIdeas.items.size)
 
         val withCheckLists = withoutIdeas.copy(checkLists = listOf(checkList(1)))
         assertEquals(
             listOf(
                 FlowItem.TasksHeader,
-                FlowItem.ReminderBanner,
                 FlowItem.TaskRow(task(1)),
                 FlowItem.CheckListsHeader,
                 FlowItem.CheckListCard(checkList(1)),
@@ -119,7 +116,6 @@ class FlowItemTest {
     fun stableKey_isUniqueAcrossAllRowVariants() {
         val items = listOf(
             FlowItem.TasksHeader,
-            FlowItem.ReminderBanner,
             FlowItem.TaskRow(task(1)),
             FlowItem.CheckListsHeader,
             FlowItem.CheckListCard(checkList(1)),
@@ -207,7 +203,6 @@ class FlowItemTest {
             FlowItem.IdeasHeader,
             FlowItem.IdeaCard(idea(1)),
             FlowItem.TasksHeader,
-            FlowItem.ReminderBanner,
             FlowItem.TaskRow(task(1)),
         )
 
@@ -223,7 +218,6 @@ class FlowItemTest {
     @Test
     fun section_isNullForChrome_andSetForCards() {
         assertNull(FlowItem.TasksHeader.section)
-        assertNull(FlowItem.ReminderBanner.section)
         assertNull(FlowItem.CheckListsHeader.section)
         assertNull(FlowItem.IdeasHeader.section)
         assertNull(FlowItem.BottomSpacer.section)
@@ -236,7 +230,6 @@ class FlowItemTest {
     @Test
     fun fullWidth_isTrueForChromeAndTasks_falseForGridCards() {
         assertTrue(FlowItem.TasksHeader.spanAllColumns)
-        assertTrue(FlowItem.ReminderBanner.spanAllColumns)
         assertTrue(FlowItem.CheckListsHeader.spanAllColumns)
         assertTrue(FlowItem.IdeasHeader.spanAllColumns)
         assertTrue(FlowItem.TaskRow(task(1)).spanAllColumns)
