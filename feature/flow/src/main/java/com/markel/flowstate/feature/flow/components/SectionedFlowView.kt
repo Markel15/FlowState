@@ -171,11 +171,9 @@ fun SectionedFlowView(
                     modifier = animateItemModifier
                         .padding(horizontal = ROW_EXTRA_INSET_DP.dp, vertical = 8.dp)
                 )
-
                 FlowItem.ReminderBanner -> ReminderPermissionBanner(
                     visible = showPermissionBanner,
-                    modifier = animateItemModifier
-                        .padding(horizontal = ROW_EXTRA_INSET_DP.dp)
+                    modifier = Modifier.padding(horizontal = ROW_EXTRA_INSET_DP.dp) // Deliberately WITHOUT animateItem: the banner owns its enter/exit animation through its internal AnimatedVisibility
                 )
 
                 FlowItem.CheckListsHeader -> SectionHeader(
