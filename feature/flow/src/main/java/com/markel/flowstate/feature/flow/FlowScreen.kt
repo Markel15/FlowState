@@ -117,6 +117,7 @@ fun FlowScreen(
                         uiState = flowUiState,
                         onScrolled = { isHeaderMinimized = true },
                         onItemReorder = { from, to -> flowViewModel.onItemReorder(from, to) },
+                        onReorderCommit = flowViewModel::commitReorder,
                         onTaskClick = { onNavigateToTaskEditor(it.id) },
                         onTaskDelete = { task -> flowViewModel.onTaskSwiped(task) },
                         onTaskToggle = { taskViewModel.toggleTaskDone(it) },

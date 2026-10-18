@@ -389,6 +389,8 @@ class FlowViewModelTest {
             assertEquals(listOf(0, 1, 2), after.tasks.map { it.position })
         }
 
+        // The write is deferred until the drag ends
+        viewModel.commitReorder()
         coVerify {
             taskRepository.updateTasksOrder(match { list -> list.map { it.id } == listOf(2, 3, 1) })
         }
@@ -416,6 +418,7 @@ class FlowViewModelTest {
             assertEquals(listOf(0, 1), after.ideas.map { it.position })
         }
 
+        viewModel.commitReorder()
         coVerify {
             ideaRepository.updateIdeasOrder(match { list -> list.map { it.id } == listOf(2, 1) })
         }
@@ -443,8 +446,38 @@ class FlowViewModelTest {
             assertEquals(listOf(0, 1), after.checkLists.map { it.position })
         }
 
+        viewModel.commitReorder()
         coVerify {
             checkListRepository.updateCheckListsOrder(match { list -> list.map { it.id } == listOf(2, 1) })
+        }
+    }
+
+    @Test
+    fun onItemReorder_persistsOnce_whenADragCrossesSeveralSlots() = runTest {
+        // GIVEN – five tasks, so a drag from one end to the other crosses 4 slots
+        val tasks = (1..5).map { Task(id = it, title = "T$it", isDone = false, position = it - 1) }
+        viewModel = createViewModel(tasks = tasks)
+
+        val before = (viewModel.uiState.value as FlowUiState.Success)
+        val firstTask = before.items.indexOfFirst { it is FlowItem.TaskRow }
+        val lastTask = before.items.indexOfLast { it is FlowItem.TaskRow }
+
+        // WHEN – drag T1 down to the end, one slot at a time (what the library does)
+        for (to in firstTask + 1..lastTask) {
+            viewModel.onItemReorder(fromIndex = to - 1, toIndex = to)
+        }
+
+        // THEN – the order moved but nothing was written yet
+        assertEquals(
+            listOf("T2", "T3", "T4", "T5", "T1"),
+            (viewModel.uiState.value as FlowUiState.Success).tasks.map { it.title }
+        )
+        coVerify(exactly = 0) { taskRepository.updateTasksOrder(any()) }
+
+        // AND – lifting the finger writes the final order exactly once
+        viewModel.commitReorder()
+        coVerify(exactly = 1) {
+            taskRepository.updateTasksOrder(match { list -> list.map { it.id } == listOf(2, 3, 4, 5, 1) })
         }
     }
 

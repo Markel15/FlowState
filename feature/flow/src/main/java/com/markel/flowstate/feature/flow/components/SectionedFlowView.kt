@@ -98,6 +98,7 @@ fun SectionedFlowView(
     uiState: FlowUiState,
     onScrolled: () -> Unit,
     onItemReorder: (fromIndex: Int, toIndex: Int) -> Unit,
+    onReorderCommit: () -> Unit,
     // Task callbacks
     onTaskClick: (Task) -> Unit,
     onTaskDelete: (Task) -> Unit,
@@ -133,7 +134,10 @@ fun SectionedFlowView(
 
     val isAnyItemDragging = reorderState.isAnyItemDragging
     LaunchedEffect(isAnyItemDragging) {
-        if (!isAnyItemDragging) draggedSection = null
+        if (!isAnyItemDragging) {
+            draggedSection = null
+            onReorderCommit()  // let the ViewModel persist the order in one go.
+        }
     }
 
     LaunchedEffect(gridState) {

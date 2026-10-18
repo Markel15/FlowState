@@ -353,6 +353,15 @@ class FlowViewModel @Inject constructor(
     // ── Reorder ────────────────────────────────────────────────────────
 
     /**
+     * Sections whose order changed since the last [commitReorder].
+     *
+     * A drag is a burst of [onItemReorder] calls, one per slot crossed, and each
+     * write renumbers and persists the *whole* section. Holding the write back
+     * until the finger lifts turns that burst into a single write.
+     */
+    private val pendingReorderSections = mutableSetOf<FlowItem.Section>()
+
+    /**
      * Applies a drag between two rows of the flat [FlowItem] list.
      *
      * The move is only applied when both rows belong to the same non-null
@@ -368,9 +377,9 @@ class FlowViewModel @Inject constructor(
      * rejected call here should therefore be unreachable, and any future
      * rejection needs the same treatment on the view side.
      *
-     * Note this is called on every item crossing during a drag, so it writes to
-     * the database on each one — same as the carousel did. Persisting a single
-     * time on drop is a follow-up.
+     * Note this is called on every item crossing during a drag, so it must stay
+     * cheap: it only reorders rows in memory. The database write is deferred to
+     * [commitReorder], which the grid calls once when the drag ends.
      */
     fun onItemReorder(fromIndex: Int, toIndex: Int) {
         val state = _uiState.value as? FlowUiState.Success ?: return
@@ -405,11 +414,38 @@ class FlowViewModel @Inject constructor(
 
         _uiState.value = renumbered
 
+        // The database is written once, when the drag ends: see [commitReorder].
+        pendingReorderSections += section
+    }
+
+    /**
+     * Persists every section whose order changed since the last commit.
+     *
+     * Called by the grid when the drag gesture ends. While the finger is down
+     * [onItemReorder] only moves rows in the UI state, so a drag across N slots
+     * costs **one** write of the section instead of N.
+     *
+     * Safe to call unconditionally — it returns immediately when nothing moved,
+     * which is the case on the effect's very first run (before any drag).
+     *
+     * The order is lost if the process dies mid-drag; that is deliberate, since
+     * a partially dragged list is not worth a write per crossing.
+     */
+    fun commitReorder() {
+        if (pendingReorderSections.isEmpty()) return
+        val state = _uiState.value as? FlowUiState.Success ?: return
+
+        val sections = pendingReorderSections.toSet()
+        pendingReorderSections.clear()
+
+        // `renumbered` already fixed the positions, so the lists can go as they are.
         viewModelScope.launch {
-            when (section) {
-                FlowItem.Section.TASKS -> taskRepository.updateTasksOrder(renumbered.tasks)
-                FlowItem.Section.CHECKLISTS -> checkListRepository.updateCheckListsOrder(renumbered.checkLists)
-                FlowItem.Section.IDEAS -> ideaRepository.updateIdeasOrder(renumbered.ideas)
+            sections.forEach { section ->
+                when (section) {
+                    FlowItem.Section.TASKS -> taskRepository.updateTasksOrder(state.tasks)
+                    FlowItem.Section.CHECKLISTS -> checkListRepository.updateCheckListsOrder(state.checkLists)
+                    FlowItem.Section.IDEAS -> ideaRepository.updateIdeasOrder(state.ideas)
+                }
             }
         }
     }
