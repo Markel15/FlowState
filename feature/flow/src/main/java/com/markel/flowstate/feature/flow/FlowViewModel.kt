@@ -357,8 +357,16 @@ class FlowViewModel @Inject constructor(
      *
      * The move is only applied when both rows belong to the same non-null
      * [FlowItem.Section]: headers and the reminder banner are fixed chrome, and
-     * a card may not jump between the CheckLists and Ideas sections. When the
-     * guard rejects the move the row simply snaps back to its original slot.
+     * a card may not jump between different Items sections.
+     *
+     * This guard is a data-safety net, **not** the mechanism that keeps the drag
+     * inside its section. `reorderable` gets no answer back from `onMove`, so a
+     * move rejected here leaves the library compensating the dragged row against
+     * a slot that never materializes (the row visibly jumps and then follows the
+     * finger from the wrong anchor). `SectionedFlowView` prevents that by
+     * disabling foreign rows as swap targets for the duration of the drag; a
+     * rejected call here should therefore be unreachable, and any future
+     * rejection needs the same treatment on the view side.
      *
      * Note this is called on every item crossing during a drag, so it writes to
      * the database on each one — same as the carousel did. Persisting a single

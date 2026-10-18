@@ -15,7 +15,9 @@ import com.markel.flowstate.core.domain.Task
  *
  * Reordering is scoped to a single [Section]: a move is only valid when the
  * dragged item and the target item share the same non-null [section]. Items whose
- * [section] is `null` (headers) are fixed chrome and never move.
+ * [section] is `null` (headers) are fixed chrome and never move. Enforcing that
+ * is *not* just a data rule — the grid has to keep a drag from ever targeting a
+ * foreign row, see [isReorderTargetFor].
  *
  * Adding a future item type (drawings, recordings, …) means adding a variant
  * here plus its card composable — the grid, the reorder state and the span
@@ -71,6 +73,32 @@ sealed interface FlowItem {
      */
     data object BottomSpacer : FlowItem
 }
+
+/**
+ * Whether a row of [this] section may be used as the swap target of the row
+ * currently being dragged ([draggedSection]).
+ *
+ * `reorderable` has **no way to veto a move**: `onMove` returns `Unit` and the
+ * library immediately assumes the list changed. Right after invoking it it
+ * *predicts* the dragged row's new slot (`predictedDraggingItemOffset`) and
+ * compensates the row's visual offset with that prediction while it waits for the
+ * next layout pass (up to `MoveItemsLayoutInfoUpdateMaxWaitDuration`, 1 s). If the
+ * move is then rejected by the ViewModel no layout pass ever disagrees with the
+ * prediction, so the dragged row is left translated by a delta that does not
+ * exist — the visible jump.
+ *
+ * The rejection therefore has to happen *before* the library chooses a target,
+ * which is exactly what `ReorderableItem(enabled = …)` does: disabled keys are
+ * removed from the library's `reorderableKeys` set and are never picked as a
+ * target.
+ *
+ * A `null` [section] (chrome rows) is never a target while a drag is in flight;
+ * chrome is not a `ReorderableItem` anyway. With no drag in flight
+ * ([draggedSection] is `null`) every row is a valid target again, so the grid can
+ * never be left locked by a drag that ended without its stop callback.
+ */
+internal fun FlowItem.Section?.isReorderTargetFor(draggedSection: FlowItem.Section?): Boolean =
+    draggedSection == null || this == draggedSection
 
 /**
  * Stable key for an item, used by the grid's `itemsIndexed`.

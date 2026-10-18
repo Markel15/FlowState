@@ -33,7 +33,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -48,6 +50,7 @@ import com.markel.flowstate.core.domain.Idea
 import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.feature.flow.FlowItem
 import com.markel.flowstate.feature.flow.FlowUiState
+import com.markel.flowstate.feature.flow.isReorderTargetFor
 import com.markel.flowstate.feature.flow.stableKey
 import com.markel.flowstate.feature.flow.tasks.components.AnimatableTaskItem
 import com.markel.flowstate.feature.flow.tasks.components.EmptyStateView
@@ -122,6 +125,16 @@ fun SectionedFlowView(
         gridState,
         scrollThresholdPadding = WindowInsets.systemBars.asPaddingValues(),
     ) { from, to -> onItemReorder(from.index, to.index) }
+
+    // Section the current drag started in; null while nothing is being dragged.
+    // It gates `ReorderableItem.enabled` so the library can never request a
+    // cross-section swap, which it cannot undo. See [isReorderTargetFor].
+    var draggedSection by remember { mutableStateOf<FlowItem.Section?>(null) }
+
+    val isAnyItemDragging = reorderState.isAnyItemDragging
+    LaunchedEffect(isAnyItemDragging) {
+        if (!isAnyItemDragging) draggedSection = null
+    }
 
     LaunchedEffect(gridState) {
         snapshotFlow {
@@ -206,6 +219,9 @@ fun SectionedFlowView(
                             reorderState = reorderState,
                             key = item.stableKey(taskDeleteVersions),
                             animateItemModifier = itemModifier,
+                            section = FlowItem.Section.TASKS,
+                            draggedSection = draggedSection,
+                            onDraggedSectionChanged = { draggedSection = it },
                             task = item.task,
                             shape = taskRowShape(taskIndex, uiState.tasks.size),
                             onDelete = { onTaskDelete(item.task) },
@@ -218,6 +234,9 @@ fun SectionedFlowView(
                         reorderState = reorderState,
                         key = item.stableKey(taskDeleteVersions),
                         animateItemModifier = itemModifier,
+                        section = FlowItem.Section.CHECKLISTS,
+                        draggedSection = draggedSection,
+                        onDraggedSectionChanged = { draggedSection = it },
                     ) {
                         CheckListGridCard(
                             checkList = item.checkList,
@@ -230,6 +249,9 @@ fun SectionedFlowView(
                         reorderState = reorderState,
                         key = item.stableKey(taskDeleteVersions),
                         animateItemModifier = itemModifier,
+                        section = FlowItem.Section.IDEAS,
+                        draggedSection = draggedSection,
+                        onDraggedSectionChanged = { draggedSection = it },
                     ) {
                         IdeaGridCard(
                             idea = item.idea,
@@ -268,17 +290,26 @@ private fun taskRowShape(index: Int, size: Int) = when {
 /**
  * Shared shell for every draggable row: long-press anywhere on the item starts
  * the drag, and the item lifts, scales and fades slightly while it is held.
+ *
+ * [section] / [draggedSection] keep the drag inside its own section: a row is
+ * only handed to the library as a swap target while the dragged row comes from
+ * the same section. [onDraggedSectionChanged] publishes the section on drag start
+ * and clears it on drag stop.
  */
 @Composable
 private fun LazyStaggeredGridItemScope.ReorderableCard(
     reorderState: ReorderableLazyStaggeredGridState,
     key: Any,
     animateItemModifier: Modifier,
+    section: FlowItem.Section,
+    draggedSection: FlowItem.Section?,
+    onDraggedSectionChanged: (FlowItem.Section?) -> Unit,
     content: @Composable ReorderableCollectionItemScope.(isDragging: Boolean) -> Unit,
 ) {
     ReorderableItem(
         state = reorderState,
         key = key,
+        enabled = section.isReorderTargetFor(draggedSection),
         animateItemModifier = animateItemModifier,
     ) { isDragging ->
         val collectionScope = this
@@ -288,7 +319,11 @@ private fun LazyStaggeredGridItemScope.ReorderableCard(
         )
         Box(
             modifier = Modifier
-                .longPressDraggableHandle(interactionSource = remember { MutableInteractionSource() })
+                .longPressDraggableHandle(
+                    interactionSource = remember { MutableInteractionSource() },
+                    onDragStarted = { onDraggedSectionChanged(section) },
+                    onDragStopped = { onDraggedSectionChanged(null) },
+                )
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -306,6 +341,9 @@ private fun LazyStaggeredGridItemScope.TaskRowContent(
     reorderState: ReorderableLazyStaggeredGridState,
     key: Any,
     animateItemModifier: Modifier,
+    section: FlowItem.Section,
+    draggedSection: FlowItem.Section?,
+    onDraggedSectionChanged: (FlowItem.Section?) -> Unit,
     task: Task,
     shape: RoundedCornerShape,
     onDelete: () -> Unit,
@@ -316,6 +354,9 @@ private fun LazyStaggeredGridItemScope.TaskRowContent(
         reorderState = reorderState,
         key = key,
         animateItemModifier = animateItemModifier,
+        section = section,
+        draggedSection = draggedSection,
+        onDraggedSectionChanged = onDraggedSectionChanged,
     ) {
         Box(
             modifier = Modifier

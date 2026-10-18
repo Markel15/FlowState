@@ -238,4 +238,61 @@ class FlowItemTest {
         assertFalse(FlowItem.CheckListCard(checkList(1)).spanAllColumns)
         assertFalse(FlowItem.IdeaCard(idea(1)).spanAllColumns)
     }
+
+    // ── isReorderTargetFor: the rule that keeps a drag inside its section ──────
+
+    @Test
+    fun isReorderTargetFor_withNoDragInFlight_acceptsEverySection() {
+        FlowItem.Section.entries.forEach { section ->
+            assertTrue("$section", section.isReorderTargetFor(null))
+        }
+    }
+
+    @Test
+    fun isReorderTargetFor_whileDragging_onlyAcceptsTheSameSection() {
+        FlowItem.Section.entries.forEach { dragged ->
+            FlowItem.Section.entries.forEach { candidate ->
+                assertEquals(
+                    "$candidate while dragging $dragged",
+                    dragged == candidate,
+                    candidate.isReorderTargetFor(dragged)
+                )
+            }
+        }
+    }
+
+    /** Chrome rows are never a swap target, so a drag can never be "into" a header. */
+    @Test
+    fun isReorderTargetFor_chromeRows_areNeverTargetsWhileDragging() {
+        assertFalse(
+            FlowItem.IdeasHeader.section.isReorderTargetFor(FlowItem.Section.IDEAS)
+        )
+        assertFalse(
+            FlowItem.BottomSpacer.section.isReorderTargetFor(FlowItem.Section.CHECKLISTS)
+        )
+    }
+
+    /**
+     * The view's target gating and the ViewModel's guard must agree, otherwise a
+     * swap the library considers legal is silently dropped by `onItemReorder`.
+     */
+    @Test
+    fun isReorderTargetFor_agreesWithTheViewModelGuard() {
+        val items = state(
+            tasks = listOf(task(1)),
+            checkLists = listOf(checkList(1)),
+            ideas = listOf(idea(1)),
+        ).items
+
+        FlowItem.Section.entries.forEach { dragged ->
+            items.forEach { item ->
+                val guardAllows = item.section != null && item.section == dragged
+                assertEquals(
+                    "$item while dragging $dragged",
+                    guardAllows,
+                    item.section.isReorderTargetFor(dragged)
+                )
+            }
+        }
+    }
 }
