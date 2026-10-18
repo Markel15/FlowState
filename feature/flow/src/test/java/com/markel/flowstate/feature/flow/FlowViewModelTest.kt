@@ -21,6 +21,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -62,9 +64,14 @@ class FlowViewModelTest {
         checkLists: List<CheckList> = emptyList(),
         categories: List<Category> = emptyList(),
         categoriesEnabled: Boolean = false,
-        applicationScope: CoroutineScope = defaultTestApplicationScope
+        applicationScope: CoroutineScope = defaultTestApplicationScope,
+        /**
+         * Override when a test needs to push new DB snapshots (defaults to a
+         * static [flowOf], which never re-emits).
+         */
+        tasksFlow: Flow<List<Task>> = flowOf(tasks)
     ): FlowViewModel {
-        coEvery { taskRepository.getTasks() } returns flowOf(tasks)
+        coEvery { taskRepository.getTasks() } returns tasksFlow
         coEvery { ideaRepository.getIdeas() } returns flowOf(ideas)
         coEvery { checkListRepository.getLists() } returns flowOf(checkLists)
         coEvery { categoryRepository.getCategories() } returns flowOf(categories)
@@ -272,6 +279,84 @@ class FlowViewModelTest {
             val success = if (state is FlowUiState.Loading) awaitItem() as FlowUiState.Success else state as FlowUiState.Success
             assertEquals(3, success.tasks.size)
         }
+    }
+
+    // ── Deletion visibility (regression) ─────────────────────────────────────
+    //
+    // `onTaskSwiped` hides the task optimistically, but the DB confirms the
+    // deletion asynchronously: Room commits the write when the suspend function
+    // returns and re-emits the query afterward. In between, the task is still
+    // in the DB snapshot, so the filter has to keep hiding it — otherwise it
+    // flashes back into the list for a frame.
+    // The static `flowOf` used by `createViewModel` never re-emits, so it holds
+    // that window open indefinitely, which is exactly what these tests need.
+
+    /** Tasks currently visible in the UI state, i.e. what the grid renders. */
+    private fun visibleTasks(): List<Task> =
+        (viewModel.uiState.value as FlowUiState.Success).tasks
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun onTaskSwiped_keepsTaskHidden_afterTheUndoWindowExpiresBeforeTheDbConfirms() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val task = Task(id = 1, title = "T", isDone = false, position = 0)
+        viewModel = createViewModel(tasks = listOf(task), applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(task)
+        assertTrue(visibleTasks().isEmpty())
+
+        // The countdown expires and the id leaves the undoable set, but the DB
+        // keeps reporting the task: it must not come back.
+        advanceTimeBy(4_000L)
+        assertTrue(visibleTasks().isEmpty())
+        coVerify { deleteTaskUseCase(task) }
+
+        // AND the undo FAB switches itself off
+        viewModel.showUndoButton.test { assertFalse(awaitItem()) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun committedDeleteId_isReleasedOnceTheDbStopsReportingTheTask() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val task = Task(id = 7, title = "T7", isDone = false, position = 0)
+        val dbTasks = MutableStateFlow(listOf(task))
+        viewModel = createViewModel(tasksFlow = dbTasks, applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(task)
+        advanceTimeBy(4_000L)
+        // Still hidden while the DB keeps reporting it — same window as above.
+        assertTrue(visibleTasks().isEmpty())
+
+        dbTasks.value = emptyList() // the DB confirms the deletion
+        assertTrue(visibleTasks().isEmpty())
+
+        // A task re-created with the same id must be visible again: if the id
+        // stayed in the committed set it would be hidden forever.
+        dbTasks.value = listOf(task)
+        assertEquals(listOf("T7"), visibleTasks().map { it.title })
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun onTaskSwiped_keepsEveryTaskHidden_whenSeveralDeletionsCommitTogether() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val t1 = Task(id = 1, title = "T1", isDone = false, position = 0)
+        val t2 = Task(id = 2, title = "T2", isDone = false, position = 1)
+        val dbTasks = MutableStateFlow(listOf(t1, t2))
+        viewModel = createViewModel(tasksFlow = dbTasks, applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(t1)
+        advanceTimeBy(1_000L)
+        viewModel.onTaskSwiped(t2)
+        advanceTimeBy(3_000L) // t = 4s: t1 committed, t2 still undoable
+        assertTrue(visibleTasks().isEmpty())
+        advanceTimeBy(1_000L) // t = 5s: t2 committed too
+        assertTrue(visibleTasks().isEmpty())
+
+        // The DB confirms both at once: neither may resurrect.
+        dbTasks.value = emptyList()
+        assertTrue(visibleTasks().isEmpty())
     }
 
     // ── Reorder logic ─────────────────────────────────────────────────────────
