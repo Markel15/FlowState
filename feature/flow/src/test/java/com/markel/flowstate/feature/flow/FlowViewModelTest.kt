@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.flow
 
+import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.Category
@@ -20,6 +21,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -61,9 +64,14 @@ class FlowViewModelTest {
         checkLists: List<CheckList> = emptyList(),
         categories: List<Category> = emptyList(),
         categoriesEnabled: Boolean = false,
-        applicationScope: CoroutineScope = defaultTestApplicationScope
+        applicationScope: CoroutineScope = defaultTestApplicationScope,
+        /**
+         * Override when a test needs to push new DB snapshots (defaults to a
+         * static [flowOf], which never re-emits).
+         */
+        tasksFlow: Flow<List<Task>> = flowOf(tasks)
     ): FlowViewModel {
-        coEvery { taskRepository.getTasks() } returns flowOf(tasks)
+        coEvery { taskRepository.getTasks() } returns tasksFlow
         coEvery { ideaRepository.getIdeas() } returns flowOf(ideas)
         coEvery { checkListRepository.getLists() } returns flowOf(checkLists)
         coEvery { categoryRepository.getCategories() } returns flowOf(categories)
@@ -273,10 +281,92 @@ class FlowViewModelTest {
         }
     }
 
-    // ── Reorder Logic ─────────────────────────────────────────────────────────
+    // ── Deletion visibility (regression) ─────────────────────────────────────
+    //
+    // `onTaskSwiped` hides the task optimistically, but the DB confirms the
+    // deletion asynchronously: Room commits the write when the suspend function
+    // returns and re-emits the query afterward. In between, the task is still
+    // in the DB snapshot, so the filter has to keep hiding it — otherwise it
+    // flashes back into the list for a frame.
+    // The static `flowOf` used by `createViewModel` never re-emits, so it holds
+    // that window open indefinitely, which is exactly what these tests need.
+
+    /** Tasks currently visible in the UI state, i.e. what the grid renders. */
+    private fun visibleTasks(): List<Task> =
+        (viewModel.uiState.value as FlowUiState.Success).tasks
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun onTaskSwiped_keepsTaskHidden_afterTheUndoWindowExpiresBeforeTheDbConfirms() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val task = Task(id = 1, title = "T", isDone = false, position = 0)
+        viewModel = createViewModel(tasks = listOf(task), applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(task)
+        assertTrue(visibleTasks().isEmpty())
+
+        // The countdown expires and the id leaves the undoable set, but the DB
+        // keeps reporting the task: it must not come back.
+        advanceTimeBy(4_000L)
+        assertTrue(visibleTasks().isEmpty())
+        coVerify { deleteTaskUseCase(task) }
+
+        // AND the undo FAB switches itself off
+        viewModel.showUndoButton.test { assertFalse(awaitItem()) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun committedDeleteId_isReleasedOnceTheDbStopsReportingTheTask() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val task = Task(id = 7, title = "T7", isDone = false, position = 0)
+        val dbTasks = MutableStateFlow(listOf(task))
+        viewModel = createViewModel(tasksFlow = dbTasks, applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(task)
+        advanceTimeBy(4_000L)
+        // Still hidden while the DB keeps reporting it — same window as above.
+        assertTrue(visibleTasks().isEmpty())
+
+        dbTasks.value = emptyList() // the DB confirms the deletion
+        assertTrue(visibleTasks().isEmpty())
+
+        // A task re-created with the same id must be visible again: if the id
+        // stayed in the committed set it would be hidden forever.
+        dbTasks.value = listOf(task)
+        assertEquals(listOf("T7"), visibleTasks().map { it.title })
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun onTaskSwiped_keepsEveryTaskHidden_whenSeveralDeletionsCommitTogether() = runTest {
+        val testApplicationScope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val t1 = Task(id = 1, title = "T1", isDone = false, position = 0)
+        val t2 = Task(id = 2, title = "T2", isDone = false, position = 1)
+        val dbTasks = MutableStateFlow(listOf(t1, t2))
+        viewModel = createViewModel(tasksFlow = dbTasks, applicationScope = testApplicationScope)
+
+        viewModel.onTaskSwiped(t1)
+        advanceTimeBy(1_000L)
+        viewModel.onTaskSwiped(t2)
+        advanceTimeBy(3_000L) // t = 4s: t1 committed, t2 still undoable
+        assertTrue(visibleTasks().isEmpty())
+        advanceTimeBy(1_000L) // t = 5s: t2 committed too
+        assertTrue(visibleTasks().isEmpty())
+
+        // The DB confirms both at once: neither may resurrect.
+        dbTasks.value = emptyList()
+        assertTrue(visibleTasks().isEmpty())
+    }
+
+    // ── Reorder logic ─────────────────────────────────────────────────────────
+    //
+    // onItemReorder() takes indices into the FLAT item list (headers included),
+    // so every test below locates the row it wants instead of hardcoding an
+    // offset. That is the whole point of the FlowItem model.
 
     @Test
-    fun onTaskReorder_updatesStateOptimistically_andCallsRepository() = runTest {
+    fun onItemReorder_withinTasks_reordersAndPersists() = runTest {
         // GIVEN
         val t1 = Task(id = 1, title = "T1", isDone = false, position = 0)
         val t2 = Task(id = 2, title = "T2", isDone = false, position = 1)
@@ -285,36 +375,29 @@ class FlowViewModelTest {
         viewModel = createViewModel(tasks = listOf(t1, t2, t3))
 
         viewModel.uiState.test {
-            val initialState = awaitItem()
-            val success = if (initialState is FlowUiState.Loading) awaitItem() as FlowUiState.Success else initialState as FlowUiState.Success
-            assertEquals(3, success.tasks.size)
+            val before = awaitSuccess()
 
-            // WHEN - Move the first task (index 0) to the end (index 2) -> Expected: T2, T3, T1
-            viewModel.onTaskReorder(fromIndex = 0, toIndex = 2)
+            // WHEN - drag the first task row down to the last task slot
+            val from = before.indexOfTask(1)
+            val to = before.items.indexOfLast { it is FlowItem.TaskRow }
+            viewModel.onItemReorder(fromIndex = from, toIndex = to)
 
-            // THEN - Local state is updated
-            val updatedState = awaitItem() as FlowUiState.Success
-            assertEquals("T2", updatedState.tasks[0].title)
-            assertEquals("T3", updatedState.tasks[1].title)
-            assertEquals("T1", updatedState.tasks[2].title)
-
-            // Positions were recalculated correctly (0, 1, 2)
-            assertEquals(0, updatedState.tasks[0].position)
-            assertEquals(1, updatedState.tasks[1].position)
-            assertEquals(2, updatedState.tasks[2].position)
+            // THEN
+            val after = awaitItem() as FlowUiState.Success
+            assertEquals(listOf("T2", "T3", "T1"), after.tasks.map { it.title })
+            // Positions are renumbered so the DAOs (ORDER BY position) keep the order
+            assertEquals(listOf(0, 1, 2), after.tasks.map { it.position })
         }
 
-        // AND - Repository is called
+        // The write is deferred until the drag ends
+        viewModel.commitReorder()
         coVerify {
-            taskRepository.updateTasksOrder(match { list ->
-                list[0].id == 2 && list[0].position == 0 &&
-                        list[2].id == 1 && list[2].position == 2
-            })
+            taskRepository.updateTasksOrder(match { list -> list.map { it.id } == listOf(2, 3, 1) })
         }
     }
 
     @Test
-    fun onIdeaReorder_updatesStateOptimistically_andCallsRepository() = runTest {
+    fun onItemReorder_withinIdeas_reordersAndPersists() = runTest {
         // GIVEN
         val i1 = Idea(id = 1, title = "I1", position = 0, content = "Content", color = 0L)
         val i2 = Idea(id = 2, title = "I2", position = 1, content = "Content", color = 0L)
@@ -322,27 +405,27 @@ class FlowViewModelTest {
         viewModel = createViewModel(ideas = listOf(i1, i2))
 
         viewModel.uiState.test {
-            val initialState = awaitItem()
-            val startState = if (initialState is FlowUiState.Loading) awaitItem() as FlowUiState.Success else initialState as FlowUiState.Success
-
-            // WHEN - Swap I1 and I2
-            viewModel.onIdeaReorder(fromIndex = 0, toIndex = 1)
+            val before = awaitSuccess()
+            // WHEN - swap the two idea cards
+            viewModel.onItemReorder(
+                fromIndex = before.indexOfIdea(1),
+                toIndex = before.indexOfIdea(2),
+            )
 
             // THEN
-            val updatedState = awaitItem() as FlowUiState.Success
-            assertEquals("I2", updatedState.ideas[0].title)
-            assertEquals("I1", updatedState.ideas[1].title)
+            val after = awaitItem() as FlowUiState.Success
+            assertEquals(listOf("I2", "I1"), after.ideas.map { it.title })
+            assertEquals(listOf(0, 1), after.ideas.map { it.position })
         }
 
+        viewModel.commitReorder()
         coVerify {
-            ideaRepository.updateIdeasOrder(match { list ->
-                list[0].id == 2 && list[1].id == 1
-            })
+            ideaRepository.updateIdeasOrder(match { list -> list.map { it.id } == listOf(2, 1) })
         }
     }
 
     @Test
-    fun onCheckListReorder_updatesStateOptimistically_andCallsRepository() = runTest {
+    fun onItemReorder_withinCheckLists_reordersAndPersists() = runTest {
         // GIVEN
         val c1 = CheckList(id = 1, title = "C1", position = 0, color = 0L)
         val c2 = CheckList(id = 2, title = "C2", position = 1, color = 0L)
@@ -350,25 +433,129 @@ class FlowViewModelTest {
         viewModel = createViewModel(checkLists = listOf(c1, c2))
 
         viewModel.uiState.test {
-            val initialState = awaitItem()
-            val startState = if (initialState is FlowUiState.Loading) awaitItem() as FlowUiState.Success else initialState as FlowUiState.Success
-
-            // WHEN
-            viewModel.onCheckListReorder(fromIndex = 1, toIndex = 0)
+            val before = awaitSuccess()
+            // WHEN - drag C2 in front of C1
+            viewModel.onItemReorder(
+                fromIndex = before.indexOfCheckList(2),
+                toIndex = before.indexOfCheckList(1),
+            )
 
             // THEN
-            val updatedState = awaitItem() as FlowUiState.Success
-            assertEquals("C2", updatedState.checkLists[0].title)
-            assertEquals("C1", updatedState.checkLists[1].title)
+            val after = awaitItem() as FlowUiState.Success
+            assertEquals(listOf("C2", "C1"), after.checkLists.map { it.title })
+            assertEquals(listOf(0, 1), after.checkLists.map { it.position })
         }
 
+        viewModel.commitReorder()
         coVerify {
-            checkListRepository.updateCheckListsOrder(match { list ->
-                list[0].id == 2 && list[1].id == 1
-            })
+            checkListRepository.updateCheckListsOrder(match { list -> list.map { it.id } == listOf(2, 1) })
         }
     }
 
+    @Test
+    fun onItemReorder_persistsOnce_whenADragCrossesSeveralSlots() = runTest {
+        // GIVEN – five tasks, so a drag from one end to the other crosses 4 slots
+        val tasks = (1..5).map { Task(id = it, title = "T$it", isDone = false, position = it - 1) }
+        viewModel = createViewModel(tasks = tasks)
+
+        val before = (viewModel.uiState.value as FlowUiState.Success)
+        val firstTask = before.items.indexOfFirst { it is FlowItem.TaskRow }
+        val lastTask = before.items.indexOfLast { it is FlowItem.TaskRow }
+
+        // WHEN – drag T1 down to the end, one slot at a time (what the library does)
+        for (to in firstTask + 1..lastTask) {
+            viewModel.onItemReorder(fromIndex = to - 1, toIndex = to)
+        }
+
+        // THEN – the order moved but nothing was written yet
+        assertEquals(
+            listOf("T2", "T3", "T4", "T5", "T1"),
+            (viewModel.uiState.value as FlowUiState.Success).tasks.map { it.title }
+        )
+        coVerify(exactly = 0) { taskRepository.updateTasksOrder(any()) }
+
+        // AND – lifting the finger writes the final order exactly once
+        viewModel.commitReorder()
+        coVerify(exactly = 1) {
+            taskRepository.updateTasksOrder(match { list -> list.map { it.id } == listOf(2, 3, 4, 5, 1) })
+        }
+    }
+
+    @Test
+    fun onItemReorder_acrossSections_isRejected() = runTest {
+        // GIVEN - both sections populated
+        val idea = Idea(id = 1, title = "I1", position = 0, content = "Content", color = 0L)
+        val list = CheckList(id = 2, title = "C1", position = 0, color = 0L)
+
+        viewModel = createViewModel(ideas = listOf(idea), checkLists = listOf(list))
+
+        viewModel.uiState.test {
+            val before = awaitSuccess()
+            cancelAndIgnoreRemainingEvents()
+
+            // WHEN - try to drop the idea card onto the checklist card
+            viewModel.onItemReorder(
+                fromIndex = before.indexOfIdea(1),
+                toIndex = before.indexOfCheckList(2),
+            )
+
+            // THEN - nothing moved and nothing was written
+            val after = viewModel.uiState.value as FlowUiState.Success
+            assertEquals(before.ideas, after.ideas)
+            assertEquals(before.checkLists, after.checkLists)
+        }
+
+        coVerify(exactly = 0) { ideaRepository.updateIdeasOrder(any()) }
+        coVerify(exactly = 0) { checkListRepository.updateCheckListsOrder(any()) }
+    }
+
+    @Test
+    fun onItemReorder_ontoAHeader_isRejected() = runTest {
+        // GIVEN
+        val i1 = Idea(id = 1, title = "I1", position = 0, content = "Content", color = 0L)
+
+        viewModel = createViewModel(ideas = listOf(i1))
+
+        viewModel.uiState.test {
+            val before = awaitSuccess()
+            cancelAndIgnoreRemainingEvents()
+
+            // WHEN - drop the idea card onto its own section header
+            viewModel.onItemReorder(
+                fromIndex = before.indexOfIdea(1),
+                toIndex = before.items.indexOf(FlowItem.IdeasHeader),
+            )
+
+            // THEN
+            val after = viewModel.uiState.value as FlowUiState.Success
+            assertEquals(before.ideas, after.ideas)
+        }
+
+        coVerify(exactly = 0) { ideaRepository.updateIdeasOrder(any()) }
+    }
+
+    @Test
+    fun onItemReorder_withOutOfBoundsIndices_isIgnored() = runTest {
+        // GIVEN
+        val i1 = Idea(id = 1, title = "I1", position = 0, content = "Content", color = 0L)
+
+        viewModel = createViewModel(ideas = listOf(i1))
+
+        viewModel.uiState.test {
+            val before = awaitSuccess()
+            cancelAndIgnoreRemainingEvents()
+
+            // WHEN
+            viewModel.onItemReorder(fromIndex = -1, toIndex = 99)
+            viewModel.onItemReorder(fromIndex = 0, toIndex = 99)
+
+            // THEN
+            val after = viewModel.uiState.value as FlowUiState.Success
+            assertEquals(before.ideas, after.ideas)
+        }
+
+        coVerify(exactly = 0) { ideaRepository.updateIdeasOrder(any()) }
+    }
 
     // ── Banner logic ──────────────────────────────────────────────────────────
 
@@ -801,4 +988,23 @@ class FlowViewModelTest {
         }
     }
 
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Consumes the initial `Loading` emission when there is one. */
+    private suspend fun ReceiveTurbine<FlowUiState>.awaitSuccess(): FlowUiState.Success {
+        val first = awaitItem()
+        return if (first is FlowUiState.Success) first else awaitItem() as FlowUiState.Success
+    }
+
+    // Locators over the FLAT item list: the reorder API speaks in item indices,
+    // not in per-section indices, so tests must not assume a header offset.
+    private fun FlowUiState.Success.indexOfTask(id: Int) =
+        items.indexOfFirst { it is FlowItem.TaskRow && it.task.id == id }
+
+    private fun FlowUiState.Success.indexOfIdea(id: Int) =
+        items.indexOfFirst { it is FlowItem.IdeaCard && it.idea.id == id }
+
+    private fun FlowUiState.Success.indexOfCheckList(id: Int) =
+        items.indexOfFirst { it is FlowItem.CheckListCard && it.checkList.id == id }
 }

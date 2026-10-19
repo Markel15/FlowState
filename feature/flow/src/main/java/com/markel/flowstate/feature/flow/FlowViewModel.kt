@@ -77,6 +77,16 @@ class FlowViewModel @Inject constructor(
     /** Tasks that have been swiped-to-dismiss but not yet permanently deleted. */
     private val _pendingUndoTasks = MutableStateFlow<Map<Int, Task>>(emptyMap())
 
+    /**
+     * Ids of tasks whose undo countdown expired and were deleted from the DB.
+     *
+     * They keep being filtered out of the UI (together with [_pendingUndoTasks])
+     * until a DB emission confirms the task is really gone; the combine below
+     * then drops the id (self-healing).
+     *
+     */
+    private val _committedDeleteIds = MutableStateFlow<Set<Int>>(emptySet())
+
     /** Whether the undo FAB should be visible – true while any deletion is pending. */
     val showUndoButton: StateFlow<Boolean> = _pendingUndoTasks
         .map { it.isNotEmpty() }
@@ -112,7 +122,7 @@ class FlowViewModel @Inject constructor(
 
     // ── Init: combine repos + pending-filter ──────────────────────────────────
     init {
-        // Restore the last visited categoom DataStory frre once at startup.
+        // Restore the last visited category DataStory free once at startup.
         viewModelScope.launch {
             userPreferencesRepository.lastCategoryId.collect { saved ->
                 if (!lastCategoryRestored && saved != null) {
@@ -137,10 +147,21 @@ class FlowViewModel @Inject constructor(
                 coreDataFlow,
                 userPreferencesRepository.categoriesEnabled,
                 _pendingUndoTasks,
+                _committedDeleteIds,
                 _selectedCategoryId
-            ) { coreData, categoriesEnabled, pendingMap, selectedCategoryId ->
+            ) { coreData, categoriesEnabled, pendingMap, committedIds, selectedCategoryId ->
 
-                val pendingIds = pendingMap.keys
+                // Ids hidden from the list: still-undoable deletions plus the
+                // committed ones whose absence the DB has not confirmed yet.
+                val pendingIds = pendingMap.keys + committedIds
+
+                // Self-heal committed deletions: as soon as this emission's task
+                // list no longer contains the id, it can be dropped.
+                val dbTaskIds = coreData.tasks.mapTo(HashSet()) { it.id }
+                val confirmedGone = committedIds.filterNot { it in dbTaskIds }
+                if (confirmedGone.isNotEmpty()) {
+                    _committedDeleteIds.update { it - confirmedGone.toSet() }
+                }
 
                 // If the persisted/selected category no longer exists, fall back to General
                 // and persist the correction so we don't keep pointing at a phantom id.
@@ -262,8 +283,11 @@ class FlowViewModel @Inject constructor(
      * The task is **not** deleted from the DB immediately. Instead, it is added
      * to [_pendingUndoTasks] which causes the `combine` above to filter it out
      * of the UI state optimistically.  A per-task countdown of 3500ms
-     * starts; if it expires the task is permanently deleted.  The user may cancel
-     * the countdown by pressing the undo FAB ([undoPendingDeletions]).
+     * starts; if it expires the task is permanently deleted and its id moves to
+     * [_committedDeleteIds], which keeps filtering it until the DB emission
+     * confirms the deletion.
+     * The user may cancel the countdown by pressing the undo FAB
+     * ([undoPendingDeletions]).
      */
     fun onTaskSwiped(task: Task) {
         // Add to the pending map – the combine will filter it out of uiState
@@ -284,7 +308,7 @@ class FlowViewModel @Inject constructor(
             // Time's up – permanently delete from DB
             reminderScheduler.cancel(task.id)
             deleteTaskUseCase(task)
-            // Clean up pending map; task is already gone from DB at this point
+            _committedDeleteIds.update { it + task.id }
             _pendingUndoTasks.update { it - task.id }
             deleteJobs.remove(task.id)
         }
@@ -297,6 +321,10 @@ class FlowViewModel @Inject constructor(
      * that was waiting to be deleted.  The tasks are still in the DB, so
      * simply removing them from [_pendingUndoTasks] makes them reappear in
      * the UI state automatically.
+     *
+     * Deletions whose countdown already expired (ids in [_committedDeleteIds])
+     * are **not** restored — they are gone from the DB and no longer undoable;
+     * their ids stay in the filter set until the combine self-heals them.
      */
     fun undoPendingDeletions() {
         // Cancel every pending countdown
@@ -324,50 +352,101 @@ class FlowViewModel @Inject constructor(
 
     // ── Reorder ────────────────────────────────────────────────────────
 
-    fun onTaskReorder(fromIndex: Int, toIndex: Int) {
-        val current = (_uiState.value as? FlowUiState.Success)?.tasks?.toMutableList() ?: return
+    /**
+     * Sections whose order changed since the last [commitReorder].
+     *
+     * A drag is a burst of [onItemReorder] calls, one per slot crossed, and each
+     * write renumbers and persists the *whole* section. Holding the write back
+     * until the finger lifts turns that burst into a single write.
+     */
+    private val pendingReorderSections = mutableSetOf<FlowItem.Section>()
 
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
+    /**
+     * Applies a drag between two rows of the flat [FlowItem] list.
+     *
+     * The move is only applied when both rows belong to the same non-null
+     * [FlowItem.Section]: headers and the reminder banner are fixed chrome, and
+     * a card may not jump between different Items sections.
+     *
+     * This guard is a data-safety net, **not** the mechanism that keeps the drag
+     * inside its section. `reorderable` gets no answer back from `onMove`, so a
+     * move rejected here leaves the library compensating the dragged row against
+     * a slot that never materializes (the row visibly jumps and then follows the
+     * finger from the wrong anchor). `SectionedFlowView` prevents that by
+     * disabling foreign rows as swap targets for the duration of the drag; a
+     * rejected call here should therefore be unreachable, and any future
+     * rejection needs the same treatment on the view side.
+     *
+     * Note this is called on every item crossing during a drag, so it must stay
+     * cheap: it only reorders rows in memory. The database write is deferred to
+     * [commitReorder], which the grid calls once when the drag ends.
+     */
+    fun onItemReorder(fromIndex: Int, toIndex: Int) {
+        val state = _uiState.value as? FlowUiState.Success ?: return
+        val items = state.items.toMutableList()
 
-        val updated = current.mapIndexed { i, t -> t.copy(position = i) }
+        val from = items.getOrNull(fromIndex) ?: return
+        val to = items.getOrNull(toIndex) ?: return
 
-        _uiState.value = (_uiState.value as FlowUiState.Success).copy(tasks = updated)
+        val section = from.section ?: return
+        if (section != to.section) return
 
-        viewModelScope.launch {
-            taskRepository.updateTasksOrder(updated)
+        val moved = items.removeAt(fromIndex)
+        items.add(toIndex, moved)
+
+        val updated = state.withItems(items)
+
+        // `position` is the column the DAOs sort by, so the reordered section has
+        // to be renumbered 0..n-1 before it is written. Without this the next
+        // database emission (ORDER BY position ASC) would restore the previous
+        // order and the card would visibly snap back to where it started.
+        val renumbered = when (section) {
+            FlowItem.Section.TASKS -> updated.copy(
+                tasks = updated.tasks.mapIndexed { index, task -> task.copy(position = index) }
+            )
+            FlowItem.Section.CHECKLISTS -> updated.copy(
+                checkLists = updated.checkLists.mapIndexed { index, list -> list.copy(position = index) }
+            )
+            FlowItem.Section.IDEAS -> updated.copy(
+                ideas = updated.ideas.mapIndexed { index, idea -> idea.copy(position = index) }
+            )
         }
+
+        _uiState.value = renumbered
+
+        // The database is written once, when the drag ends: see [commitReorder].
+        pendingReorderSections += section
     }
 
-    fun onIdeaReorder(fromIndex: Int, toIndex: Int) {
-        val currentState = _uiState.value as? FlowUiState.Success ?: return
-        val list = currentState.ideas.toMutableList()
+    /**
+     * Persists every section whose order changed since the last commit.
+     *
+     * Called by the grid when the drag gesture ends. While the finger is down
+     * [onItemReorder] only moves rows in the UI state, so a drag across N slots
+     * costs **one** write of the section instead of N.
+     *
+     * Safe to call unconditionally — it returns immediately when nothing moved,
+     * which is the case on the effect's very first run (before any drag).
+     *
+     * The order is lost if the process dies mid-drag; that is deliberate, since
+     * a partially dragged list is not worth a write per crossing.
+     */
+    fun commitReorder() {
+        if (pendingReorderSections.isEmpty()) return
+        val state = _uiState.value as? FlowUiState.Success ?: return
 
-        val item = list.removeAt(fromIndex)
-        list.add(toIndex, item)
+        val sections = pendingReorderSections.toSet()
+        pendingReorderSections.clear()
 
-        val updated = list.mapIndexed { i, idea -> idea.copy(position = i) }
-
-        _uiState.value = currentState.copy(ideas = updated)
-
+        // `renumbered` already fixed the positions, so the lists can go as they are.
         viewModelScope.launch {
-            ideaRepository.updateIdeasOrder(updated)
-        }
-    }
-
-    fun onCheckListReorder(fromIndex: Int, toIndex: Int) {
-        val currentState = _uiState.value as? FlowUiState.Success ?: return
-        val list = currentState.checkLists.toMutableList()
-
-        val item = list.removeAt(fromIndex)
-        list.add(toIndex, item)
-
-        val updated = list.mapIndexed { i, cl -> cl.copy(position = i) }
-
-        _uiState.value = currentState.copy(checkLists = updated)
-
-        viewModelScope.launch {
-            checkListRepository.updateCheckListsOrder(updated)
+            sections.forEach { section ->
+                when (section) {
+                    FlowItem.Section.TASKS -> taskRepository.updateTasksOrder(state.tasks)
+                    FlowItem.Section.CHECKLISTS -> checkListRepository.updateCheckListsOrder(state.checkLists)
+                    FlowItem.Section.IDEAS -> ideaRepository.updateIdeasOrder(state.ideas)
+                }
+            }
         }
     }
 

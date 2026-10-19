@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,13 +35,27 @@ import androidx.compose.ui.unit.dp
 import com.markel.flowstate.feature.tasks.R
 import androidx.core.net.toUri
 
+private const val BANNER_EXPAND_MS = 250
+private const val BANNER_SHRINK_MS = 300
+private const val BANNER_FADE_IN_MS = 200
+private const val BANNER_FADE_OUT_MS = 150
+
 /**
- * Contextual banner shown inside the task list when:
+ * Contextual banner shown above the task list when:
  *  1. At least one task has a reminderTime set (there is something that should ring), AND
  *  2. The exact alarm permission is missing (it won't ring).
  *
  * The visibility check (hasTasksWithReminder && !canScheduleExactAlarms) is done
- * by the caller (SectionedFlowView or equivalent) so this composable stays dumb.
+ * by the caller (SectionedFlowView) so this composable stays dumb.
+ *
+ * ── It must stay OUT of the scrolling container ──────────────────────────────
+ * Animating its height inside the LazyVerticalStaggeredGrid moved the end of the
+ * content on every frame of the exit, and that bound is what
+ * LazyLayoutItemAnimator uses to invent a start offset for rows that were never
+ * composed: they were born glued to the row above, or popped straight into their
+ * final slot when the collapse happened in one frame. Pinned above the grid the
+ * height belongs to the viewport, not to the content, so the grid translates
+ * rigidly and the rows it reveals come in through the bottom edge.
  */
 @Composable
 fun ReminderPermissionBanner(
@@ -51,14 +66,16 @@ fun ReminderPermissionBanner(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + expandVertically(),
-        exit = fadeOut() + shrinkVertically(),
+        enter = fadeIn(animationSpec = tween(durationMillis = BANNER_FADE_IN_MS)) +
+            expandVertically(animationSpec = tween(durationMillis = BANNER_EXPAND_MS)),
+        exit = fadeOut(animationSpec = tween(durationMillis = BANNER_FADE_OUT_MS)) +
+            shrinkVertically(animationSpec = tween(durationMillis = BANNER_SHRINK_MS)),
         modifier = modifier
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 10.dp)
+                .padding(top = 16.dp, bottom = 4.dp)
                 .background(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(16.dp)
