@@ -25,13 +25,13 @@ sealed interface FlowUiState {
                 add(FlowItem.TasksHeader)
                 tasks.forEach { add(FlowItem.TaskRow(it)) }
             }
-            if (checkLists.isNotEmpty()) {
-                add(FlowItem.CheckListsHeader)
-                checkLists.forEach { add(FlowItem.CheckListCard(it)) }
-            }
             if (ideas.isNotEmpty()) {
                 add(FlowItem.IdeasHeader)
                 ideas.forEach { add(FlowItem.IdeaCard(it)) }
+            }
+            if (checkLists.isNotEmpty()) {
+                add(FlowItem.CheckListsHeader)
+                checkLists.forEach { add(FlowItem.CheckListCard(it)) }
             }
             // Only when there is something to scroll: an empty screen shows
             // EmptyStateView and must keep `items.isEmpty()` true.
@@ -46,7 +46,7 @@ sealed interface FlowUiState {
  * Used by the reorder callback: a drag hands back a shuffled `List<FlowItem>`,
  * and this projects it back onto the three typed lists. `filterIsInstance`
  * preserves the relative order of each section and the assignment order
- * (tasks → checkLists → ideas) matches how [FlowUiState.Success.items] is built,
+ * (tasks → ideas → checklists) matches how [FlowUiState.Success.items] is built,
  * so the resulting `items` mirrors the list that was passed in.
  *
  * Chrome items (headers) are dropped — they are re-emitted by `items` in their

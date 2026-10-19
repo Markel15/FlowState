@@ -40,7 +40,7 @@ class FlowItemTest {
         checkLists: List<CheckList> = emptyList(),
     ) = FlowUiState.Success(tasks = tasks, ideas = ideas, checkLists = checkLists)
 
-    // ── items: construcción ────────────────────────────────────────────────────
+    // ── items: construction ────────────────────────────────────────────────────
 
     @Test
     fun rows_withAllSections_emitsHeadersThenItems_inOrder() {
@@ -55,10 +55,10 @@ class FlowItemTest {
                 FlowItem.TasksHeader,
                 FlowItem.TaskRow(task(1)),
                 FlowItem.TaskRow(task(2)),
-                FlowItem.CheckListsHeader,
-                FlowItem.CheckListCard(checkList(1)),
                 FlowItem.IdeasHeader,
                 FlowItem.IdeaCard(idea(1)),
+                FlowItem.CheckListsHeader,
+                FlowItem.CheckListCard(checkList(1)),
                 FlowItem.BottomSpacer,
             ),
             items
@@ -146,7 +146,7 @@ class FlowItemTest {
 
         assertEquals(Pair(7, 0), item.stableKey())
         assertEquals(Pair(7, 3), item.stableKey(mapOf(7 to 3)))
-        // Ids distintos siguen siendo distintos con el mismo contador
+        // Different Ids keep being different with the same counter
         assertNotEquals(
             FlowItem.TaskRow(task(7)).stableKey(mapOf(7 to 1)),
             FlowItem.TaskRow(task(8)).stableKey(mapOf(7 to 1))
@@ -191,7 +191,7 @@ class FlowItemTest {
         val rebuilt = original.withItems(items)
 
         assertEquals(listOf(idea(3), idea(1), idea(2)), rebuilt.ideas)
-        // Las secciones que no se han tocado se conservan
+        // Sections remain untouched
         assertEquals(original.tasks, rebuilt.tasks)
         assertEquals(original.checkLists, rebuilt.checkLists)
     }

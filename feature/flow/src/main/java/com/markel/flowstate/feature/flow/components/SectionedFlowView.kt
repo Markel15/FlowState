@@ -67,8 +67,12 @@ private const val GRID_SPACING_DP = 10
 private const val GRID_EDGE_DP = 12
 /** Top breathing room, applied to the first row instead of the container (see below). */
 private const val GRID_TOP_DP = 8
-/** Extra inset for full-width rows so tasks keep today's 20dp margins (12 + 8). */
+/** Extra inset for headers*/
 private const val ROW_EXTRA_INSET_DP = 8
+/** Gap above a section header when another section precedes it. */
+private const val SECTION_GAP_DP = 24
+/** Gap between a section header and the first row or card it introduces. */
+private const val SECTION_HEADER_BOTTOM_DP = 12
 /** Bottom room for the FAB, rendered as [FlowItem.BottomSpacer] (see below). */
 private const val GRID_BOTTOM_DP = 96
 /**
@@ -85,8 +89,8 @@ private const val CARD_VERTICAL_SPACING_DP = 9
  *
  * Layout:
  *  - Tasks      → full-width rows using [AnimatableTaskItem] (swipe-to-dismiss)
- *  - CheckLists → cards, one per column, height driven by their content
  *  - Ideas      → cards, one per column, height driven by their content
+ *  - CheckLists → cards, one per column, height driven by their content
  *
  * Everything (headers included) is emitted from one [FlowItem] list, which is
  * what lets the index reported by `reorderable` map 1:1 onto `items[index]`.
@@ -199,22 +203,26 @@ fun SectionedFlowView(
                     if (index == 0) Modifier.padding(top = GRID_TOP_DP.dp) else Modifier
                 val itemModifier = animateItemModifier.then(topInsetModifier)
 
+                // Room above a header that may have another section above it.
+                val sectionTopPadding = if (index == 0) 8.dp else SECTION_GAP_DP.dp
+
                 when (item) {
                     FlowItem.TasksHeader -> SectionHeader(
                         title = stringResource(R.string.tasks_m),
                         modifier = itemModifier
                             .padding(horizontal = ROW_EXTRA_INSET_DP.dp, vertical = 8.dp)
                     )
-                    FlowItem.CheckListsHeader -> SectionHeader(
-                        title = stringResource(R.string.checklists_m),
-                        modifier = itemModifier
-                            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
-                    )
 
                     FlowItem.IdeasHeader -> SectionHeader(
                         title = stringResource(R.string.ideas_notes_m),
                         modifier = itemModifier
-                            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp)
+                            .padding(start = ROW_EXTRA_INSET_DP.dp, end= ROW_EXTRA_INSET_DP.dp, top = sectionTopPadding, bottom = SECTION_HEADER_BOTTOM_DP.dp)
+                    )
+
+                    FlowItem.CheckListsHeader -> SectionHeader(
+                        title = stringResource(R.string.checklists_m),
+                        modifier = itemModifier
+                            .padding(start = ROW_EXTRA_INSET_DP.dp, end= ROW_EXTRA_INSET_DP.dp,  top = sectionTopPadding, bottom = SECTION_HEADER_BOTTOM_DP.dp)
                     )
 
                     is FlowItem.TaskRow -> {
