@@ -1,5 +1,7 @@
 package com.markel.flowstate.feature.habits
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.domain.Habit
@@ -19,17 +21,21 @@ import com.markel.flowstate.core.domain.usecase.habits.ToggleHabitEntryUseCase
 import com.markel.flowstate.core.domain.usecase.habits.UpdateHabitUseCase
 import com.markel.flowstate.core.domain.usecase.habits.UpdateHabitsOrderUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HabitViewModel @Inject constructor(
     private val getHabitsWithStatus: GetHabitsWithStatusUseCase,
@@ -44,42 +50,57 @@ class HabitViewModel @Inject constructor(
     private val decrementNumericValue: DecrementNumericValueUseCase,
     private val deleteNumericEntry: DeleteNumericEntryUseCase,
     private val updateHabitsOrder: UpdateHabitsOrderUseCase
-) : ViewModel() {
+) : ViewModel(), DefaultLifecycleObserver {
 
+    private val _today = MutableStateFlow(LocalDate.now())
     private val _showAddDialog = MutableStateFlow(false)
     private val _uiState = MutableStateFlow<HabitUiState>(HabitUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
-    init{
+    init {
         viewModelScope.launch {
             combine(
-                getHabitsWithStatus(),
+                _today.flatMapLatest { today ->
+                    getHabitsWithStatus(today).map { habits -> today to habits }
+                },
                 getAllBooleanEntries(),
                 getAllNumericEntries(),
                 _showAddDialog
-            ) { habits, allBooleanEntries, allNumericEntries, showDialog ->
+            ) { (today, habits), allBooleanEntries, allNumericEntries, showDialog ->
                 val weekEntriesByHabit = allBooleanEntries
                     .groupBy({ it.habitId }, { it.epochDay })
                     .mapValues { it.value.toSet() }
 
                 val numericEntriesByHabit = allNumericEntries.groupBy { it.habitId }
-                val today = LocalDate.now()
                 val habitsDueToday = habits.filter { it.habit.isScheduledFor(today) }
 
                 HabitUiState.Success(
                     habits = habits,
                     weekEntriesByHabit = weekEntriesByHabit,
                     numericEntriesByHabit = numericEntriesByHabit,
+                    today = today,
                     showAddDialog = showDialog,
                     completedToday = habitsDueToday.count { it.isCompletedToday },
                     totalHabits = habitsDueToday.size,
                     motivationalMessageIndex = today.dayOfYear % 7
                 )
-            }.collect {newState ->
+            }.collect { newState ->
                 _uiState.value = newState
             }
-
         }
+    }
+
+    override fun onResume(owner: LifecycleOwner) {
+        refreshTodayIfNeeded()
+    }
+
+    /**
+     * Re-evaluates the current date when returning to the foreground.
+     * Because [_today] is a [MutableStateFlow], assigning the same [LocalDate]
+     * is a no-op and only triggers a re-computation when midnight has passed.
+     */
+    fun refreshTodayIfNeeded(now: LocalDate = LocalDate.now()) {
+        _today.value = now
     }
 
     // ==================================

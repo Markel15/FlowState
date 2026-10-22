@@ -45,11 +45,11 @@ fun HabitCard(
         colorArgb: Int,
         scheduledDays: Set<DayOfWeek>
     ) -> Unit,
+    today: LocalDate = LocalDate.now(),
     onNavigateToDetail: (() -> Unit)? = null
 ) {
     val habit = habitWithStatus.habit
     val habitColor = Color(habit.colorArgb)
-    val today = LocalDate.now()
     val isScheduledToday = habit.isScheduledFor(today)
     val isCompletedToday = isScheduledToday && today.toEpochDay() in weekEntries
 
@@ -61,6 +61,11 @@ fun HabitCard(
         firstVisibleWeekDate = today,
         firstDayOfWeek = DayOfWeek.MONDAY
     )
+
+    // For the edge case of leaving the app in the background a Sunday and returning a Monday, scroll to the new week
+    LaunchedEffect(today) {
+        weekState.animateScrollToWeek(today)
+    }
 
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainer
     val cardBg by animateColorAsState(

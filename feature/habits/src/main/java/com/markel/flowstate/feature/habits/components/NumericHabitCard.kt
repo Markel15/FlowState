@@ -57,14 +57,14 @@ fun NumericHabitCard(
         step: Float?,
         scheduledDays: Set<DayOfWeek>
     ) -> Unit,
+    today: LocalDate = LocalDate.now(),
     onNavigateToDetail: (() -> Unit)? = null
 ) {
     val habit = habitWithStatus.habit
     val habitColor = Color(habit.colorArgb)
-    val today = LocalDate.now()
     val scope = rememberCoroutineScope()
-    var weekOffset by remember { mutableIntStateOf(0) }  // O if actual week, -1 if is last week
-    val weekStart = remember(weekOffset) {
+    var weekOffset by remember(today) { mutableIntStateOf(0) }  // 0 if actual week, -1 if is last week
+    val weekStart = remember(today, weekOffset) {
         today.with(DayOfWeek.MONDAY).plusWeeks(weekOffset.toLong())
     }
 
@@ -86,7 +86,7 @@ fun NumericHabitCard(
     }
 
     // selectedDate resets to today (if is this week) or monday when changing week view
-    var selectedDate by remember(weekOffset) {
+    var selectedDate by remember(today, weekOffset) {
         mutableStateOf(if (weekOffset == 0) today else weekStart)
     }
 
