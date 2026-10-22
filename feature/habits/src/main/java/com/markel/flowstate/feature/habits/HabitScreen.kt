@@ -21,6 +21,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.domain.HabitType
 import com.markel.flowstate.feature.habits.components.AddHabitSheet
@@ -30,7 +31,6 @@ import com.markel.flowstate.feature.habits.components.HabitFabMenu
 import com.markel.flowstate.feature.habits.components.NumericHabitCard
 import com.markel.flowstate.feature.habits.details.components.HabitHeader
 import com.markel.flowstate.feature.habits.details.components.MotivationalMessage
-import java.time.LocalDate
 import com.markel.flowstate.core.designsystem.R as DesignR
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -41,6 +41,12 @@ fun HabitScreen(
     viewModel: HabitViewModel = hiltViewModel(),
     onNavigateToDetail: (habitId: Int) -> Unit,
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.addObserver(viewModel)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(viewModel) }
+    }
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Box(
@@ -121,6 +127,7 @@ fun HabitScreen(
                                                     habitWithStatus = habitWithStatus,
                                                     weekEntries = state.weekEntriesByHabit[habitWithStatus.habit.id]
                                                         ?: emptySet(),
+                                                    today = state.today,
                                                     onToggleDay = { date ->
                                                         viewModel.toggleBooleanHabitOnDate(
                                                             habitWithStatus.habit.id,
@@ -154,10 +161,11 @@ fun HabitScreen(
                                                     habitWithStatus = habitWithStatus,
                                                     allEntries = state.numericEntriesByHabit[habitWithStatus.habit.id]
                                                         ?: emptyList(),
+                                                    today = state.today,
                                                     onIncrementToday = {
                                                         viewModel.incrementNumericHabit(
                                                             habitId = habitWithStatus.habit.id,
-                                                            date = LocalDate.now(),
+                                                            date = state.today,
                                                             currentValue = habitWithStatus.todayValue,
                                                             step = habitWithStatus.habit.step
                                                         )
@@ -165,7 +173,7 @@ fun HabitScreen(
                                                     onDecrementToday = {
                                                         viewModel.decrementNumericHabit(
                                                             habitId = habitWithStatus.habit.id,
-                                                            date = LocalDate.now(),
+                                                            date = state.today,
                                                             currentValue = habitWithStatus.todayValue,
                                                             step = habitWithStatus.habit.step
                                                         )

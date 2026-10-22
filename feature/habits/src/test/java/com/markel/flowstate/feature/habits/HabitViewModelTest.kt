@@ -581,4 +581,43 @@ class HabitViewModelTest {
         // THEN
         coVerify { deleteNumericEntry(4, date) }
     }
+
+    @Test
+    fun refreshTodayIfNeeded_whenDayChanges_recomputesStatusForNewDay() = runTest {
+        // GIVEN - Habit completed on day 1 (23:30), not completed on day 2 (00:20)
+        val today = LocalDate.now()
+        val tomorrow = today.plusDays(1)
+        val testHabit = habit(id = 1)
+
+        coEvery { getHabitsWithStatus(today) } returns flowOf(
+            listOf(habitWithStatus(testHabit, completedToday = true))
+        )
+        coEvery { getHabitsWithStatus(tomorrow) } returns flowOf(
+            listOf(habitWithStatus(testHabit, completedToday = false))
+        )
+        coEvery { getAllBooleanEntries() } returns flowOf(
+            listOf(entry(habitId = 1, epochDay = today.toEpochDay()))
+        )
+
+        viewModel = buildViewModel()
+
+        viewModel.uiState.test {
+            val initialState = awaitItem().let {
+                if (it is HabitUiState.Loading) awaitItem() else it
+            } as HabitUiState.Success
+
+            assertEquals(today, initialState.today)
+            assertEquals(1, initialState.completedToday)
+            assertTrue(initialState.habits.first().isCompletedToday)
+
+            // WHEN - User returns to the app after midnight (00:20)
+            viewModel.refreshTodayIfNeeded(tomorrow)
+
+            // THEN - State updates to tomorrow and resets today's completion status
+            val updatedState = awaitItem() as HabitUiState.Success
+            assertEquals(tomorrow, updatedState.today)
+            assertEquals(0, updatedState.completedToday)
+            assertFalse(updatedState.habits.first().isCompletedToday)
+        }
+    }
 }
