@@ -67,6 +67,11 @@ import com.markel.flowstate.core.designsystem.R as DesignR
 import com.markel.flowstate.core.domain.achievements.AchievementId
 import com.markel.flowstate.core.domain.achievements.AchievementProgress
 
+/**
+ * Four lanes: compact badges take one lane each while in-progress cards take two.
+ */
+private const val GRID_COLUMNS = 4
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AchievementsScreen(
@@ -101,7 +106,7 @@ fun AchievementsScreen(
         }
     ) { innerPadding ->
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Fixed(GRID_COLUMNS),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
@@ -121,6 +126,23 @@ fun AchievementsScreen(
             val inProgress = achievements.filter { !it.maxed && it.tierReached > 0 }
             val completed = achievements.filter { it.maxed }
 
+            if (inProgress.isNotEmpty()) {
+                item(key = "header_in_progress", span = { GridItemSpan(maxLineSpan) }) {
+                    SectionHeader(
+                        text = stringResource(R.string.achievements_section_in_progress),
+                        count = inProgress.size,
+                        modifier = Modifier.animateItem()
+                    )
+                }
+                items(
+                    items = inProgress,
+                    key = { it.definition.id },
+                    span = { GridItemSpan(GRID_COLUMNS / 2) }
+                ) { progress ->
+                    AchievementCard(progress, modifier = Modifier.animateItem())
+                }
+            }
+
             if (locked.isNotEmpty()) {
                 item(key = "header_locked", span = { GridItemSpan(maxLineSpan) }) {
                     SectionHeader(
@@ -130,20 +152,11 @@ fun AchievementsScreen(
                     )
                 }
                 items(locked, key = { it.definition.id }) { progress ->
-                    AchievementCard(progress, modifier = Modifier.animateItem())
-                }
-            }
-
-            if (inProgress.isNotEmpty()) {
-                item(key = "header_in_progress", span = { GridItemSpan(maxLineSpan) }) {
-                    SectionHeader(
-                        text = stringResource(R.string.achievements_section_in_progress),
-                        count = inProgress.size,
+                    AchievementBadge(
+                        progress = progress,
+                        locked = true,
                         modifier = Modifier.animateItem()
                     )
-                }
-                items(inProgress, key = { it.definition.id }) { progress ->
-                    AchievementCard(progress, modifier = Modifier.animateItem())
                 }
             }
 
@@ -156,7 +169,11 @@ fun AchievementsScreen(
                     )
                 }
                 items(completed, key = { it.definition.id }) { progress ->
-                    AchievementCard(progress, modifier = Modifier.animateItem())
+                    AchievementBadge(
+                        progress = progress,
+                        locked = false,
+                        modifier = Modifier.animateItem()
+                    )
                 }
             }
         }
@@ -563,6 +580,86 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
                             .padding(top = 5.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Compact representation of an achievement that is either still locked or
+ * already maxed.
+ *
+ * Locked badges share the same layout with a tinted cookie and a thin progress
+ * bar, so the section still reads as a collection with empty slots.
+ */
+@Composable
+private fun AchievementBadge(
+    progress: AchievementProgress,
+    locked: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val visuals = visualsFor(progress.definition.id)
+    val shape = shapeForTier(progress.tierReached, progress.definition.tiers.size)
+    val cookieColor = if (locked) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    val iconTint = if (locked) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+    } else {
+        MaterialTheme.colorScheme.onPrimary
+    }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 11.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(color = cookieColor, shape = shape)
+            ) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(visuals.iconRes),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            // Two lines reserved so every badge measures exactly the same.
+            Text(
+                text = stringResource(visuals.nameRes),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = if (locked) MaterialTheme.colorScheme.onSurfaceVariant
+                else Color.Unspecified
+            )
+
+            if (locked) {
+                val target = progress.nextTier ?: return@Column
+                LinearProgressIndicator(
+                    progress = {
+                        (progress.current.toFloat() / target).coerceIn(0f, 1f)
+                    },
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                    trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth(0.66f)
+                )
             }
         }
     }
