@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Units the achievement detail sheet counts in. -->
+<resources>
+    <plurals name="achievement_perfect_day_unit">
+        <item quantity="one">día perfecto</item>
+        <item quantity="other">días perfectos</item>
+    </plurals>
+    <plurals name="achievement_streak_unit">
+        <item quantity="one">día de racha</item>
+        <item quantity="other">días de racha</item>
+    </plurals>
+    <plurals name="achievement_unstoppable_unit">
+        <item quantity="one">hábito completado</item>
+        <item quantity="other">hábitos completados</item>
+    </plurals>
+    <plurals name="achievement_task_total_unit">
+        <item quantity="one">tarea completada</item>
+        <item quantity="other">tareas completadas</item>
+    </plurals>
+    <plurals name="achievement_night_owl_unit">
+        <item quantity="one">tarea de madrugada</item>
+        <item quantity="other">tareas de madrugada</item>
+    </plurals>
+    <plurals name="achievement_early_bird_unit">
+        <item quantity="one">tarea al alba</item>
+        <item quantity="other">tareas al alba</item>
+    </plurals>
+    <plurals name="achievement_flawless_monday_unit">
+        <item quantity="one">lunes perfecto</item>
+        <item quantity="other">lunes perfectos</item>
+    </plurals>
+    <plurals name="achievement_sunday_fun_day_unit">
+        <item quantity="one">tarea en domingo</item>
+        <item quantity="other">tareas en domingo</item>
+    </plurals>
+    <plurals name="achievement_productive_morning_unit">
+        <item quantity="one">mañana productiva</item>
+        <item quantity="other">mañanas productivas</item>
+    </plurals>
+    <plurals name="achievement_on_time_unit">
+        <item quantity="one">tarea a tiempo</item>
+        <item quantity="other">tareas a tiempo</item>
+    </plurals>
+    <plurals name="achievement_flawless_week_unit">
+        <item quantity="one">semana perfecta</item>
+        <item quantity="other">semanas perfectas</item>
+    </plurals>
+    <plurals name="achievement_comeback_unit">
+        <item quantity="one">regreso</item>
+        <item quantity="other">regresos</item>
+    </plurals>
+</resources>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Units the achievement detail sheet counts in. -->
+<resources>
+    <plurals name="achievement_perfect_day_unit">
+        <item quantity="one">perfect day</item>
+        <item quantity="other">perfect days</item>
+    </plurals>
+    <plurals name="achievement_streak_unit">
+        <item quantity="one">streak day</item>
+        <item quantity="other">streak days</item>
+    </plurals>
+    <plurals name="achievement_unstoppable_unit">
+        <item quantity="one">habit completion</item>
+        <item quantity="other">habit completions</item>
+    </plurals>
+    <plurals name="achievement_task_total_unit">
+        <item quantity="one">task completed</item>
+        <item quantity="other">tasks completed</item>
+    </plurals>
+    <plurals name="achievement_night_owl_unit">
+        <item quantity="one">late-night task</item>
+        <item quantity="other">late-night tasks</item>
+    </plurals>
+    <plurals name="achievement_early_bird_unit">
+        <item quantity="one">early task</item>
+        <item quantity="other">early tasks</item>
+    </plurals>
+    <plurals name="achievement_flawless_monday_unit">
+        <item quantity="one">perfect Monday</item>
+        <item quantity="other">perfect Mondays</item>
+    </plurals>
+    <plurals name="achievement_sunday_fun_day_unit">
+        <item quantity="one">Sunday task</item>
+        <item quantity="other">Sunday tasks</item>
+    </plurals>
+    <plurals name="achievement_productive_morning_unit">
+        <item quantity="one">productive morning</item>
+        <item quantity="other">productive mornings</item>
+    </plurals>
+    <plurals name="achievement_on_time_unit">
+        <item quantity="one">on-time task</item>
+        <item quantity="other">on-time tasks</item>
+    </plurals>
+    <plurals name="achievement_flawless_week_unit">
+        <item quantity="one">perfect week</item>
+        <item quantity="other">perfect weeks</item>
+    </plurals>
+    <plurals name="achievement_comeback_unit">
+        <item quantity="one">comeback</item>
+        <item quantity="other">comebacks</item>
+    </plurals>
+</resources>

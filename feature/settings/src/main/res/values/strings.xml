@@ -124,4 +124,11 @@
     <string name="achievement_on_time_desc">Complete tasks before their due date</string>
     <string name="achievement_productive_morning_name">Productive morning</string>
     <string name="achievement_productive_morning_desc">Check off 3 tasks before noon on the same day</string>
+    <string name="achievement_state_completed">Level %1$d of %2$d · completed</string>
+    <string name="achievement_state_in_progress">Level %1$d of %2$d</string>
+    <string name="achievement_state_locked">Not unlocked yet</string>
+    <string name="achievement_detail_level">Level %1$d</string>
+    <string name="achievement_detail_progress_title">Level progress</string>
+    <string name="achievement_detail_next_level">Next level</string>
+    <string name="achievement_detail_first_level">First level</string>
 </resources>

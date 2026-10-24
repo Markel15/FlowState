@@ -45,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +80,10 @@ fun AchievementsScreen(
     viewModel: AchievementsViewModel = hiltViewModel()
 ) {
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
+
+    // The selection is UI state: it survives recomposition and rotation (rememberSaveable)
+    var selectedId by rememberSaveable { mutableStateOf<AchievementId?>(null) }
+    val selected = achievements.firstOrNull { it.definition.id == selectedId }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -139,7 +144,11 @@ fun AchievementsScreen(
                     key = { it.definition.id },
                     span = { GridItemSpan(GRID_COLUMNS / 2) }
                 ) { progress ->
-                    AchievementCard(progress, modifier = Modifier.animateItem())
+                    AchievementCard(
+                        progress = progress,
+                        onClick = { selectedId = progress.definition.id },
+                        modifier = Modifier.animateItem()
+                    )
                 }
             }
 
@@ -155,6 +164,7 @@ fun AchievementsScreen(
                     AchievementBadge(
                         progress = progress,
                         locked = true,
+                        onClick = { selectedId = progress.definition.id },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -172,10 +182,18 @@ fun AchievementsScreen(
                     AchievementBadge(
                         progress = progress,
                         locked = false,
+                        onClick = { selectedId = progress.definition.id },
                         modifier = Modifier.animateItem()
                     )
                 }
             }
+        }
+
+        selected?.let { progress ->
+            AchievementDetailSheet(
+                progress = progress,
+                onDismiss = { selectedId = null }
+            )
         }
     }
 }
@@ -211,58 +229,79 @@ private fun SectionHeader(text: String, count: Int, modifier: Modifier = Modifie
     }
 }
 
-/** Visual assets per achievement: the icon and its strings. */
-private data class AchievementVisuals(val iconRes: Int, val nameRes: Int, val descRes: Int)
+/**
+ * Visual assets per achievement: the icon, its strings and the unit its value
+ * is counted in (a plural, so the detail sheet can say "1 perfect day" or
+ * "128 perfect days" without hardcoding either).
+ */
+internal data class AchievementVisuals(
+    val iconRes: Int,
+    val nameRes: Int,
+    val descRes: Int,
+    val unitRes: Int
+)
 
-private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
+internal fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
     AchievementId.PERFECT_DAY -> AchievementVisuals(
         R.drawable.star_shine_24px,
-        R.string.achievement_perfect_day_name, R.string.achievement_perfect_day_desc
+        R.string.achievement_perfect_day_name, R.string.achievement_perfect_day_desc,
+        R.plurals.achievement_perfect_day_unit
     )
     AchievementId.STREAK -> AchievementVisuals(
         R.drawable.mode_heat_24px,
-        R.string.achievement_streak_name, R.string.achievement_streak_desc
+        R.string.achievement_streak_name, R.string.achievement_streak_desc,
+        R.plurals.achievement_streak_unit
     )
     AchievementId.UNSTOPPABLE -> AchievementVisuals(
         R.drawable.check_circle_24px,
-        R.string.achievement_unstoppable_name, R.string.achievement_unstoppable_desc
+        R.string.achievement_unstoppable_name, R.string.achievement_unstoppable_desc,
+        R.plurals.achievement_unstoppable_unit
     )
     AchievementId.TASK_TOTAL -> AchievementVisuals(
         R.drawable.check_box_24px,
-        R.string.achievement_task_total_name, R.string.achievement_task_total_desc
+        R.string.achievement_task_total_name, R.string.achievement_task_total_desc,
+        R.plurals.achievement_task_total_unit
     )
     AchievementId.NIGHT_OWL -> AchievementVisuals(
         R.drawable.owl_24px,
-        R.string.achievement_night_owl_name, R.string.achievement_night_owl_desc
+        R.string.achievement_night_owl_name, R.string.achievement_night_owl_desc,
+        R.plurals.achievement_night_owl_unit
     )
     AchievementId.EARLY_BIRD -> AchievementVisuals(
         R.drawable.wb_twilight_24px,
-        R.string.achievement_early_bird_name, R.string.achievement_early_bird_desc
+        R.string.achievement_early_bird_name, R.string.achievement_early_bird_desc,
+        R.plurals.achievement_early_bird_unit
     )
     AchievementId.FLAWLESS_MONDAY -> AchievementVisuals(
         R.drawable.calendar_month_24px,
-        R.string.achievement_flawless_monday_name, R.string.achievement_flawless_monday_desc
+        R.string.achievement_flawless_monday_name, R.string.achievement_flawless_monday_desc,
+        R.plurals.achievement_flawless_monday_unit
     )
     AchievementId.SUNDAY_FUN_DAY -> AchievementVisuals(
         R.drawable.task_alt_24px,
-        R.string.achievement_sunday_fun_day_name, R.string.achievement_sunday_fun_day_desc
+        R.string.achievement_sunday_fun_day_name, R.string.achievement_sunday_fun_day_desc,
+        R.plurals.achievement_sunday_fun_day_unit
     )
     AchievementId.PRODUCTIVE_MORNING -> AchievementVisuals(
         R.drawable.wb_sunny_24px,
         R.string.achievement_productive_morning_name,
-        R.string.achievement_productive_morning_desc
+        R.string.achievement_productive_morning_desc,
+        R.plurals.achievement_productive_morning_unit
     )
     AchievementId.ON_TIME -> AchievementVisuals(
         R.drawable.event_available_24px,
-        R.string.achievement_on_time_name, R.string.achievement_on_time_desc
+        R.string.achievement_on_time_name, R.string.achievement_on_time_desc,
+        R.plurals.achievement_on_time_unit
     )
     AchievementId.FLAWLESS_WEEK -> AchievementVisuals(
         R.drawable.view_week_24px,
-        R.string.achievement_flawless_week_name, R.string.achievement_flawless_week_desc
+        R.string.achievement_flawless_week_name, R.string.achievement_flawless_week_desc,
+        R.plurals.achievement_flawless_week_unit
     )
     AchievementId.COMEBACK -> AchievementVisuals(
         R.drawable.restart_alt_24px,
-        R.string.achievement_comeback_name, R.string.achievement_comeback_desc
+        R.string.achievement_comeback_name, R.string.achievement_comeback_desc,
+        R.plurals.achievement_comeback_unit
     )
 }
 
@@ -273,7 +312,7 @@ private fun visualsFor(id: AchievementId): AchievementVisuals = when (id) {
  */
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
+internal fun shapeForTier(tierReached: Int, totalTiers: Int): Shape = when {
     totalTiers == 1 -> if (tierReached >= 1) MaterialShapes.SoftBurst.toShape()
     else MaterialShapes.Cookie4Sided.toShape()
 
@@ -409,9 +448,13 @@ private fun HeroSummary(achievements: List<AchievementProgress>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = Modifier) {
+private fun AchievementCard(
+    progress: AchievementProgress,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val visuals = visualsFor(progress.definition.id)
     val tier = progress.tierReached
     val totalTiers = progress.definition.tiers.size
@@ -445,6 +488,7 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
     else MaterialTheme.colorScheme.onPrimary
 
     Card(
+        onClick = onClick,
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -586,6 +630,24 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
 }
 
 /**
+ * Cookie fill + icon tint shared by the compact badges and the detail sheet, so
+ * a badge and the sheet it opens always look like the same object.
+ */
+@Composable
+internal fun cookieContainerColor(locked: Boolean): Color = if (locked) {
+    MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+} else {
+    MaterialTheme.colorScheme.primary
+}
+
+@Composable
+internal fun cookieContentColor(locked: Boolean): Color = if (locked) {
+    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+} else {
+    MaterialTheme.colorScheme.onPrimary
+}
+
+/**
  * Compact representation of an achievement that is either still locked or
  * already maxed.
  *
@@ -596,22 +658,16 @@ private fun AchievementCard(progress: AchievementProgress, modifier: Modifier = 
 private fun AchievementBadge(
     progress: AchievementProgress,
     locked: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val visuals = visualsFor(progress.definition.id)
     val shape = shapeForTier(progress.tierReached, progress.definition.tiers.size)
-    val cookieColor = if (locked) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    val iconTint = if (locked) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-    } else {
-        MaterialTheme.colorScheme.onPrimary
-    }
+    val cookieColor = cookieContainerColor(locked)
+    val iconTint = cookieContentColor(locked)
 
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier.fillMaxWidth()

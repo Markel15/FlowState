@@ -124,4 +124,11 @@
     <string name="achievement_on_time_desc">Completa tareas antes de su fecha límite</string>
     <string name="achievement_productive_morning_name">Mañana productiva</string>
     <string name="achievement_productive_morning_desc">Completa 3 tareas antes del mediodía en un mismo día</string>
+    <string name="achievement_state_completed">Nivel %1$d de %2$d · completado</string>
+    <string name="achievement_state_in_progress">Nivel %1$d de %2$d</string>
+    <string name="achievement_state_locked">Por desbloquear</string>
+    <string name="achievement_detail_level">Nivel %1$d</string>
+    <string name="achievement_detail_progress_title">Progreso por niveles</string>
+    <string name="achievement_detail_next_level">Próximo nivel</string>
+    <string name="achievement_detail_first_level">Primer nivel</string>
 </resources>
