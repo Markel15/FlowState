@@ -7,21 +7,54 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 
-/** Task-derived raw values used by the achievement catalog. */
+/** A date and how many times the event happened on it. */
+data class DayCount(val date: LocalDate, val count: Int)
+
+/**
+ * Task-derived raw values used by the achievement catalog.
+ *
+ * Same idea as [HabitAchievementMetrics]: keep the dates that produced each
+ * counter so the UI can date every tier, and derive the counters from them.
+ * `totalDone` is the only exception — it mirrors "tasks marked as done", which
+ * is not exactly the same as "tasks with a completion timestamp" — so it is
+ * tracked separately and never used to date a tier.
+ */
 data class TaskDerivedMetrics(
-    /** Tasks completed between midnight and 5 AM (night owl sessions). */
-    val nightOwlTasks: Int,
-    /** Most tasks completed on a single Sunday. */
-    val bestSundayTasks: Int,
-    /** Every task currently marked as done. */
-    val totalDone: Int,
-    /** Tasks wrapped up before 7 AM (early bird sessions). */
-    val earlyBirdTasks: Int,
-    /** Tasks completed on or before their due date. */
-    val onTimeTasks: Int,
+    /** One entry per completed task with a timestamp, ascending. */
+    val completionDates: List<LocalDate>,
+    /** Tasks completed between midnight and 5 AM. */
+    val nightOwlDates: List<LocalDate>,
+    /** Tasks wrapped up before 7 AM. */
+    val earlyBirdDates: List<LocalDate>,
     /** Days when at least 3 tasks were completed before noon. */
-    val productiveMornings: Int
-)
+    val productiveMorningDates: List<LocalDate>,
+    /** Tasks completed on or before their due date. */
+    val onTimeDates: List<LocalDate>,
+    /** Tasks completed on a Sunday, grouped by date, ascending. */
+    val sundayCounts: List<DayCount>,
+    /** Every task currently marked as done, with or without a timestamp. */
+    val doneTasks: Int
+) {
+    val totalDone: Int get() = doneTasks
+    val nightOwlTasks: Int get() = nightOwlDates.size
+    val earlyBirdTasks: Int get() = earlyBirdDates.size
+    val productiveMornings: Int get() = productiveMorningDates.size
+    val onTimeTasks: Int get() = onTimeDates.size
+    /** Most tasks completed on a single Sunday. */
+    val bestSundayTasks: Int get() = sundayCounts.maxOfOrNull { it.count } ?: 0
+
+    companion object {
+        val EMPTY = TaskDerivedMetrics(
+            completionDates = emptyList(),
+            nightOwlDates = emptyList(),
+            earlyBirdDates = emptyList(),
+            productiveMorningDates = emptyList(),
+            onTimeDates = emptyList(),
+            sundayCounts = emptyList(),
+            doneTasks = 0
+        )
+    }
+}
 
 private const val NIGHT_OWL_END_HOUR = 5
 private const val EARLY_BIRD_END_HOUR = 7
@@ -39,49 +72,53 @@ fun computeTaskDerivedMetrics(
     zone: ZoneId = ZoneId.systemDefault()
 ): TaskDerivedMetrics {
     val completionDates = mutableListOf<LocalDate>()
+    val nightOwlDates = mutableListOf<LocalDate>()
+    val earlyBirdDates = mutableListOf<LocalDate>()
+    val onTimeDates = mutableListOf<LocalDate>()
     val morningCounts = mutableMapOf<LocalDate, Int>()
-    var nightOwl = 0
-    var earlyBird = 0
-    var onTime = 0
+    val sundayCounts = mutableMapOf<LocalDate, Int>()
 
     tasks.forEach { task ->
         val completedAt = task.completedAt ?: return@forEach
         if (!task.isDone) return@forEach
         val zoned = Instant.ofEpochMilli(completedAt).atZone(zone)
+        val date = zoned.toLocalDate()
         val time = zoned.toLocalTime()
+
+        completionDates += date
+        if (date.dayOfWeek == DayOfWeek.SUNDAY) {
+            sundayCounts[date] = (sundayCounts[date] ?: 0) + 1
+        }
         if (time < LocalTime.of(NIGHT_OWL_END_HOUR, 0)) {
-            nightOwl++
+            nightOwlDates += date
         }
         if (time < LocalTime.of(EARLY_BIRD_END_HOUR, 0)) {
-            earlyBird++
+            earlyBirdDates += date
         }
         if (time < LocalTime.NOON) {
-            val date = zoned.toLocalDate()
             morningCounts[date] = (morningCounts[date] ?: 0) + 1
         }
         val dueDate = task.dueDate
         if (dueDate != null) {
             val dueDay = Instant.ofEpochMilli(dueDate).atZone(zone).toLocalDate()
-            if (!zoned.toLocalDate().isAfter(dueDay)) {
-                onTime++
+            if (!date.isAfter(dueDay)) {
+                onTimeDates += date
             }
         }
-        completionDates += zoned.toLocalDate()
     }
 
-    val bestSunday = completionDates
-        .filter { it.dayOfWeek == DayOfWeek.SUNDAY }
-        .groupingBy { it }
-        .eachCount()
-        .values
-        .maxOrNull() ?: 0
-
     return TaskDerivedMetrics(
-        nightOwlTasks = nightOwl,
-        bestSundayTasks = bestSunday,
-        totalDone = tasks.count { it.isDone },
-        earlyBirdTasks = earlyBird,
-        onTimeTasks = onTime,
-        productiveMornings = morningCounts.values.count { it >= PRODUCTIVE_MORNING_MIN_TASKS }
+        completionDates = completionDates.sorted(),
+        nightOwlDates = nightOwlDates.sorted(),
+        earlyBirdDates = earlyBirdDates.sorted(),
+        productiveMorningDates = morningCounts
+            .filterValues { it >= PRODUCTIVE_MORNING_MIN_TASKS }
+            .keys
+            .sorted(),
+        onTimeDates = onTimeDates.sorted(),
+        sundayCounts = sundayCounts
+            .map { (date, count) -> DayCount(date, count) }
+            .sortedBy { it.date },
+        doneTasks = tasks.count { it.isDone }
     )
 }

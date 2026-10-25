@@ -49,4 +49,8 @@
         <item quantity="one">regreso</item>
         <item quantity="other">regresos</item>
     </plurals>
+    <plurals name="achievement_detail_remaining">
+        <item quantity="one">falta %1$d</item>
+        <item quantity="other">faltan %1$d</item>
+    </plurals>
 </resources>

@@ -129,6 +129,4 @@
     <string name="achievement_state_locked">Por desbloquear</string>
     <string name="achievement_detail_level">Nivel %1$d</string>
     <string name="achievement_detail_progress_title">Progreso por niveles</string>
-    <string name="achievement_detail_next_level">Próximo nivel</string>
-    <string name="achievement_detail_first_level">Primer nivel</string>
 </resources>

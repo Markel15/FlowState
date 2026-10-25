@@ -129,6 +129,4 @@
     <string name="achievement_state_locked">Not unlocked yet</string>
     <string name="achievement_detail_level">Level %1$d</string>
     <string name="achievement_detail_progress_title">Level progress</string>
-    <string name="achievement_detail_next_level">Next level</string>
-    <string name="achievement_detail_first_level">First level</string>
 </resources>

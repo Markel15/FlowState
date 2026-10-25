@@ -1,5 +1,7 @@
 package com.markel.flowstate.feature.settings
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -25,8 +28,15 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -36,6 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.markel.flowstate.core.domain.achievements.AchievementProgress
 import java.text.NumberFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Read-only detail sheet shared by every achievement state.
@@ -173,16 +187,34 @@ private fun StateLine(tier: Int, totalTiers: Int, locked: Boolean, maxed: Boolea
 }
 
 /**
- * The current value in its own unit, plus what the next milestone asks for.
- * A maxed achievement leaves the right slot free on purpose: that is where the
- * unlock date lands once the tier dates are derived.
+ * Hero stat of the sheet: the raw value in its own unit, plus a ring that
+ * answers "how much is left" at a glance.
+ *
+ * The target itself is spelled out one line below in the ladder and the unlock
+ * date already sits on its rung, so repeating either of them here only ate
+ * space: what the panel adds is the distance left, shown as a shape that can be
+ * read without doing arithmetic. When the achievement is maxed there is nothing
+ * left to measure, so the ring closes, settles (no wave) and shows a check.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CountPanel(
     visuals: AchievementVisuals,
     progress: AchievementProgress,
     locked: Boolean
 ) {
+    val target = if (locked) progress.definition.tiers.first() else progress.nextTier
+    val fraction = target?.let { (progress.current.toFloat() / it).coerceIn(0f, 1f) }
+
+    // Grows from empty when the sheet opens, like the bars in the grid.
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { started = true }
+    val animatedFraction by animateFloatAsState(
+        targetValue = if (started) (fraction ?: 1f) else 0f,
+        animationSpec = tween(durationMillis = 700),
+        label = "detailRing"
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -190,11 +222,11 @@ private fun CountPanel(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = RoundedCornerShape(20.dp)
             )
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = formatCount(progress.current),
                 style = MaterialTheme.typography.displaySmall,
@@ -207,23 +239,33 @@ private fun CountPanel(
             )
         }
 
-        val target = if (locked) progress.definition.tiers.first() else progress.nextTier
-        if (target != null) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = stringResource(
-                        if (locked) R.string.achievement_detail_first_level
-                        else R.string.achievement_detail_next_level
-                    ).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(76.dp)
+        ) {
+            CircularWavyProgressIndicator(
+                progress = { animatedFraction },
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                stroke = Stroke(width = 12f, cap = StrokeCap.Round),
+                trackStroke = Stroke(width = 12f, cap = StrokeCap.Round),
+                // The wave settles once there is nothing left to chase.
+                amplitude = { if (progress.maxed) 0f else 1f },
+                modifier = Modifier.size(76.dp)
+            )
+            if (progress.maxed) {
+                Icon(
+                    imageVector = ImageVector.vectorResource(R.drawable.check_24px),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
                 )
+            } else {
                 Text(
-                    text = formatCount(target),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    text = "${(animatedFraction * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -327,17 +369,28 @@ private fun LevelRow(
 
         Column(
             modifier = Modifier
-                .width(74.dp)
+                .width(84.dp)
                 .padding(vertical = 7.dp),
             horizontalAlignment = Alignment.End
         ) {
             when {
-                reached -> Icon(
-                    imageVector = ImageVector.vectorResource(R.drawable.check_24px),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+                reached -> {
+                    progress.tierDates.getOrNull(index)?.let { date ->
+                        Text(
+                            text = formatDate(date),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                    }
+                    Icon(
+                        imageVector = ImageVector.vectorResource(R.drawable.check_24px),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 inProgress -> {
                     Text(
                         text = stringResource(
@@ -388,3 +441,7 @@ private fun requirementText(visuals: AchievementVisuals, target: Int): String {
 
 /** Grouping separators for the locale (6.482 in Spanish, 6,482 in English). */
 private fun formatCount(value: Int): String = NumberFormat.getIntegerInstance().format(value.toLong())
+
+/** "7 feb 2026" / "7 Feb 2026": short and unambiguous in both locales. */
+private fun formatDate(date: LocalDate): String =
+    date.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault()))

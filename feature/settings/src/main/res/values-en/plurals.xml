@@ -49,4 +49,8 @@
         <item quantity="one">comeback</item>
         <item quantity="other">comebacks</item>
     </plurals>
+    <plurals name="achievement_detail_remaining">
+        <item quantity="one">%1$d left</item>
+        <item quantity="other">%1$d left</item>
+    </plurals>
 </resources>
