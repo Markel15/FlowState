@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.markel.flowstate.core.data.FlowCardHeight
 import com.markel.flowstate.core.data.ThemeMode
 import com.markel.flowstate.feature.settings.components.settingsItemShape
 
@@ -41,10 +42,12 @@ fun AppearanceScreen(
     currentDynamicColor: Boolean,
     currentPureSurfaces: Boolean,
     currentSystemFont: Boolean,
+    currentCardHeight: FlowCardHeight,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onPureSurfacesChange: (Boolean) -> Unit,
     onSystemFontChange: (Boolean) -> Unit,
+    onCardHeightChange: (FlowCardHeight) -> Unit,
     onBack: () -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -123,7 +126,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 4))
+                modifier = Modifier.clip(settingsItemShape(index = 0, totalItems = 5))
             )
 
             // ── Dynamic color ──
@@ -157,7 +160,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 4))
+                modifier = Modifier.clip(settingsItemShape(index = 1, totalItems = 5))
             )
 
             // ── Pure surfaces ──
@@ -184,7 +187,7 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 2, totalItems = 4))
+                modifier = Modifier.clip(settingsItemShape(index = 2, totalItems = 5))
             )
 
             // ── System font ──
@@ -211,7 +214,53 @@ fun AppearanceScreen(
                 colors = ListItemDefaults.colors(
                     containerColor = groupContainerColor
                 ),
-                modifier = Modifier.clip(settingsItemShape(index = 3, totalItems = 4))
+                modifier = Modifier.clip(settingsItemShape(index = 3, totalItems = 5))
+            )
+
+            // ── Flow card height ──
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = stringResource(R.string.settings_flow_cards),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                },
+                supportingContent = {
+                    Column {
+                        Text(text = stringResource(R.string.settings_flow_cards_desc))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(groupContainerColor)
+                                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                        ) {
+                            FlowCardHeight.entries.forEach { mode ->
+                                ToggleButton(
+                                    checked = currentCardHeight == mode,
+                                    onCheckedChange = { onCardHeightChange(mode) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ToggleButtonDefaults.toggleButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                    ),
+                                ) {
+                                    Text(
+                                        text = when (mode) {
+                                            FlowCardHeight.UNIFORM ->
+                                                stringResource(R.string.settings_flow_cards_uniform)
+                                            FlowCardHeight.CONTENT ->
+                                                stringResource(R.string.settings_flow_cards_content)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                colors = ListItemDefaults.colors(
+                    containerColor = groupContainerColor
+                ),
+                modifier = Modifier.clip(settingsItemShape(index = 4, totalItems = 5))
             )
         }
     }

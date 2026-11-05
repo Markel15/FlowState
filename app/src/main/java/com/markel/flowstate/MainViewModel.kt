@@ -2,6 +2,7 @@ package com.markel.flowstate
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.markel.flowstate.core.data.FlowCardHeight
 import com.markel.flowstate.core.data.MainTab
 import com.markel.flowstate.core.data.ThemeMode
 import com.markel.flowstate.core.data.UserPreferencesRepository
@@ -68,6 +69,14 @@ class MainViewModel @Inject constructor(
             initialValue = false
         )
 
+    /** How the Flow cards are sized: fixed height or grown with their content */
+    val flowCardHeight: StateFlow<FlowCardHeight> = userPreferencesRepository.flowCardHeight
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = FlowCardHeight.DEFAULT
+        )
+
     init {
         viewModelScope.launch {
             // Combine last tab with hidden tabs to ensure startDestination is always visible
@@ -121,6 +130,12 @@ class MainViewModel @Inject constructor(
     fun saveSystemFont(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.saveSystemFont(enabled)
+        }
+    }
+
+    fun saveFlowCardHeight(mode: FlowCardHeight) {
+        viewModelScope.launch {
+            userPreferencesRepository.saveFlowCardHeight(mode)
         }
     }
 

@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity() {
             val dynamicColor by mainViewModel.dynamicColor.collectAsStateWithLifecycle()
             val pureSurfaces by mainViewModel.pureSurfaces.collectAsStateWithLifecycle()
             val systemFont by mainViewModel.systemFont.collectAsStateWithLifecycle()
+            val flowCardHeight by mainViewModel.flowCardHeight.collectAsStateWithLifecycle()
 
             splashScreen.setKeepOnScreenCondition { !isReady }
 
@@ -133,6 +134,8 @@ class MainActivity : ComponentActivity() {
                                 onDynamicColorChange = mainViewModel::saveDynamicColor,
                                 onPureSurfacesChange = mainViewModel::savePureSurfaces,
                                 onSystemFontChange = mainViewModel::saveSystemFont,
+                                flowCardHeight = flowCardHeight,
+                                onFlowCardHeightChange = mainViewModel::saveFlowCardHeight,
                                 sharedTransitionScope = this,
                                 bottomBar = {
                                     FlowBottomBar(

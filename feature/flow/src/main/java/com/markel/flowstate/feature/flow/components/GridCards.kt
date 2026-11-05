@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,30 +13,43 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.markel.flowstate.core.data.FlowCardHeight
+import com.markel.flowstate.core.designsystem.components.FillHeightText
 import com.markel.flowstate.core.designsystem.ui.CheckListSharedKeys
 import com.markel.flowstate.core.designsystem.ui.IdeaSharedKeys
-import com.markel.flowstate.core.designsystem.ui.TaskSharedKeys
 import com.markel.flowstate.core.designsystem.ui.sharedCardBounds
 import com.markel.flowstate.core.domain.CheckList
 import com.markel.flowstate.core.domain.Idea
-import com.markel.flowstate.core.domain.Priority
-import com.markel.flowstate.core.domain.Task
-import com.markel.flowstate.feature.flow.tasks.components.formatDate
-import com.markel.flowstate.feature.flow.tasks.components.isDateOverdue
-import com.markel.flowstate.feature.flow.tasks.util.asColor
 import com.markel.flowstate.feature.tasks.R
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
- * Cap on the idea body before it is truncated with an ellipsis.
+ * Fixed height shared by **every** idea card when [FlowCardHeight.UNIFORM] is
+ * selected, so a row of them lines up instead of producing a ragged masonry of
+ * 60dp and 160dp cards. Ignored in [FlowCardHeight.CONTENT].
  *
- * The card sizes itself to its content, so this is what bounds the height.
- * `heightIn(max = …)` would clip the text instead, which is why it is not used.
+ * Inside that height the space is distributed by content:
+ *  - idea with a body → title capped at [IDEA_TITLE_MAX_LINES], body fills the
+ *    rest of the card ([FillHeightText]);
+ *  - idea without a body → the title itself fills the whole card, so a long
+ *    title is no longer cut at 2 lines with half the card empty.
+ */
+private const val IDEA_CARD_HEIGHT_DP = 136
+
+/**
+ * Title lines allowed when the idea also has a body.
+ *
+ * Without a body the title is not capped: it fills the card and ellipsizes on
+ * the last line that fits.
+ */
+private const val IDEA_TITLE_MAX_LINES = 2
+
+/**
+ * Hard cap for [FlowCardHeight.CONTENT] mode only.
+ *
+ * There the card grows with its text, so this is not a layout budget but a
+ * guard: without it a 40-line idea would own the whole scroll.
  */
 private const val IDEA_CONTENT_MAX_LINES = 8
 
@@ -50,12 +62,14 @@ private const val CHECK_LIST_VISIBLE_ITEMS = 5
 fun IdeaGridCard(
     idea: Idea,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardHeight: FlowCardHeight = FlowCardHeight.UNIFORM,
 ) {
     val resolvedColor = idea.color.resolveIdeaColor()
     val isTransparent = resolvedColor == COLOR_TRANSPARENT
     val cardColor = if (isTransparent) Color.Transparent else Color(resolvedColor)
     val shape = RoundedCornerShape(12.dp)
+    val isUniform = cardHeight == FlowCardHeight.UNIFORM
 
     Card(
         onClick = onClick,
@@ -63,6 +77,7 @@ fun IdeaGridCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         modifier = modifier
             .fillMaxWidth()
+            .then(if (isUniform) Modifier.height(IDEA_CARD_HEIGHT_DP.dp) else Modifier)
             .sharedCardBounds(key = IdeaSharedKeys.container(idea.id), shape = shape)
             .then(
                 if (isTransparent) Modifier.border(
@@ -72,21 +87,50 @@ fun IdeaGridCard(
                 ) else Modifier
             )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = idea.title,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (idea.content.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
+        val titleStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+        val bodyStyle = MaterialTheme.typography.bodySmall
+        val hasBody = idea.content.isNotBlank()
+        val textColor = if (hasBody) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+
+        Column(
+            modifier = Modifier
+                .then(if (isUniform) Modifier.fillMaxHeight() else Modifier)
+                .padding(12.dp)
+        ) {
+            if (hasBody) {
                 Text(
-                    text = idea.content,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = IDEA_CONTENT_MAX_LINES,
+                    text = idea.title,
+                    style = titleStyle,
+                    maxLines = IDEA_TITLE_MAX_LINES,
                     overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+
+            if (isUniform) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = if (hasBody) Alignment.TopStart else Alignment.Center
+                ) {
+                    FillHeightText(
+                        text = if (hasBody) idea.content else idea.title,
+                        style = if (hasBody) bodyStyle else titleStyle,
+                        color = textColor,
+                    )
+                }
+            } else {
+                Text(
+                    text = if (hasBody) idea.content else idea.title,
+                    style = if (hasBody) bodyStyle else titleStyle,
+                    color = textColor,
+                    maxLines = IDEA_CONTENT_MAX_LINES,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

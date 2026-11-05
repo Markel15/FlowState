@@ -53,6 +53,10 @@
     <string name="settings_pure_surfaces_desc">Fondos en negro puro en el tema oscuro y blanco puro en el claro</string>
     <string name="settings_system_font">Fuente del sistema</string>
     <string name="settings_system_font_desc">Usa la tipografía del dispositivo</string>
+    <string name="settings_flow_cards">Tarjetas de Flow</string>
+    <string name="settings_flow_cards_desc">Altura fija o ajustada a su contenido</string>
+    <string name="settings_flow_cards_uniform">Uniforme</string>
+    <string name="settings_flow_cards_content">Adaptable</string>
     <string name="settings_dynamic_color">Color dinámico</string>
     <string name="settings_dynamic_color_desc">Adaptar colores al fondo de pantalla (Android 12+)</string>
     <string name="settings_dynamic_color_unavailable">Requiere Android 12 o superior</string>

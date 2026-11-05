@@ -199,4 +199,24 @@ class UserPreferencesRepository @Inject constructor(
             preferences[LAST_CATEGORY_ID_KEY] = id
         }
     }
+
+    // ── Flow screen card height ───────────────────────────────────
+
+    private val FLOW_CARD_HEIGHT_KEY = stringPreferencesKey("flow_card_height")
+
+    /** Uniform-height cards (default) or cards that grow with their content. */
+    val flowCardHeight: Flow<FlowCardHeight> = context.dataStore.data.map { preferences ->
+        val name = preferences[FLOW_CARD_HEIGHT_KEY] ?: FlowCardHeight.DEFAULT.name
+        try {
+            FlowCardHeight.valueOf(name)
+        } catch (_: IllegalArgumentException) {
+            FlowCardHeight.DEFAULT
+        }
+    }
+
+    suspend fun saveFlowCardHeight(mode: FlowCardHeight) {
+        context.dataStore.edit { preferences ->
+            preferences[FLOW_CARD_HEIGHT_KEY] = mode.name
+        }
+    }
 }
