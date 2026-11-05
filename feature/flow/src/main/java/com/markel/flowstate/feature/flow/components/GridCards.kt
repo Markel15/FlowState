@@ -43,7 +43,7 @@ private const val IDEA_CARD_HEIGHT_DP = 136
  * Without a body the title is not capped: it fills the card and ellipsizes on
  * the last line that fits.
  */
-private const val IDEA_TITLE_MAX_LINES = 2
+private const val IDEA_TITLE_MAX_LINES = 3
 
 /**
  * Hard cap for [FlowCardHeight.CONTENT] mode only.
@@ -90,48 +90,69 @@ fun IdeaGridCard(
         val titleStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
         val bodyStyle = MaterialTheme.typography.bodySmall
         val hasBody = idea.content.isNotBlank()
-        val textColor = if (hasBody) {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
 
         Column(
             modifier = Modifier
                 .then(if (isUniform) Modifier.fillMaxHeight() else Modifier)
                 .padding(12.dp)
         ) {
-            if (hasBody) {
-                Text(
+            when {
+                // ── UNIFORM · title + body ────────────────────────────────
+                isUniform && hasBody -> {
+                    Text(
+                        text = idea.title,
+                        style = titleStyle,
+                        maxLines = IDEA_TITLE_MAX_LINES,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        FillHeightText(
+                            text = idea.content,
+                            style = bodyStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // ── UNIFORM · title only ─────────────────────────────────
+                isUniform -> FillHeightText(
                     text = idea.title,
                     style = titleStyle,
-                    maxLines = IDEA_TITLE_MAX_LINES,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(4.dp))
-            }
 
-            if (isUniform) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = if (hasBody) Alignment.TopStart else Alignment.Center
-                ) {
-                    FillHeightText(
-                        text = if (hasBody) idea.content else idea.title,
-                        style = if (hasBody) bodyStyle else titleStyle,
-                        color = textColor,
-                    )
+                // ── ADAPTABLE ──────────────────────────────────────────────
+                else -> {
+                    if (hasBody) {
+                        Text(
+                            text = idea.title,
+                            style = titleStyle,
+                            maxLines = IDEA_TITLE_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = idea.content,
+                            style = bodyStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = IDEA_CONTENT_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        Text(
+                            text = idea.title,
+                            style = titleStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = IDEA_CONTENT_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-            } else {
-                Text(
-                    text = if (hasBody) idea.content else idea.title,
-                    style = if (hasBody) bodyStyle else titleStyle,
-                    color = textColor,
-                    maxLines = IDEA_CONTENT_MAX_LINES,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }
