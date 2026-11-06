@@ -257,7 +257,8 @@ fun SectionedFlowView(
                         CheckListGridCard(
                             checkList = item.checkList,
                             onClick = { onCheckListClick(item.checkList) },
-                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
+                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp),
+                            cardHeight = cardHeight,
                         )
                     }
 

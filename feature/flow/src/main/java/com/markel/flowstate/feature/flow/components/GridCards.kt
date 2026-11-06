@@ -25,9 +25,10 @@ import com.markel.flowstate.core.domain.Idea
 import com.markel.flowstate.feature.tasks.R
 
 /**
- * Fixed height shared by **every** idea card when [FlowCardHeight.UNIFORM] is
- * selected, so a row of them lines up instead of producing a ragged masonry of
- * 60dp and 160dp cards. Ignored in [FlowCardHeight.CONTENT].
+ * Fixed height shared by **every** card of the grid (ideas and checklists) when
+ * [FlowCardHeight.UNIFORM] is selected, so a row of them lines up instead of
+ * producing a ragged masonry of 60dp and 160dp cards. Ignored in
+ * [FlowCardHeight.CONTENT].
  *
  * Inside that height the space is distributed by content:
  *  - idea with a body → title capped at [IDEA_TITLE_MAX_LINES], body fills the
@@ -35,7 +36,7 @@ import com.markel.flowstate.feature.tasks.R
  *  - idea without a body → the title itself fills the whole card, so a long
  *    title is no longer cut at 2 lines with half the card empty.
  */
-private const val IDEA_CARD_HEIGHT_DP = 136
+private const val FLOW_CARD_HEIGHT_DP = 146
 
 /**
  * Title lines allowed when the idea also has a body.
@@ -55,6 +56,13 @@ private const val IDEA_CONTENT_MAX_LINES = 8
 
 /** Pending items rendered inside a checklist card before the "+N more" line. */
 private const val CHECK_LIST_VISIBLE_ITEMS = 5
+
+/**
+ * Same, but for [FlowCardHeight.UNIFORM], where the height is fixed and the items
+ * have to fit inside it.
+ *
+*/
+private const val CHECK_LIST_VISIBLE_ITEMS_UNIFORM = 4
 
 // ── Idea ──────────────────────────────────────────────────────────────────────
 
@@ -77,7 +85,7 @@ fun IdeaGridCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         modifier = modifier
             .fillMaxWidth()
-            .then(if (isUniform) Modifier.height(IDEA_CARD_HEIGHT_DP.dp) else Modifier)
+            .then(if (isUniform) Modifier.height(FLOW_CARD_HEIGHT_DP.dp) else Modifier)
             .sharedCardBounds(key = IdeaSharedKeys.container(idea.id), shape = shape)
             .then(
                 if (isTransparent) Modifier.border(
@@ -164,12 +172,14 @@ fun IdeaGridCard(
 fun CheckListGridCard(
     checkList: CheckList,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardHeight: FlowCardHeight = FlowCardHeight.UNIFORM,
 ) {
     val resolvedColor = checkList.color.resolveIdeaColor()
     val isTransparent = resolvedColor == COLOR_TRANSPARENT
     val cardColor = if (isTransparent) Color.Transparent else Color(resolvedColor)
     val shape = RoundedCornerShape(12.dp)
+    val isUniform = cardHeight == FlowCardHeight.UNIFORM
 
     Card(
         shape = shape,
@@ -177,6 +187,7 @@ fun CheckListGridCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         modifier = modifier
             .fillMaxWidth()
+            .then(if (isUniform) Modifier.height(FLOW_CARD_HEIGHT_DP.dp) else Modifier)
             .sharedCardBounds(
                 key = CheckListSharedKeys.container(checkList.id),
                 shape = shape
@@ -198,7 +209,9 @@ fun CheckListGridCard(
             )
             Spacer(Modifier.height(6.dp))
             val pendingItems = checkList.items.filter { !it.isDone }
-            val visibleItems = pendingItems.take(CHECK_LIST_VISIBLE_ITEMS)
+            val visibleItems = pendingItems.take(
+                if (isUniform) CHECK_LIST_VISIBLE_ITEMS_UNIFORM else CHECK_LIST_VISIBLE_ITEMS
+            )
             visibleItems.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
