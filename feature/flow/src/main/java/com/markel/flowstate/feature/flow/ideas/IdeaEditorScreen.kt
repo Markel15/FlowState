@@ -260,6 +260,8 @@ fun IdeaEditorScreen(
                     .defaultMinSize(minHeight = 300.dp)
                     .focusRequester(contentFocusRequester)
             )
+            // Scrollable breathing room
+            Spacer(Modifier.height(80.dp))
         }
     }
 
