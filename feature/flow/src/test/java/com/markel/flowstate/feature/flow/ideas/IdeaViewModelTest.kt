@@ -1,5 +1,7 @@
 package com.markel.flowstate.feature.flow.ideas
 
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.text.TextRange
 import app.cash.turbine.test
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.CategoryRepository
@@ -29,6 +31,19 @@ class IdeaViewModelTest {
     private val userPreferencesRepository: UserPreferencesRepository = mockk(relaxed = true)
     private lateinit var viewModel: IdeaEditorViewModel
 
+    /**
+     * Simulates the user typing in the body field (now a hoisted TextFieldState).
+     *
+     * In production, the Compose frame loop delivers snapshot apply notifications
+     * automatically, so the ViewModel's snapshotFlow-based autosave sees every edit.
+     * Plain JVM tests have no frame loop: we must call Snapshot.sendApplyNotifications()
+     * after each edit, otherwise the autosave flow never observes the change.
+     */
+    private fun IdeaEditorViewModel.typeContent(text: String) {
+        contentState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
+
     @Test
     fun openNew_resetsEditorState() = runTest {
         // GIVEN - A fresh ViewModel instance
@@ -42,8 +57,8 @@ class IdeaViewModelTest {
             val state = awaitItem()
             assertNull(state.idea)
             assertEquals("", state.title)
-            assertEquals("", state.content)
         }
+        assertEquals("", viewModel.contentState.text.toString())
     }
 
     @Test
@@ -62,6 +77,9 @@ class IdeaViewModelTest {
             assertEquals("Original", state.title)
             assertEquals(0xFF123456L, state.color)
         }
+        // Body text is loaded into the hoisted TextFieldState, cursor at the end
+        assertEquals("Content", viewModel.contentState.text.toString())
+        assertEquals(TextRange("Content".length), viewModel.contentState.selection)
     }
 
     @Test
@@ -71,16 +89,16 @@ class IdeaViewModelTest {
 
         // WHEN - The user types a new title, content and changes the color
         viewModel.updateTitle("New Idea")
-        viewModel.updateContent("Content of the idea")
+        viewModel.typeContent("Content of the idea")
         viewModel.updateColor(0xFF654321L)
 
         // THEN - The UI state should be updated with the new values immediately
         viewModel.editor.test {
             val state = awaitItem()
             assertEquals("New Idea", state.title)
-            assertEquals("Content of the idea", state.content)
             assertEquals(0xFF654321L, state.color)
         }
+        assertEquals("Content of the idea", viewModel.contentState.text.toString())
     }
 
     @Test
@@ -88,7 +106,7 @@ class IdeaViewModelTest {
         // GIVEN - A new idea being composed in the editor
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
         viewModel.updateTitle("New Title")
-        viewModel.updateContent("New Content")
+        viewModel.typeContent("New Content")
 
         // WHEN - Closing the editor (which triggers the save logic)
         viewModel.closeAndSave()
@@ -137,7 +155,7 @@ class IdeaViewModelTest {
         viewModel.updateTitle("My idea")
         advanceTimeBy(900) // first autosave → should insert and save ID=42
 
-        viewModel.updateContent("More text")
+        viewModel.typeContent("More text")
         advanceTimeBy(900) // second autosave → should update id=42, NOT insert a new one
 
         // THEN - upsertIdea was called exactly twice...
@@ -253,6 +271,54 @@ class IdeaViewModelTest {
         coVerify { repository.deleteIdea(idea) }
     }
 
+    /**
+     * New contract after the TextFieldState migration: body-only edits (no title,
+     * color or category changes) must also trigger the debounced autosave, because
+     * content changes now travel through snapshotFlow { contentState.text } instead
+     * of the _editor StateFlow.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_contentOnlyEdit_persistsContent() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 7L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+
+        // WHEN - The user only types in the body field
+        viewModel.typeContent("Only body text")
+        advanceTimeBy(900)
+
+        // THEN - The autosave persisted the body text
+        coVerify(exactly = 1) {
+            repository.upsertIdea(match { it.content == "Only body text" })
+        }
+    }
+
+    /**
+     * Editing the body of an EXISTING idea must update that idea (same ID),
+     * never create a new one.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_contentEditOnExistingIdea_updatesSameId() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 5L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        val idea = Idea(id = 5, title = "Original", content = "Old body", color = 0L)
+        viewModel.openExisting(idea)
+
+        // WHEN - The user edits only the body
+        viewModel.typeContent("New body")
+        advanceTimeBy(900)
+
+        // THEN - Updated with id=5 and the new body; no insertion with id=0
+        coVerify(atLeast = 1) {
+            repository.upsertIdea(match { it.id == 5 && it.content == "New body" })
+        }
+        coVerify(exactly = 0) {
+            repository.upsertIdea(match { it.id == 0 })
+        }
+    }
+
 
     /**
      * Invokes the protected [androidx.lifecycle.ViewModel.onCleared] via
@@ -290,12 +356,13 @@ class IdeaViewModelTest {
         // WHEN — Nav3 destroys the NavEntry → VM.onCleared()
         viewModel.invokeOnCleared()
 
-        // THEN — editor state is reset to the default empty state
+        // THEN — editor state is reset to the default empty state.
+        // (contentState is not asserted here: it lives in the ViewModel being
+        // destroyed; a new NavEntry creates a fresh ViewModel with empty text.)
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.idea)
             assertEquals("", state.title)
-            assertEquals("", state.content)
         }
     }
 

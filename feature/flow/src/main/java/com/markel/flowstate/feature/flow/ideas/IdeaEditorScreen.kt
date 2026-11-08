@@ -104,6 +104,9 @@ fun IdeaEditorScreen(
     val contentFocusRequester = remember { FocusRequester() }
     var showColorSheet by remember { mutableStateOf(false) }
 
+    // ── State-based BasicTextField ───────────────────────────────────────────
+    val contentState = viewModel.contentState
+
     Scaffold(
         modifier = Modifier
             .then(
@@ -157,8 +160,8 @@ fun IdeaEditorScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             // ── Category selector (only when categories are enabled) ──────────────
@@ -232,8 +235,7 @@ fun IdeaEditorScreen(
             Spacer(Modifier.height(16.dp))
 
             BasicTextField(
-                value = editorState.content,
-                onValueChange = { viewModel.updateContent(it) },
+                state = contentState,
                 textStyle = TextStyle(
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
@@ -243,9 +245,9 @@ fun IdeaEditorScreen(
                     capitalization = KeyboardCapitalization.Sentences
                 ),
                 cursorBrush = SolidColor(onCardColor),
-                decorationBox = { inner ->
+                decorator = { inner ->
                     Box {
-                        if (editorState.content.isEmpty()) {
+                        if (contentState.text.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.idea_content),
                                 fontSize = 16.sp,

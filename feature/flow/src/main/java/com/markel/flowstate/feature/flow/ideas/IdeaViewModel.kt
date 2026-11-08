@@ -1,5 +1,9 @@
 package com.markel.flowstate.feature.flow.ideas
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.data.UserPreferencesRepository
@@ -17,6 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -25,7 +31,6 @@ import javax.inject.Inject
 data class IdeaEditorState(
     val idea: Idea? = null,
     val title: String = "",
-    val content: String = "",
     val color: Long = COLOR_TRANSPARENT, // default: no background color
     val categoryId: Int? = Category.GENERAL_ID
 )
@@ -39,6 +44,14 @@ class IdeaEditorViewModel @Inject constructor(
 ) : ViewModel() {
     private val _editor = MutableStateFlow(IdeaEditorState())
     val editor: StateFlow<IdeaEditorState> = _editor.asStateFlow()
+
+    /**
+     * Editing state for the idea's body text, hoisted into the ViewModel as recommended
+     * by Google's state-based text field migration guide. The UI binds it directly to
+     * BasicTextField(state = contentState); there is no String <-> TextFieldState bridge.
+     * Text changes are observed via snapshotFlow in [autosaveJob].
+     */
+    val contentState = TextFieldState()
 
     /**
      * Handle to the debounced autosave collector so it can be canceled in
@@ -59,13 +72,17 @@ class IdeaEditorViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
-        // Autosave: debounce of 800ms
-        // drop(1) to drop the initial state when opening the editor
+        // Autosave: debounce of 800ms over BOTH sources of editor changes:
+        //  • _editor: title, color, category (drop(1) skips the initial state)
+        //  • contentState.text: body edits (drop(1) skips the initial echo)
+        // persistIfNeeded always reads the latest values of both.
         autosaveJob = viewModelScope.launch {
-            _editor
-                .drop(1)
+            merge(
+                _editor.drop(1).map { },
+                snapshotFlow { contentState.text.toString() }.drop(1).map { }
+            )
                 .debounce(800)
-                .collect { state -> persistIfNeeded(state) }
+                .collect { persistIfNeeded(_editor.value) }
         }
     }
 
@@ -74,6 +91,7 @@ class IdeaEditorViewModel @Inject constructor(
     /** Opens the overlay to CREATE a new blank idea. */
     fun openNew(categoryId: Int? = Category.GENERAL_ID) {
         _editor.value = IdeaEditorState(categoryId = categoryId)
+        contentState.clearText()
     }
 
     /** Opens the overlay to EDIT an existing idea. */
@@ -81,10 +99,10 @@ class IdeaEditorViewModel @Inject constructor(
         _editor.value = IdeaEditorState(
             idea = idea,
             title = idea.title,
-            content = idea.content,
             color = idea.color,
             categoryId = idea.categoryId
         )
+        contentState.setTextAndPlaceCursorAtEnd(idea.content)
     }
 
     /**
@@ -122,13 +140,12 @@ class IdeaEditorViewModel @Inject constructor(
     /** Discards changes without saving (e.g. user explicitly cancels (not implemented yet)). */
     fun closeWithoutSaving() {
         _editor.value = IdeaEditorState()
+        contentState.clearText()
     }
 
     // ── Field updates ─────────────────────────────────────────────────────────
 
     fun updateTitle(value: String) = _editor.update { it.copy(title = value) }
-
-    fun updateContent(value: String) = _editor.update { it.copy(content = value) }
 
     fun updateColor(color: Long) = _editor.update { it.copy(color = color) }
 
@@ -151,21 +168,23 @@ class IdeaEditorViewModel @Inject constructor(
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private suspend fun persistIfNeeded(state: IdeaEditorState) {
+        // Body text comes from the hoisted TextFieldState (single source of truth).
+        val content = contentState.text.toString()
         val existing = state.idea
         if (existing != null) {
             ideaRepository.upsertIdea(
                 existing.copy(
                     title = state.title,
-                    content = state.content,
+                    content = content,
                     color = state.color,
                     categoryId = state.categoryId
                 )
             )
-        } else if (state.title.isNotBlank() || state.content.isNotBlank()) {
+        } else if (state.title.isNotBlank() || content.isNotBlank()) {
             val insertedId = ideaRepository.upsertIdea(
                 Idea(
                     title = state.title,
-                    content = state.content,
+                    content = content,
                     color = state.color,
                     createdAt = System.currentTimeMillis(),
                     categoryId = state.categoryId
@@ -175,7 +194,7 @@ class IdeaEditorViewModel @Inject constructor(
             _editor.update { it.copy(idea = Idea(
                 id = insertedId.toInt(),
                 title = state.title,
-                content = state.content,
+                content = content,
                 color = state.color,
                 createdAt = System.currentTimeMillis(),
                 categoryId = state.categoryId
