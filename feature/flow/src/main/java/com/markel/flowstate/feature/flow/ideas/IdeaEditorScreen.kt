@@ -105,6 +105,7 @@ fun IdeaEditorScreen(
     var showColorSheet by remember { mutableStateOf(false) }
 
     // ── State-based BasicTextField ───────────────────────────────────────────
+    val titleState = viewModel.titleState
     val contentState = viewModel.contentState
 
     Scaffold(
@@ -201,8 +202,7 @@ fun IdeaEditorScreen(
             else Spacer(modifier = Modifier.size(6.dp))
 
             BasicTextField(
-                value = editorState.title,
-                onValueChange = { viewModel.updateTitle(it) },
+                state = titleState,
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontSize = 24.sp,
                     lineHeight = 29.sp,
@@ -213,9 +213,9 @@ fun IdeaEditorScreen(
                     capitalization = KeyboardCapitalization.Sentences
                 ),
                 cursorBrush = SolidColor(onCardColor),
-                decorationBox = { inner ->
+                decorator = { inner ->
                     Box {
-                        if (editorState.title.isEmpty()) {
+                        if (titleState.text.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.title),
                                 style = MaterialTheme.typography.headlineSmall.copy(

@@ -44,6 +44,12 @@ class IdeaViewModelTest {
         Snapshot.sendApplyNotifications()
     }
 
+    /** Same as [typeContent], for the title field (also a hoisted TextFieldState). */
+    private fun IdeaEditorViewModel.typeTitle(text: String) {
+        titleState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
+
     @Test
     fun openNew_resetsEditorState() = runTest {
         // GIVEN - A fresh ViewModel instance
@@ -56,8 +62,8 @@ class IdeaViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.idea)
-            assertEquals("", state.title)
         }
+        assertEquals("", viewModel.titleState.text.toString())
         assertEquals("", viewModel.contentState.text.toString())
     }
 
@@ -74,10 +80,11 @@ class IdeaViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertEquals(idea, state.idea)
-            assertEquals("Original", state.title)
             assertEquals(0xFF123456L, state.color)
         }
-        // Body text is loaded into the hoisted TextFieldState, cursor at the end
+        // Title and body are loaded into the hoisted TextFieldStates, cursor at the end
+        assertEquals("Original", viewModel.titleState.text.toString())
+        assertEquals(TextRange("Original".length), viewModel.titleState.selection)
         assertEquals("Content", viewModel.contentState.text.toString())
         assertEquals(TextRange("Content".length), viewModel.contentState.selection)
     }
@@ -88,16 +95,16 @@ class IdeaViewModelTest {
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
 
         // WHEN - The user types a new title, content and changes the color
-        viewModel.updateTitle("New Idea")
+        viewModel.typeTitle("New Idea")
         viewModel.typeContent("Content of the idea")
         viewModel.updateColor(0xFF654321L)
 
         // THEN - The UI state should be updated with the new values immediately
         viewModel.editor.test {
             val state = awaitItem()
-            assertEquals("New Idea", state.title)
             assertEquals(0xFF654321L, state.color)
         }
+        assertEquals("New Idea", viewModel.titleState.text.toString())
         assertEquals("Content of the idea", viewModel.contentState.text.toString())
     }
 
@@ -105,7 +112,7 @@ class IdeaViewModelTest {
     fun closeAndSave_withNewIdea_callsRepository() = runTest {
         // GIVEN - A new idea being composed in the editor
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("New Title")
+        viewModel.typeTitle("New Title")
         viewModel.typeContent("New Content")
 
         // WHEN - Closing the editor (which triggers the save logic)
@@ -127,7 +134,7 @@ class IdeaViewModelTest {
         viewModel.openExisting(idea)
 
         // WHEN - Modifying the title and saving
-        viewModel.updateTitle("Updated Title")
+        viewModel.typeTitle("Updated Title")
         viewModel.closeAndSave()
 
         // THEN - The repository should receive an update for the specific ID with the new title
@@ -152,7 +159,7 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - The user types in two separate bursts (2 debounce triggers)
-        viewModel.updateTitle("My idea")
+        viewModel.typeTitle("My idea")
         advanceTimeBy(900) // first autosave → should insert and save ID=42
 
         viewModel.typeContent("More text")
@@ -180,7 +187,7 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - The debounce triggers
-        viewModel.updateTitle("Title")
+        viewModel.typeTitle("Title")
         advanceTimeBy(900)
 
         // THEN - The state already contains the idea with the real ID
@@ -203,7 +210,7 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - User types and closes before 800ms
-        viewModel.updateTitle("Fast")
+        viewModel.typeTitle("Fast")
         viewModel.closeAndSave() // manually save before debounce
 
         advanceTimeBy(900) // debounce should no longer do anything (state reset)
@@ -243,9 +250,9 @@ class IdeaViewModelTest {
         viewModel.openExisting(idea)
 
         // WHEN - Multiple writing bursts
-        viewModel.updateTitle("Edit 1"); advanceTimeBy(900)
-        viewModel.updateTitle("Edit 2"); advanceTimeBy(900)
-        viewModel.updateTitle("Edit 3"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 1"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 2"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 3"); advanceTimeBy(900)
 
         // THEN - All calls use id=5, never id=0
         coVerify(atLeast = 1) {
@@ -291,6 +298,27 @@ class IdeaViewModelTest {
         // THEN - The autosave persisted the body text
         coVerify(exactly = 1) {
             repository.upsertIdea(match { it.content == "Only body text" })
+        }
+    }
+
+    /**
+     * Same contract for the title after its TextFieldState migration: title-only
+     * edits must trigger the debounced autosave through snapshotFlow.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_titleOnlyEdit_persistsTitle() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 11L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+
+        // WHEN - The user only types in the title field
+        viewModel.typeTitle("Only title")
+        advanceTimeBy(900)
+
+        // THEN - The autosave persisted the title
+        coVerify(exactly = 1) {
+            repository.upsertIdea(match { it.title == "Only title" })
         }
     }
 
@@ -351,18 +379,17 @@ class IdeaViewModelTest {
 
         // Sanity: state is loaded before onCleared
         assertEquals(idea, viewModel.editor.value.idea)
-        assertEquals("To delete", viewModel.editor.value.title)
+        assertEquals("To delete", viewModel.titleState.text.toString())
 
         // WHEN — Nav3 destroys the NavEntry → VM.onCleared()
         viewModel.invokeOnCleared()
 
         // THEN — editor state is reset to the default empty state.
-        // (contentState is not asserted here: it lives in the ViewModel being
-        // destroyed; a new NavEntry creates a fresh ViewModel with empty text.)
+        // (titleState/contentState are not asserted here: they live in the ViewModel
+        // being destroyed; a new NavEntry creates a fresh ViewModel with empty text.)
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.idea)
-            assertEquals("", state.title)
         }
     }
 
@@ -382,7 +409,7 @@ class IdeaViewModelTest {
         coEvery { repository.upsertIdea(any()) } returns 42L
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
         viewModel.openNew()
-        viewModel.updateTitle("Title")
+        viewModel.typeTitle("Title")
 
         // First autosave fires (debounce elapses)
         advanceTimeBy(900)
