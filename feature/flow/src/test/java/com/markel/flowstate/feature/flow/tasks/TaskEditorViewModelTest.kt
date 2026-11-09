@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.flow.tasks
 
+import androidx.compose.runtime.snapshots.Snapshot
 import app.cash.turbine.test
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.Category
@@ -52,8 +53,9 @@ class TaskEditorViewModelTest {
         newReminderTime: Long?,
         newSubTasks: List<SubTask>
     ) {
-        viewModel.updateTitle(newTitle)
-        viewModel.updateDescription(newDescription)
+        typeTitle(newTitle)
+        viewModel.descriptionState.edit { replace(0, length, newDescription) }
+        Snapshot.sendApplyNotifications()
         viewModel.updatePriority(newPriority)
         viewModel.updateDueDate(newDueDate)
         if (viewModel.editor.value.taskOrNull?.reminderTime != newReminderTime) {
@@ -61,6 +63,16 @@ class TaskEditorViewModelTest {
         }
         viewModel.updateSubTasks(newSubTasks)
         viewModel.saveTask()
+    }
+
+    /**
+     * Types into the hoisted title state exactly as BasicTextField(state = ...)
+     * would. On-device the frame loop applies snapshots automatically; JVM tests
+     * must call sendApplyNotifications so the VM's snapshotFlow collector runs.
+     */
+    private fun typeTitle(text: String) {
+        viewModel.titleState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
     }
 
     @Test
@@ -95,6 +107,33 @@ class TaskEditorViewModelTest {
             assertEquals(1000L, state.taskOrNull?.dueDate)
             assertEquals(false, state.taskOrNull?.isDone)
         }
+    }
+
+    @Test
+    fun loadTask_seedsHoistedTextStates_withoutTriggeringAutosave() = runTest {
+        // GIVEN - A task with title and description in the repository
+        val task = Task(
+            id = 42, title = "Buy milk", description = "From the corner shop",
+            isDone = false, priority = Priority.HIGH, dueDate = 1000L
+        )
+        coEvery { repository.getTaskById(any()) } returns task
+
+        viewModel = TaskEditorViewModel(repository, toggleTaskUseCase, deleteTaskUseCase, reminderScheduler, categoryRepository, userPreferencesRepository)
+
+        // WHEN
+        viewModel.loadTask(taskId = 42)
+        Snapshot.sendApplyNotifications()
+        advanceUntilIdle()
+
+        // THEN - Hoisted states are seeded with the persisted text...
+        assertEquals("Buy milk", viewModel.titleState.text.toString())
+        assertEquals("From the corner shop", viewModel.descriptionState.text.toString())
+
+        // ...and seeding them does not count as an edit: no revision bump, no autosave.
+        val ready = viewModel.editor.value as TaskEditorState.Ready
+        assertEquals(0, ready.autosaveRevision)
+        assertEquals(0, ready.savedRevision)
+        coVerify(exactly = 0) { repository.upsertTask(any()) }
     }
 
     @Test
@@ -295,10 +334,10 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(15)
         advanceUntilIdle()
 
-        viewModel.updateTitle("Pending edit")
+        typeTitle("Pending edit")
         advanceTimeBy(600)
         runCurrent() // The autosave is now suspended inside the repository.
-        viewModel.updateTitle("Newest draft") // Its debounce must be canceled by deletion.
+        typeTitle("Newest draft") // Its debounce must be canceled by deletion.
 
         val deleteDeferred = async { viewModel.deleteCurrentTask() }
         runCurrent()
@@ -336,7 +375,7 @@ class TaskEditorViewModelTest {
         )
         viewModel.loadTask(16)
         advanceUntilIdle()
-        viewModel.updateTitle("Unsaved edit")
+        typeTitle("Unsaved edit")
 
         assertFalse(viewModel.deleteCurrentTask())
         assertEquals("Unsaved edit", viewModel.editor.value.taskOrNull?.title)
@@ -471,7 +510,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(17)
         advanceUntilIdle()
 
-        viewModel.updateTitle("Edited before toggle")
+        typeTitle("Edited before toggle")
         advanceTimeBy(600)
         runCurrent() // The autosave is now suspended inside the repository.
         assertEquals(listOf("autosave:Edited before toggle"), operations)
@@ -938,10 +977,10 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(11)
         advanceUntilIdle()
 
-        viewModel.updateTitle("First edit")
+        typeTitle("First edit")
         advanceTimeBy(300)
         runCurrent()
-        viewModel.updateTitle("Latest edit")
+        typeTitle("Latest edit")
         advanceTimeBy(599)
         runCurrent()
 
@@ -972,7 +1011,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(12)
         advanceUntilIdle()
 
-        viewModel.updateTitle("Edited before leaving")
+        typeTitle("Edited before leaving")
 
         assertTrue(viewModel.flushPendingChanges())
         assertEquals(listOf("Edited before leaving"), persistedTasks.map { it.title })
@@ -1007,10 +1046,10 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(13)
         advanceUntilIdle()
 
-        viewModel.updateTitle("First edit")
+        typeTitle("First edit")
         advanceTimeBy(600)
         runCurrent() // The first upsert is now suspended in the repository.
-        viewModel.updateTitle("Latest edit")
+        typeTitle("Latest edit")
 
         val flushDeferred = async {
             viewModel.flushPendingChanges()
@@ -1043,7 +1082,7 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(14)
         advanceUntilIdle()
 
-        viewModel.updateTitle("Unsaved edit")
+        typeTitle("Unsaved edit")
 
         assertFalse(viewModel.flushPendingChanges())
         val ready = viewModel.editor.value as TaskEditorState.Ready
@@ -1075,9 +1114,9 @@ class TaskEditorViewModelTest {
         viewModel.loadTask(10)
         advanceUntilIdle()
 
-        viewModel.updateTitle("First edit")
+        typeTitle("First edit")
         viewModel.saveTask() // Suspends inside the repository.
-        viewModel.updateTitle("Newer edit")
+        typeTitle("Newer edit")
         allowSaveToFinish.complete(Unit)
         advanceUntilIdle()
 

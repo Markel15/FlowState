@@ -1,5 +1,9 @@
 package com.markel.flowstate.feature.flow.tasks
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.data.UserPreferencesRepository
@@ -68,6 +72,18 @@ class TaskEditorViewModel @Inject constructor(
     private val _editor = MutableStateFlow<TaskEditorState>(TaskEditorState.Loading)
     val editor: StateFlow<TaskEditorState> = _editor.asStateFlow()
 
+    /**
+     * Editing state for the task's title, hoisted into the ViewModel as recommended
+     * by Google's state-based text field migration guide. The UI binds it directly
+     * to BasicTextField(state = titleState). Edits flow into the Ready draft through
+     * the snapshotFlow collector in init, feeding the same revision/autosave
+     * machinery as every other field.
+     */
+    val titleState = TextFieldState()
+
+    /** Same as [titleState], for the task's description. */
+    val descriptionState = TextFieldState()
+
     private var loadTaskJob: Job? = null
     private var autosaveJob: Job? = null
 
@@ -95,6 +111,22 @@ class TaskEditorViewModel @Inject constructor(
     val generalCategoryName: StateFlow<String?> = userPreferencesRepository.generalCategoryName
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    init {
+        // TextFieldState → Ready.task. updateReadyTask ignores emissions while the
+        // editor is not Ready and emissions equal to the current draft (e.g. the
+        // initial seeding in loadTask), so loading a task never schedules a save.
+        viewModelScope.launch {
+            snapshotFlow { titleState.text.toString() }.collect { text ->
+                updateReadyTask(autosave = true) { it.copy(title = text) }
+            }
+        }
+        viewModelScope.launch {
+            snapshotFlow { descriptionState.text.toString() }.collect { text ->
+                updateReadyTask(autosave = true) { it.copy(description = text) }
+            }
+        }
+    }
+
     /** Loads one task and represents every outcome explicitly in editor state. */
     fun loadTask(taskId: Int) {
         loadTaskJob?.cancel()
@@ -103,6 +135,8 @@ class TaskEditorViewModel @Inject constructor(
         isDeleted = false
         persistedTask = null
         _editor.value = TaskEditorState.Loading
+        titleState.clearText()
+        descriptionState.clearText()
         loadTaskJob = viewModelScope.launch {
             try {
                 val task = repository.getTaskById(taskId)
@@ -112,6 +146,12 @@ class TaskEditorViewModel @Inject constructor(
                 } else {
                     persistedTask = task
                     TaskEditorState.Ready(task)
+                }
+                if (task != null) {
+                    // Seed the hoisted text states after publishing the draft, so the
+                    // collectors observe text equal to the draft and do not autosave.
+                    titleState.setTextAndPlaceCursorAtEnd(task.title)
+                    descriptionState.setTextAndPlaceCursorAtEnd(task.description)
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -144,7 +184,7 @@ class TaskEditorViewModel @Inject constructor(
                     // Deletion may have completed while this flush waited for the mutex.
                     if (isDeleted) return@withLock true
 
-                    val task = _editor.value.taskOrNull ?: return@withLock true
+                    val task = currentDraftTask() ?: return@withLock true
                     // A blank title is not persisted.
                     if (task.title.isBlank() || task == persistedTask) {
                         return@withLock true
@@ -154,7 +194,7 @@ class TaskEditorViewModel @Inject constructor(
 
                     // An edit may have arrived while the repository write was suspended.
                     // Loop and save that newer snapshot before allowing navigation.
-                    val latestTask = _editor.value.taskOrNull
+                    val latestTask = currentDraftTask()
                     latestTask == null || latestTask.title.isBlank() || latestTask == persistedTask
                 }
 
@@ -167,11 +207,6 @@ class TaskEditorViewModel @Inject constructor(
             false
         }
     }
-
-    fun updateTitle(value: String) = updateReadyTask(autosave = true) { it.copy(title = value) }
-
-    fun updateDescription(value: String) =
-        updateReadyTask(autosave = true) { it.copy(description = value) }
 
     fun updatePriority(value: Priority) =
         updateReadyTask(autosave = true) { it.copy(priority = value) }
@@ -210,7 +245,7 @@ class TaskEditorViewModel @Inject constructor(
         viewModelScope.launch {
             taskMutationMutex.withLock {
                 if (isDeleted) return@withLock  // double safeguard if the task was deleted waiting for lock
-                val current = _editor.value.taskOrNull ?: return@withLock
+                val current = currentDraftTask() ?: return@withLock
                 val original = persistedTask ?: current
                 val updatedTask = toggleTaskUseCase(current)
 
@@ -250,12 +285,25 @@ class TaskEditorViewModel @Inject constructor(
     }
 
     private fun restoreAfterDeleteFailure(ready: TaskEditorState.Ready) {
-        val task = _editor.value.taskOrNull ?: return
+        val task = currentDraftTask() ?: return
         if (task != persistedTask) scheduleAutosave()
     }
 
 
     // ── Internal ──────────────────────────────────────────────────────────────
+
+    /**
+     * Latest draft with text read directly from the hoisted TextFieldStates, so a
+     * save/flush never depends on the snapshotFlow collectors having run yet (e.g.
+     * back pressed in the same frame as the last keystroke).
+     */
+    private fun currentDraftTask(): Task? {
+        val ready = _editor.value as? TaskEditorState.Ready ?: return null
+        return ready.task.copy(
+            title = titleState.text.toString(),
+            description = descriptionState.text.toString()
+        )
+    }
 
     private fun updateReadyTask(
         autosave: Boolean = false,
@@ -303,7 +351,7 @@ class TaskEditorViewModel @Inject constructor(
     private suspend fun persistCurrentDraftLocked() {
         if (isDeleted) return
         val ready = _editor.value as? TaskEditorState.Ready ?: return
-        val task = ready.task
+        val task = currentDraftTask() ?: return
         val revision = ready.autosaveRevision
         if (task.title.isBlank()) return
         val original = persistedTask ?: task
