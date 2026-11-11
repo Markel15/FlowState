@@ -18,9 +18,6 @@ No accounts, no ads, no tracking, no servers. Your data never leaves your phone.
 2. Open it and tap **Install** — Android will ask you to allow installs from your browser once.
 3. That's it. Updates install on top of the previous version and the data remains.
 
-> 💡 **Tip:** use [Obtainium](https://obtainium.imranr.dev/) to get automatic updates straight from these GitHub releases.
-> Older versions and changelogs live in [Releases](https://github.com/Markel15/FlowState/releases).
-
 ## Screenshots
 
 <p align="center" width="100%">
