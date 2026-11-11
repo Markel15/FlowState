@@ -4,6 +4,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.markel.flowstate.core.data.FlowCardHeight
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.Category
 import com.markel.flowstate.core.domain.CategoryRepository
@@ -111,6 +112,15 @@ class FlowViewModel @Inject constructor(
 
     private val _selectedCategoryId = MutableStateFlow<Int?>(Category.GENERAL_ID)
     val generalCategoryName: StateFlow<String?> = userPreferencesRepository.generalCategoryName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /**
+     * Card sizing for the grid (fixed height vs grown with content), read
+     * straight from preferences: the settings screen writes it, this screen
+     * only renders it. A second instance of the same DataStore flow, so no
+     * navigation plumbing is needed.
+     */
+    val flowCardHeight: StateFlow<FlowCardHeight> = userPreferencesRepository.flowCardHeight
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FlowCardHeight.DEFAULT)
 
     /**
      * Tracks whether we have already applied the persisted "last visited

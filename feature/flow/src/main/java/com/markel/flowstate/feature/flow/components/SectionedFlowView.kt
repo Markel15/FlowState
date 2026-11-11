@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.markel.flowstate.core.data.FlowCardHeight
 import com.markel.flowstate.core.domain.CheckList
 import com.markel.flowstate.core.domain.Idea
 import com.markel.flowstate.core.domain.Task
@@ -112,6 +113,9 @@ fun SectionedFlowView(
     onCheckListClick: (CheckList) -> Unit,
     showPermissionBanner: Boolean,
     modifier: Modifier = Modifier,
+    // Fixed height for every card vs cards that grow with their content.
+    // Hoisted from FlowViewModel so the whole grid is decided in one place.
+    cardHeight: FlowCardHeight = FlowCardHeight.DEFAULT,
     // Tracks per-task swipe-to-delete versions so that undo restores a fresh
     // SwipeToDismissBoxState instead of the stale EndToStart saved state.
     taskDeleteVersions: Map<Int, Int> = emptyMap(),
@@ -253,7 +257,8 @@ fun SectionedFlowView(
                         CheckListGridCard(
                             checkList = item.checkList,
                             onClick = { onCheckListClick(item.checkList) },
-                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
+                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp),
+                            cardHeight = cardHeight,
                         )
                     }
 
@@ -268,7 +273,8 @@ fun SectionedFlowView(
                         IdeaGridCard(
                             idea = item.idea,
                             onClick = { onIdeaClick(item.idea) },
-                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp)
+                            modifier = Modifier.padding(bottom = CARD_VERTICAL_SPACING_DP.dp),
+                            cardHeight = cardHeight,
                         )
                     }
 

@@ -41,6 +41,7 @@ fun FlowScreen(
     onNavigateToCheckListEditor: (checkListId: Int?, categoryId: Int?) -> Unit
 ) {
     val flowUiState by flowViewModel.uiState.collectAsStateWithLifecycle()
+    val flowCardHeight by flowViewModel.flowCardHeight.collectAsStateWithLifecycle()
     val showPermissionBanner by flowViewModel.showReminderBanner.collectAsStateWithLifecycle()
     val showUndoButton by flowViewModel.showUndoButton.collectAsStateWithLifecycle()
     val taskDeleteVersions by flowViewModel.taskDeleteVersions.collectAsStateWithLifecycle()
@@ -126,6 +127,7 @@ fun FlowScreen(
                         showPermissionBanner = showPermissionBanner,
                         taskDeleteVersions = taskDeleteVersions,
                         gridState = tabGridState,
+                        cardHeight = flowCardHeight,
                     )
                 }
             }

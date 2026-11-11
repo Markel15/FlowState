@@ -1,5 +1,7 @@
 package com.markel.flowstate.core.domain.achievements
 
+import java.time.LocalDate
+
 /**
  * Static catalog and pure evaluation logic for the achievements section.
  *
@@ -51,6 +53,26 @@ data class AchievementInputs(
     val comebacks: Int = 0
 )
 
+/**
+ * Dates of the events behind every counter, already sorted oldest first.
+ * Optional: leaving them out makes the evaluator behave exactly as before and
+ * [AchievementProgress.tierDates] stays empty.
+ */
+data class AchievementDates(
+    val perfectDays: List<LocalDate> = emptyList(),
+    val mondayPerfectDays: List<LocalDate> = emptyList(),
+    val perfectWeeks: List<LocalDate> = emptyList(),
+    val habitCompletions: List<LocalDate> = emptyList(),
+    val taskCompletions: List<LocalDate> = emptyList(),
+    val nightOwl: List<LocalDate> = emptyList(),
+    val earlyBird: List<LocalDate> = emptyList(),
+    val productiveMornings: List<LocalDate> = emptyList(),
+    val onTime: List<LocalDate> = emptyList(),
+    val sundayCounts: List<DayCount> = emptyList(),
+    val comebacks: List<LocalDate> = emptyList(),
+    val streakRuns: List<StreakRun> = emptyList()
+)
+
 data class AchievementProgress(
     val definition: AchievementDefinition,
     /** Raw current value (can exceed the top tier). */
@@ -58,9 +80,19 @@ data class AchievementProgress(
     /** How many tiers are unlocked (0..tiers.size). */
     val tierReached: Int,
     /** Target of the tier still in progress, or null when maxed out. */
-    val nextTier: Int?
+    val nextTier: Int?,
+    /**
+     * Date on which each tier was crossed, aligned with
+     * [AchievementDefinition.tiers]. Entries beyond [tierReached] are null, and
+     * an unlocked tier can still be null when the underlying events cannot be
+     * dated (e.g. a task marked as done without a completion timestamp).
+     */
+    val tierDates: List<LocalDate?> = emptyList()
 ) {
     val maxed: Boolean get() = nextTier == null
+
+    /** Date of the last tier crossed, or null when nothing is unlocked yet. */
+    val completedAt: LocalDate? get() = tierDates.getOrNull(tierReached - 1)
 }
 
 object AchievementCatalog {
@@ -84,21 +116,69 @@ object AchievementCatalog {
 
 object AchievementEvaluator {
 
-    /** Evaluates the whole catalog against [inputs]. */
-    fun evaluate(inputs: AchievementInputs): List<AchievementProgress> =
+    /**
+     * Evaluates the whole catalog against [inputs] and, when [dates] is
+     * provided, dates every crossed tier. Omitting [dates] keeps the counters
+     * untouched and leaves every tier undated (the list is still sized, with
+     * nulls, so callers can index it by tier).
+     */
+    fun evaluate(
+        inputs: AchievementInputs,
+        dates: AchievementDates = AchievementDates()
+    ): List<AchievementProgress> =
         AchievementCatalog.definitions.map { definition ->
-            toProgress(definition, currentValue(definition.id, inputs))
+            toProgress(definition, currentValue(definition.id, inputs), dates)
         }
 
-    private fun toProgress(definition: AchievementDefinition, current: Int): AchievementProgress {
+    private fun toProgress(
+        definition: AchievementDefinition,
+        current: Int,
+        dates: AchievementDates
+    ): AchievementProgress {
         val tierReached = definition.tiers.count { current >= it }
         return AchievementProgress(
             definition = definition,
             current = current,
             tierReached = tierReached,
-            nextTier = definition.tiers.getOrNull(tierReached)
+            nextTier = definition.tiers.getOrNull(tierReached),
+            tierDates = definition.tiers.mapIndexed { index, target ->
+                // Only crossed tiers get a date: an unfinished tier has no
+                // "date" yet, and asking for one would invent it.
+                if (index < tierReached) dateFor(definition.id, target, dates) else null
+            }
         )
     }
+
+    /**
+     * Date on which [id] reached [target]: the N-th event for counters, or the
+     * first date whose per-day count gets there.
+     */
+    private fun dateFor(id: AchievementId, target: Int, dates: AchievementDates): LocalDate? =
+        when (id) {
+            AchievementId.PERFECT_DAY -> dates.perfectDays.nthEvent(target)
+            AchievementId.FLAWLESS_MONDAY -> dates.mondayPerfectDays.nthEvent(target)
+            AchievementId.FLAWLESS_WEEK -> dates.perfectWeeks.nthEvent(target)
+            AchievementId.UNSTOPPABLE -> dates.habitCompletions.nthEvent(target)
+            AchievementId.TASK_TOTAL -> dates.taskCompletions.nthEvent(target)
+            AchievementId.NIGHT_OWL -> dates.nightOwl.nthEvent(target)
+            AchievementId.EARLY_BIRD -> dates.earlyBird.nthEvent(target)
+            AchievementId.PRODUCTIVE_MORNING -> dates.productiveMornings.nthEvent(target)
+            AchievementId.ON_TIME -> dates.onTime.nthEvent(target)
+            AchievementId.COMEBACK -> dates.comebacks.nthEvent(target)
+            // A Sunday holds several tasks, so its tier is reached on the first
+            // Sunday whose total gets there, not on the N-th task.
+            AchievementId.SUNDAY_FUN_DAY -> dates.sundayCounts.firstReaching(target)
+            // A streak is a run, not a list of events: the date is the
+            // occurrence in which the run got long enough.
+            AchievementId.STREAK -> dates.streakRuns
+                .mapNotNull { run -> run.dateReaching(target) }
+                .minOrNull()
+        }
+
+    private fun List<LocalDate>.nthEvent(target: Int): LocalDate? = getOrNull(target - 1)
+
+    private fun List<DayCount>.firstReaching(target: Int): LocalDate? =
+        firstOrNull { it.count >= target }?.date
 
     private fun currentValue(id: AchievementId, inputs: AchievementInputs): Int = when (id) {
         AchievementId.PERFECT_DAY -> inputs.perfectDays

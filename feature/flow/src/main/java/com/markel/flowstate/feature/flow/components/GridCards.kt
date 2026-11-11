@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,35 +13,56 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.markel.flowstate.core.data.FlowCardHeight
+import com.markel.flowstate.core.designsystem.components.FillHeightText
 import com.markel.flowstate.core.designsystem.ui.CheckListSharedKeys
 import com.markel.flowstate.core.designsystem.ui.IdeaSharedKeys
-import com.markel.flowstate.core.designsystem.ui.TaskSharedKeys
 import com.markel.flowstate.core.designsystem.ui.sharedCardBounds
 import com.markel.flowstate.core.domain.CheckList
 import com.markel.flowstate.core.domain.Idea
-import com.markel.flowstate.core.domain.Priority
-import com.markel.flowstate.core.domain.Task
-import com.markel.flowstate.feature.flow.tasks.components.formatDate
-import com.markel.flowstate.feature.flow.tasks.components.isDateOverdue
-import com.markel.flowstate.feature.flow.tasks.util.asColor
 import com.markel.flowstate.feature.tasks.R
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
- * Cap on the idea body before it is truncated with an ellipsis.
+ * Fixed height shared by **every** card of the grid (ideas and checklists) when
+ * [FlowCardHeight.UNIFORM] is selected, so a row of them lines up instead of
+ * producing a ragged masonry of 60dp and 160dp cards. Ignored in
+ * [FlowCardHeight.CONTENT].
  *
- * The card sizes itself to its content, so this is what bounds the height.
- * `heightIn(max = …)` would clip the text instead, which is why it is not used.
+ * Inside that height the space is distributed by content:
+ *  - idea with a body → title capped at [IDEA_TITLE_MAX_LINES], body fills the
+ *    rest of the card ([FillHeightText]);
+ *  - idea without a body → the title itself fills the whole card, so a long
+ *    title is no longer cut at 2 lines with half the card empty.
+ */
+private const val FLOW_CARD_HEIGHT_DP = 146
+
+/**
+ * Title lines allowed when the idea also has a body.
+ *
+ * Without a body the title is not capped: it fills the card and ellipsizes on
+ * the last line that fits.
+ */
+private const val IDEA_TITLE_MAX_LINES = 3
+
+/**
+ * Hard cap for [FlowCardHeight.CONTENT] mode only.
+ *
+ * There the card grows with its text, so this is not a layout budget but a
+ * guard: without it a 40-line idea would own the whole scroll.
  */
 private const val IDEA_CONTENT_MAX_LINES = 8
 
 /** Pending items rendered inside a checklist card before the "+N more" line. */
 private const val CHECK_LIST_VISIBLE_ITEMS = 5
+
+/**
+ * Same, but for [FlowCardHeight.UNIFORM], where the height is fixed and the items
+ * have to fit inside it.
+ *
+*/
+private const val CHECK_LIST_VISIBLE_ITEMS_UNIFORM = 4
 
 // ── Idea ──────────────────────────────────────────────────────────────────────
 
@@ -50,12 +70,14 @@ private const val CHECK_LIST_VISIBLE_ITEMS = 5
 fun IdeaGridCard(
     idea: Idea,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardHeight: FlowCardHeight = FlowCardHeight.UNIFORM,
 ) {
     val resolvedColor = idea.color.resolveIdeaColor()
     val isTransparent = resolvedColor == COLOR_TRANSPARENT
     val cardColor = if (isTransparent) Color.Transparent else Color(resolvedColor)
     val shape = RoundedCornerShape(12.dp)
+    val isUniform = cardHeight == FlowCardHeight.UNIFORM
 
     Card(
         onClick = onClick,
@@ -63,6 +85,7 @@ fun IdeaGridCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         modifier = modifier
             .fillMaxWidth()
+            .then(if (isUniform) Modifier.height(FLOW_CARD_HEIGHT_DP.dp) else Modifier)
             .sharedCardBounds(key = IdeaSharedKeys.container(idea.id), shape = shape)
             .then(
                 if (isTransparent) Modifier.border(
@@ -72,22 +95,72 @@ fun IdeaGridCard(
                 ) else Modifier
             )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = idea.title,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (idea.content.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = idea.content,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = IDEA_CONTENT_MAX_LINES,
-                    overflow = TextOverflow.Ellipsis
+        val titleStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+        val bodyStyle = MaterialTheme.typography.bodySmall
+        val hasBody = idea.content.isNotBlank()
+
+        Column(
+            modifier = Modifier
+                .then(if (isUniform) Modifier.fillMaxHeight() else Modifier)
+                .padding(12.dp)
+        ) {
+            when {
+                // ── UNIFORM · title + body ────────────────────────────────
+                isUniform && hasBody -> {
+                    Text(
+                        text = idea.title,
+                        style = titleStyle,
+                        maxLines = IDEA_TITLE_MAX_LINES,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        FillHeightText(
+                            text = idea.content,
+                            style = bodyStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                // ── UNIFORM · title only ─────────────────────────────────
+                isUniform -> FillHeightText(
+                    text = idea.title,
+                    style = titleStyle,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
+
+                // ── ADAPTABLE ──────────────────────────────────────────────
+                else -> {
+                    if (hasBody) {
+                        Text(
+                            text = idea.title,
+                            style = titleStyle,
+                            maxLines = IDEA_TITLE_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = idea.content,
+                            style = bodyStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = IDEA_CONTENT_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        Text(
+                            text = idea.title,
+                            style = titleStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = IDEA_CONTENT_MAX_LINES,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }
@@ -99,12 +172,14 @@ fun IdeaGridCard(
 fun CheckListGridCard(
     checkList: CheckList,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardHeight: FlowCardHeight = FlowCardHeight.UNIFORM,
 ) {
     val resolvedColor = checkList.color.resolveIdeaColor()
     val isTransparent = resolvedColor == COLOR_TRANSPARENT
     val cardColor = if (isTransparent) Color.Transparent else Color(resolvedColor)
     val shape = RoundedCornerShape(12.dp)
+    val isUniform = cardHeight == FlowCardHeight.UNIFORM
 
     Card(
         shape = shape,
@@ -112,6 +187,7 @@ fun CheckListGridCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
         modifier = modifier
             .fillMaxWidth()
+            .then(if (isUniform) Modifier.height(FLOW_CARD_HEIGHT_DP.dp) else Modifier)
             .sharedCardBounds(
                 key = CheckListSharedKeys.container(checkList.id),
                 shape = shape
@@ -133,7 +209,9 @@ fun CheckListGridCard(
             )
             Spacer(Modifier.height(6.dp))
             val pendingItems = checkList.items.filter { !it.isDone }
-            val visibleItems = pendingItems.take(CHECK_LIST_VISIBLE_ITEMS)
+            val visibleItems = pendingItems.take(
+                if (isUniform) CHECK_LIST_VISIBLE_ITEMS_UNIFORM else CHECK_LIST_VISIBLE_ITEMS
+            )
             visibleItems.forEach { item ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

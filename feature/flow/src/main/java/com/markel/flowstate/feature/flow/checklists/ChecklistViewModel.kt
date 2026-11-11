@@ -1,5 +1,9 @@
 package com.markel.flowstate.feature.flow.checklists
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.data.UserPreferencesRepository
@@ -44,6 +48,24 @@ class CheckListViewModel @Inject constructor(
     private val _editor = MutableStateFlow(CheckListEditorState())
     val editor: StateFlow<CheckListEditorState> = _editor.asStateFlow()
 
+    /**
+     * Editing state for the checklist title, hoisted into the ViewModel as
+     * recommended by Google's state-based text field migration guide. The UI
+     * binds it directly to BasicTextField(state = titleState); edits flow into
+     * [CheckListEditorState.title] through the snapshotFlow collector in init,
+     * feeding the same debounced autosave as every other field.
+     */
+    val titleState = TextFieldState()
+
+    /**
+     * Per-item editing states, keyed by item id. Created (and seeded from the
+     * current draft) on first use via [itemTextState]; each gets a snapshotFlow
+     * collector that mirrors its text into [CheckListEditorState.items] through
+     * [applyItemText]. Keyed by id so toggling/reordering keeps the state.
+     */
+    private val itemTextStates = mutableMapOf<String, TextFieldState>()
+    private val itemTextJobs = mutableMapOf<String, Job>()
+
     /** Handle to the debounced autosave collector so it can be canceled in */
     private var autosaveJob: Job? = null
 
@@ -65,12 +87,45 @@ class CheckListViewModel @Inject constructor(
                 .debounce(800)
                 .collect { state -> persistIfNeeded(state) }
         }
+        // TextFieldState → editor.title. Equal values are conflated by the
+        // StateFlow (no emission), so seeding the state never schedules a save.
+        viewModelScope.launch {
+            snapshotFlow { titleState.text.toString() }.collect { text ->
+                _editor.update { it.copy(title = text) }
+            }
+        }
+    }
+
+    /**
+     * Hoisted editing state for one item's text, as bound by the row's
+     * BasicTextField(state = ...). Lazily created and seeded from the current
+     * draft; its collector keeps [CheckListEditorState.items] in sync.
+     */
+    fun itemTextState(id: String): TextFieldState =
+        itemTextStates.getOrPut(id) {
+            val initial = _editor.value.items.firstOrNull { it.id == id }?.text.orEmpty()
+            TextFieldState(initial).also { state ->
+                itemTextJobs[id] = viewModelScope.launch {
+                    snapshotFlow { state.text.toString() }.collect { text ->
+                        applyItemText(id, text)
+                    }
+                }
+            }
+        }
+
+    /** Cancels per-item collectors and clears all hoisted text states. */
+    private fun resetTextStates() {
+        itemTextJobs.values.forEach { it.cancel() }
+        itemTextJobs.clear()
+        itemTextStates.clear()
+        titleState.clearText()
     }
 
 
     // ── Open / Close ──────────────────────────────────────────────────────────
 
     fun openNew(categoryId: Int? = Category.GENERAL_ID) {
+        resetTextStates()
         _editor.value = CheckListEditorState(categoryId = categoryId)
     }
 
@@ -78,6 +133,7 @@ class CheckListViewModel @Inject constructor(
         viewModelScope.launch {
             val lists = checkListRepository.getLists().first()
             val found = lists.firstOrNull { it.id == checkListId } ?: return@launch
+            resetTextStates()
             _editor.value = CheckListEditorState(
                 checkList = found,
                 title = found.title,
@@ -85,13 +141,18 @@ class CheckListViewModel @Inject constructor(
                 items = found.items,
                 categoryId = found.categoryId
             )
+            // Seed the hoisted states after publishing the draft. The collectors
+            // then observe text equal to the draft, which the StateFlow conflates
+            // (no emission), so seeding never counts as an edit.
+            titleState.setTextAndPlaceCursorAtEnd(found.title)
+            found.items.forEach { itemTextState(it.id) }
         }
     }
 
     fun closeAndSave() {
         autosaveJob?.cancel()
         viewModelScope.launch {
-            persistIfNeeded(_editor.value)
+            persistIfNeeded(currentDraft())
         }
     }
 
@@ -105,12 +166,11 @@ class CheckListViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        resetTextStates()
         _editor.value = CheckListEditorState()
     }
 
     // ── Field updates ─────────────────────────────────────────────────────────
-
-    fun updateTitle(value: String) = _editor.update { it.copy(title = value) }
 
     fun updateColor(color: Long) = _editor.update { it.copy(color = color) }
 
@@ -131,10 +191,16 @@ class CheckListViewModel @Inject constructor(
             position = _editor.value.items.size
         )
         _editor.update { it.copy(items = it.items + newItem) }
+        itemTextState(newItem.id)  // hoisted state ready before the row composes
         return newItem.id
     }
 
-    fun updateItemText(id: String, text: String) {
+    /**
+     * Draft-only write used by the snapshotFlow collector: the hoisted state is
+     * already the source of the text, so it must NOT be written back (a stale
+     * emission could otherwise revert a newer keystroke).
+     */
+    private fun applyItemText(id: String, text: String) {
         _editor.update { state ->
             state.copy(items = state.items.map { if (it.id == id) it.copy(text = text) else it })
         }
@@ -147,6 +213,8 @@ class CheckListViewModel @Inject constructor(
     }
 
     fun removeItem(id: String) {
+        itemTextJobs.remove(id)?.cancel()
+        itemTextStates.remove(id)
         _editor.update { state ->
             state.copy(items = state.items.filter { it.id != id })
         }
@@ -166,6 +234,22 @@ class CheckListViewModel @Inject constructor(
 
 
     // ── Internal ──────────────────────────────────────────────────────────────
+
+    /**
+     * Latest draft with text read directly from the hoisted TextFieldStates, so
+     * closing the editor never depends on the snapshotFlow collectors having run
+     * yet (e.g. back pressed in the same frame as the last keystroke).
+     */
+    private fun currentDraft(): CheckListEditorState {
+        val state = _editor.value
+        return state.copy(
+            title = titleState.text.toString(),
+            items = state.items.map { item ->
+                val text = itemTextStates[item.id]?.text?.toString() ?: return@map item
+                item.copy(text = text)
+            }
+        )
+    }
 
     private suspend fun persistIfNeeded(state: CheckListEditorState) {
         val itemsToSave = state.items

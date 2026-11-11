@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,8 +44,8 @@ import java.util.UUID
 @Composable
 fun TaskEditorSheetContent(
     task: Task,
-    onTitleChange: (String) -> Unit,
-    onDescriptionChange: (String) -> Unit,
+    titleState: TextFieldState,
+    descriptionState: TextFieldState,
     onSubTasksChange: (List<SubTask>) -> Unit,
     onDueDateChange: (Long?) -> Unit = {},
     onReminderTimeChange: (Long?) -> Unit = {},
@@ -135,7 +136,7 @@ fun TaskEditorSheetContent(
                 .fillMaxWidth()
                 .padding(vertical = 6.dp)
         ) {
-            if (task.title.isEmpty()) {
+            if (titleState.text.isEmpty()) {
                 Text(
                     text = stringResource(R.string.edit_task_placeholder),
                     style = MaterialTheme.typography.headlineSmall.copy(
@@ -147,8 +148,7 @@ fun TaskEditorSheetContent(
                 )
             }
             BasicTextField(
-                value = task.title,
-                onValueChange = onTitleChange,
+                state = titleState,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontSize = 23.sp,
@@ -170,7 +170,7 @@ fun TaskEditorSheetContent(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
         ) {
-            if (task.description.isEmpty()) {
+            if (descriptionState.text.isEmpty()) {
                 Text(
                     text = stringResource(R.string.edit_task_desc_placeholder),
                     style = MaterialTheme.typography.bodyLarge,
@@ -178,8 +178,7 @@ fun TaskEditorSheetContent(
                 )
             }
             BasicTextField(
-                value = task.description,
-                onValueChange = onDescriptionChange,
+                state = descriptionState,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(
                     lineHeight = 22.sp,

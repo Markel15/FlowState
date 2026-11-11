@@ -6,10 +6,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
@@ -42,11 +43,10 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 
 @Composable
 fun CheckListItemRow(
-    text: String,
+    textState: TextFieldState,
     isDone: Boolean,
     requestFocusOnAppear: Boolean,
     onFocusConsumed: () -> Unit,
-    onTextChange: (String) -> Unit,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     onAddNext: () -> Unit,
@@ -99,8 +99,7 @@ fun CheckListItemRow(
         )
 
         BasicTextField(
-            value = text,
-            onValueChange = onTextChange,
+            state = textState,
             textStyle = TextStyle(
                 fontSize = 17.sp,
                 color = if (isDone) onCardColor.copy(alpha = 0.45f) else onCardColor,
@@ -110,9 +109,10 @@ fun CheckListItemRow(
                 imeAction = ImeAction.Next,
                 capitalization = KeyboardCapitalization.Sentences
             ),
-            keyboardActions = KeyboardActions( onNext = { onAddNext() } ),
+            onKeyboardAction = { onAddNext() },
             modifier = Modifier
                 .weight(1f)
+                .padding(vertical = 8.dp)
                 .focusRequester(focusRequester)
                 .onFocusChanged{ isFocused = it.isFocused }
         )

@@ -1,5 +1,7 @@
 package com.markel.flowstate.feature.flow.ideas
 
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.text.TextRange
 import app.cash.turbine.test
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.CategoryRepository
@@ -29,6 +31,25 @@ class IdeaViewModelTest {
     private val userPreferencesRepository: UserPreferencesRepository = mockk(relaxed = true)
     private lateinit var viewModel: IdeaEditorViewModel
 
+    /**
+     * Simulates the user typing in the body field (now a hoisted TextFieldState).
+     *
+     * In production, the Compose frame loop delivers snapshot apply notifications
+     * automatically, so the ViewModel's snapshotFlow-based autosave sees every edit.
+     * Plain JVM tests have no frame loop: we must call Snapshot.sendApplyNotifications()
+     * after each edit, otherwise the autosave flow never observes the change.
+     */
+    private fun IdeaEditorViewModel.typeContent(text: String) {
+        contentState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
+
+    /** Same as [typeContent], for the title field (also a hoisted TextFieldState). */
+    private fun IdeaEditorViewModel.typeTitle(text: String) {
+        titleState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
+
     @Test
     fun openNew_resetsEditorState() = runTest {
         // GIVEN - A fresh ViewModel instance
@@ -41,9 +62,9 @@ class IdeaViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.idea)
-            assertEquals("", state.title)
-            assertEquals("", state.content)
         }
+        assertEquals("", viewModel.titleState.text.toString())
+        assertEquals("", viewModel.contentState.text.toString())
     }
 
     @Test
@@ -59,9 +80,13 @@ class IdeaViewModelTest {
         viewModel.editor.test {
             val state = awaitItem()
             assertEquals(idea, state.idea)
-            assertEquals("Original", state.title)
             assertEquals(0xFF123456L, state.color)
         }
+        // Title and body are loaded into the hoisted TextFieldStates, cursor at the end
+        assertEquals("Original", viewModel.titleState.text.toString())
+        assertEquals(TextRange("Original".length), viewModel.titleState.selection)
+        assertEquals("Content", viewModel.contentState.text.toString())
+        assertEquals(TextRange("Content".length), viewModel.contentState.selection)
     }
 
     @Test
@@ -70,25 +95,25 @@ class IdeaViewModelTest {
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
 
         // WHEN - The user types a new title, content and changes the color
-        viewModel.updateTitle("New Idea")
-        viewModel.updateContent("Content of the idea")
+        viewModel.typeTitle("New Idea")
+        viewModel.typeContent("Content of the idea")
         viewModel.updateColor(0xFF654321L)
 
         // THEN - The UI state should be updated with the new values immediately
         viewModel.editor.test {
             val state = awaitItem()
-            assertEquals("New Idea", state.title)
-            assertEquals("Content of the idea", state.content)
             assertEquals(0xFF654321L, state.color)
         }
+        assertEquals("New Idea", viewModel.titleState.text.toString())
+        assertEquals("Content of the idea", viewModel.contentState.text.toString())
     }
 
     @Test
     fun closeAndSave_withNewIdea_callsRepository() = runTest {
         // GIVEN - A new idea being composed in the editor
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("New Title")
-        viewModel.updateContent("New Content")
+        viewModel.typeTitle("New Title")
+        viewModel.typeContent("New Content")
 
         // WHEN - Closing the editor (which triggers the save logic)
         viewModel.closeAndSave()
@@ -109,7 +134,7 @@ class IdeaViewModelTest {
         viewModel.openExisting(idea)
 
         // WHEN - Modifying the title and saving
-        viewModel.updateTitle("Updated Title")
+        viewModel.typeTitle("Updated Title")
         viewModel.closeAndSave()
 
         // THEN - The repository should receive an update for the specific ID with the new title
@@ -134,10 +159,10 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - The user types in two separate bursts (2 debounce triggers)
-        viewModel.updateTitle("My idea")
+        viewModel.typeTitle("My idea")
         advanceTimeBy(900) // first autosave → should insert and save ID=42
 
-        viewModel.updateContent("More text")
+        viewModel.typeContent("More text")
         advanceTimeBy(900) // second autosave → should update id=42, NOT insert a new one
 
         // THEN - upsertIdea was called exactly twice...
@@ -162,7 +187,7 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - The debounce triggers
-        viewModel.updateTitle("Title")
+        viewModel.typeTitle("Title")
         advanceTimeBy(900)
 
         // THEN - The state already contains the idea with the real ID
@@ -185,7 +210,7 @@ class IdeaViewModelTest {
         viewModel.openNew()
 
         // WHEN - User types and closes before 800ms
-        viewModel.updateTitle("Fast")
+        viewModel.typeTitle("Fast")
         viewModel.closeAndSave() // manually save before debounce
 
         advanceTimeBy(900) // debounce should no longer do anything (state reset)
@@ -225,9 +250,9 @@ class IdeaViewModelTest {
         viewModel.openExisting(idea)
 
         // WHEN - Multiple writing bursts
-        viewModel.updateTitle("Edit 1"); advanceTimeBy(900)
-        viewModel.updateTitle("Edit 2"); advanceTimeBy(900)
-        viewModel.updateTitle("Edit 3"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 1"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 2"); advanceTimeBy(900)
+        viewModel.typeTitle("Edit 3"); advanceTimeBy(900)
 
         // THEN - All calls use id=5, never id=0
         coVerify(atLeast = 1) {
@@ -251,6 +276,75 @@ class IdeaViewModelTest {
         viewModel.deleteIdea(7)
 
         coVerify { repository.deleteIdea(idea) }
+    }
+
+    /**
+     * New contract after the TextFieldState migration: body-only edits (no title,
+     * color or category changes) must also trigger the debounced autosave, because
+     * content changes now travel through snapshotFlow { contentState.text } instead
+     * of the _editor StateFlow.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_contentOnlyEdit_persistsContent() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 7L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+
+        // WHEN - The user only types in the body field
+        viewModel.typeContent("Only body text")
+        advanceTimeBy(900)
+
+        // THEN - The autosave persisted the body text
+        coVerify(exactly = 1) {
+            repository.upsertIdea(match { it.content == "Only body text" })
+        }
+    }
+
+    /**
+     * Same contract for the title after its TextFieldState migration: title-only
+     * edits must trigger the debounced autosave through snapshotFlow.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_titleOnlyEdit_persistsTitle() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 11L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+
+        // WHEN - The user only types in the title field
+        viewModel.typeTitle("Only title")
+        advanceTimeBy(900)
+
+        // THEN - The autosave persisted the title
+        coVerify(exactly = 1) {
+            repository.upsertIdea(match { it.title == "Only title" })
+        }
+    }
+
+    /**
+     * Editing the body of an EXISTING idea must update that idea (same ID),
+     * never create a new one.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun autosave_contentEditOnExistingIdea_updatesSameId() = runTest {
+        coEvery { repository.upsertIdea(any()) } returns 5L
+        viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
+        val idea = Idea(id = 5, title = "Original", content = "Old body", color = 0L)
+        viewModel.openExisting(idea)
+
+        // WHEN - The user edits only the body
+        viewModel.typeContent("New body")
+        advanceTimeBy(900)
+
+        // THEN - Updated with id=5 and the new body; no insertion with id=0
+        coVerify(atLeast = 1) {
+            repository.upsertIdea(match { it.id == 5 && it.content == "New body" })
+        }
+        coVerify(exactly = 0) {
+            repository.upsertIdea(match { it.id == 0 })
+        }
     }
 
 
@@ -285,17 +379,17 @@ class IdeaViewModelTest {
 
         // Sanity: state is loaded before onCleared
         assertEquals(idea, viewModel.editor.value.idea)
-        assertEquals("To delete", viewModel.editor.value.title)
+        assertEquals("To delete", viewModel.titleState.text.toString())
 
         // WHEN — Nav3 destroys the NavEntry → VM.onCleared()
         viewModel.invokeOnCleared()
 
-        // THEN — editor state is reset to the default empty state
+        // THEN — editor state is reset to the default empty state.
+        // (titleState/contentState are not asserted here: they live in the ViewModel
+        // being destroyed; a new NavEntry creates a fresh ViewModel with empty text.)
         viewModel.editor.test {
             val state = awaitItem()
             assertNull(state.idea)
-            assertEquals("", state.title)
-            assertEquals("", state.content)
         }
     }
 
@@ -315,7 +409,7 @@ class IdeaViewModelTest {
         coEvery { repository.upsertIdea(any()) } returns 42L
         viewModel = IdeaEditorViewModel(repository, categoryRepository, userPreferencesRepository)
         viewModel.openNew()
-        viewModel.updateTitle("Title")
+        viewModel.typeTitle("Title")
 
         // First autosave fires (debounce elapses)
         advanceTimeBy(900)

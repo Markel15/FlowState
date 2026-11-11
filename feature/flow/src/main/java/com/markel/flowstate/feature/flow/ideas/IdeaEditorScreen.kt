@@ -104,6 +104,10 @@ fun IdeaEditorScreen(
     val contentFocusRequester = remember { FocusRequester() }
     var showColorSheet by remember { mutableStateOf(false) }
 
+    // ── State-based BasicTextField ───────────────────────────────────────────
+    val titleState = viewModel.titleState
+    val contentState = viewModel.contentState
+
     Scaffold(
         modifier = Modifier
             .then(
@@ -157,8 +161,8 @@ fun IdeaEditorScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
             // ── Category selector (only when categories are enabled) ──────────────
@@ -198,8 +202,7 @@ fun IdeaEditorScreen(
             else Spacer(modifier = Modifier.size(6.dp))
 
             BasicTextField(
-                value = editorState.title,
-                onValueChange = { viewModel.updateTitle(it) },
+                state = titleState,
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
                     fontSize = 24.sp,
                     lineHeight = 29.sp,
@@ -210,9 +213,9 @@ fun IdeaEditorScreen(
                     capitalization = KeyboardCapitalization.Sentences
                 ),
                 cursorBrush = SolidColor(onCardColor),
-                decorationBox = { inner ->
+                decorator = { inner ->
                     Box {
-                        if (editorState.title.isEmpty()) {
+                        if (titleState.text.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.title),
                                 style = MaterialTheme.typography.headlineSmall.copy(
@@ -232,8 +235,7 @@ fun IdeaEditorScreen(
             Spacer(Modifier.height(16.dp))
 
             BasicTextField(
-                value = editorState.content,
-                onValueChange = { viewModel.updateContent(it) },
+                state = contentState,
                 textStyle = TextStyle(
                     fontSize = 16.sp,
                     lineHeight = 24.sp,
@@ -243,9 +245,9 @@ fun IdeaEditorScreen(
                     capitalization = KeyboardCapitalization.Sentences
                 ),
                 cursorBrush = SolidColor(onCardColor),
-                decorationBox = { inner ->
+                decorator = { inner ->
                     Box {
-                        if (editorState.content.isEmpty()) {
+                        if (contentState.text.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.idea_content),
                                 fontSize = 16.sp,
@@ -260,6 +262,8 @@ fun IdeaEditorScreen(
                     .defaultMinSize(minHeight = 300.dp)
                     .focusRequester(contentFocusRequester)
             )
+            // Scrollable breathing room
+            Spacer(Modifier.height(80.dp))
         }
     }
 

@@ -2,6 +2,7 @@ package com.markel.flowstate.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.markel.flowstate.core.domain.achievements.AchievementDates
 import com.markel.flowstate.core.domain.achievements.AchievementEvaluator
 import com.markel.flowstate.core.domain.achievements.AchievementInputs
 import com.markel.flowstate.core.domain.achievements.AchievementProgress
@@ -21,7 +22,7 @@ class AchievementsViewModel @Inject constructor(
     val achievements: StateFlow<List<AchievementProgress>> = getAchievementMetrics()
         .map { metrics ->
             AchievementEvaluator.evaluate(
-                AchievementInputs(
+                inputs = AchievementInputs(
                     totalHabitCompletions = metrics.habit.totalCompletions,
                     totalTaskCompletions = metrics.tasks.totalDone,
                     earlyBirdTasks = metrics.tasks.earlyBirdTasks,
@@ -34,6 +35,20 @@ class AchievementsViewModel @Inject constructor(
                     perfectWeeks = metrics.habit.perfectWeeks,
                     nightOwlTasks = metrics.tasks.nightOwlTasks,
                     bestSundayTasks = metrics.tasks.bestSundayTasks
+                ),
+                dates = AchievementDates(
+                    perfectDays = metrics.habit.perfectDayDates,
+                    mondayPerfectDays = metrics.habit.mondayPerfectDayDates,
+                    perfectWeeks = metrics.habit.perfectWeekDates,
+                    habitCompletions = metrics.habit.completionDates,
+                    taskCompletions = metrics.tasks.completionDates,
+                    nightOwl = metrics.tasks.nightOwlDates,
+                    earlyBird = metrics.tasks.earlyBirdDates,
+                    productiveMornings = metrics.tasks.productiveMorningDates,
+                    onTime = metrics.tasks.onTimeDates,
+                    sundayCounts = metrics.tasks.sundayCounts,
+                    comebacks = metrics.habit.comebackDates,
+                    streakRuns = metrics.habit.streakRuns
                 )
             ).sortedForDisplay()
         }

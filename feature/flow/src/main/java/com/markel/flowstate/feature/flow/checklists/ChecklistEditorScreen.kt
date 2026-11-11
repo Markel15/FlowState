@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -204,8 +205,7 @@ fun CheckListEditorScreen(
                 }
                 else Spacer(modifier = Modifier.size(6.dp))
                 BasicTextField(
-                    value = editorState.title,
-                    onValueChange = { viewModel.updateTitle(it) },
+                    state = viewModel.titleState,
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
                         fontSize = 24.sp,
                         lineHeight = 29.sp,
@@ -216,9 +216,9 @@ fun CheckListEditorScreen(
                         capitalization = KeyboardCapitalization.Sentences
                     ),
                     cursorBrush = SolidColor(onCardColor),
-                    decorationBox = { inner ->
+                    decorator = TextFieldDecorator { inner ->
                         Box {
-                            if (editorState.title.isEmpty()) {
+                            if (viewModel.titleState.text.isEmpty()) {
                                 Text(
                                     text = stringResource(R.string.title),
                                     style = MaterialTheme.typography.headlineSmall.copy(
@@ -242,11 +242,10 @@ fun CheckListEditorScreen(
                 ReorderableItem(reorderableState, key = item.id) { isDragging ->
                     val requestFocus = pendingFocusId == item.id
                     CheckListItemRow(
-                        text = item.text,
+                        textState = viewModel.itemTextState(item.id),
                         isDone = item.isDone,
                         requestFocusOnAppear = requestFocus,
                         onFocusConsumed = { if (requestFocus) pendingFocusId = null },
-                        onTextChange = { viewModel.updateItemText(item.id, it) },
                         onToggle = { viewModel.toggleItem(item.id) },
                         onDelete = { viewModel.removeItem(item.id) },
                         onAddNext = {
@@ -315,11 +314,10 @@ fun CheckListEditorScreen(
                         Column {
                             completedItems.forEach { item ->
                                 CheckListItemRow(
-                                    text = item.text,
+                                    textState = viewModel.itemTextState(item.id),
                                     isDone = item.isDone,
                                     requestFocusOnAppear = false,
                                     onFocusConsumed = {},
-                                    onTextChange = { viewModel.updateItemText(item.id, it) },
                                     onToggle = { viewModel.toggleItem(item.id) },
                                     onDelete = { viewModel.removeItem(item.id) },
                                     onAddNext = {

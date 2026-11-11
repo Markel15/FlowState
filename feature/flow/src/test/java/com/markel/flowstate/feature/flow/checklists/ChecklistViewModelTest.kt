@@ -1,5 +1,6 @@
 package com.markel.flowstate.feature.flow.checklists
 
+import androidx.compose.runtime.snapshots.Snapshot
 import app.cash.turbine.test
 import com.markel.flowstate.core.data.UserPreferencesRepository
 import com.markel.flowstate.core.domain.CategoryRepository
@@ -42,6 +43,27 @@ class ChecklistViewModelTest {
         title: String = "My List",
         items: List<CheckListItem> = emptyList()
     ) = CheckList(id = id, title = title, color = 0L, items = items)
+
+    /**
+     * Types into the hoisted title state exactly as BasicTextField(state = ...)
+     * would. On-device the frame loop applies snapshots automatically; JVM tests
+     * must call sendApplyNotifications so the VM's snapshotFlow collector runs.
+     */
+    private fun typeTitle(text: String) {
+        viewModel.titleState.edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
+
+    /**
+     * Types into one item's hoisted TextFieldState exactly as the row's
+     * BasicTextField(state = ...) would. On-device the frame loop applies
+     * snapshots automatically; JVM tests must call sendApplyNotifications so
+     * the VM's snapshotFlow collector runs (see [typeTitle]).
+     */
+    private fun typeItemText(id: String, text: String) {
+        viewModel.itemTextState(id).edit { replace(0, length, text) }
+        Snapshot.sendApplyNotifications()
+    }
 
     // ── openNew ───────────────────────────────────────────────────────────────
 
@@ -102,15 +124,15 @@ class ChecklistViewModelTest {
         }
     }
 
-    // ── updateTitle / updateColor ─────────────────────────────────────────────
+    // ── typeTitle / updateColor ───────────────────────────────────────────────
 
     @Test
-    fun updateTitle_updatesStateCorrectly() = runTest {
+    fun typeTitle_updatesStateCorrectly() = runTest {
         // GIVEN
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
 
         // WHEN
-        viewModel.updateTitle("Shopping")
+        typeTitle("Shopping")
 
         // THEN
         viewModel.editor.test {
@@ -172,16 +194,16 @@ class ChecklistViewModelTest {
         }
     }
 
-    // ── updateItemText ────────────────────────────────────────────────────────
+    // ── typeItemText ──────────────────────────────────────────────────────────
 
     @Test
-    fun updateItemText_updatesCorrectItem() = runTest {
+    fun typeItemText_updatesCorrectItem() = runTest {
         // GIVEN
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
         val id = viewModel.addItem()
 
         // WHEN
-        viewModel.updateItemText(id, "Milk")
+        typeItemText(id, "Milk")
 
         // THEN
         viewModel.editor.test {
@@ -191,14 +213,14 @@ class ChecklistViewModelTest {
     }
 
     @Test
-    fun updateItemText_doesNotAffectOtherItems() = runTest {
+    fun typeItemText_doesNotAffectOtherItems() = runTest {
         // GIVEN
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
         val id1 = viewModel.addItem()
         val id2 = viewModel.addItem()
 
         // WHEN
-        viewModel.updateItemText(id1, "Item 1 text")
+        typeItemText(id1, "Item 1 text")
 
         // THEN
         viewModel.editor.test {
@@ -267,9 +289,12 @@ class ChecklistViewModelTest {
     fun reorderPendingItems_movesItemCorrectly() = runTest {
         // GIVEN — three pending items in order A, B, C
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        val idA = viewModel.addItem(); viewModel.updateItemText(idA, "A")
-        val idB = viewModel.addItem(); viewModel.updateItemText(idB, "B")
-        val idC = viewModel.addItem(); viewModel.updateItemText(idC, "C")
+        val idA = viewModel.addItem()
+        typeItemText(idA, "A")
+        val idB = viewModel.addItem()
+        typeItemText(idB, "B")
+        val idC = viewModel.addItem()
+        typeItemText(idC, "C")
 
         // WHEN — move A (index 0) to the end (index 2) → expected: B, C, A
         viewModel.reorderPendingItems(fromIndex = 0, toIndex = 2)
@@ -287,9 +312,13 @@ class ChecklistViewModelTest {
     fun reorderPendingItems_doesNotAffectCompletedItems() = runTest {
         // GIVEN — two pending items and one completed
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        val idA = viewModel.addItem(); viewModel.updateItemText(idA, "A")
-        val idB = viewModel.addItem(); viewModel.updateItemText(idB, "B")
-        val idDone = viewModel.addItem(); viewModel.updateItemText(idDone, "Done"); viewModel.toggleItem(idDone)
+        val idA = viewModel.addItem()
+        typeItemText(idA, "A")
+        val idB = viewModel.addItem()
+        typeItemText(idB, "B")
+        val idDone = viewModel.addItem()
+        typeItemText(idDone, "Done")
+        viewModel.toggleItem(idDone)
 
         // WHEN — reorder pending items
         viewModel.reorderPendingItems(fromIndex = 0, toIndex = 1)
@@ -327,8 +356,9 @@ class ChecklistViewModelTest {
     fun closeAndSave_withNewChecklist_callsRepositoryUpsert() = runTest {
         // GIVEN
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("Groceries")
-        val id = viewModel.addItem(); viewModel.updateItemText(id, "Milk")
+        typeTitle("Groceries")
+        val id = viewModel.addItem()
+        typeItemText(id, "Milk")
 
         // WHEN
         viewModel.closeAndSave()
@@ -357,8 +387,9 @@ class ChecklistViewModelTest {
     fun closeAndSave_filtersOutBlankItems_beforePersisting() = runTest {
         // GIVEN — one real item and one blank (ghost) item
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("List")
-        val idReal = viewModel.addItem(); viewModel.updateItemText(idReal, "Real item")
+        typeTitle("List")
+        val idReal = viewModel.addItem()
+        typeItemText(idReal, "Real item")
         viewModel.addItem() // blank item — should be discarded
 
         // WHEN
@@ -379,7 +410,7 @@ class ChecklistViewModelTest {
         coEvery { repository.getLists() } returns flowOf(listOf(original))
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
         viewModel.loadForEditing(7)
-        viewModel.updateTitle("New Title")
+        typeTitle("New Title")
 
         // WHEN
         viewModel.closeAndSave()
@@ -395,7 +426,7 @@ class ChecklistViewModelTest {
     @Test
     fun closeAndSave_persistsCurrentState() = runTest {
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("Temp")
+        typeTitle("Temp")
 
         // WHEN
         viewModel.closeAndSave()
@@ -460,9 +491,9 @@ class ChecklistViewModelTest {
     @Test
     fun onCleared_resetsEditorState() = runTest {
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("Persistent")
+        typeTitle("Persistent")
         val itemId = viewModel.addItem()
-        viewModel.updateItemText(itemId, "Persistent item")
+        typeItemText(itemId, "Persistent item")
 
         // Sanity: state has data before onCleared
         assertEquals("Persistent", viewModel.editor.value.title)
@@ -495,7 +526,7 @@ class ChecklistViewModelTest {
     fun closeAndSave_afterAutosaveFired_doesNotInsertTwice() = runTest {
         coEvery { repository.upsertList(any()) } returns 42
         viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
-        viewModel.updateTitle("Title")
+        typeTitle("Title")
 
         // First autosave fires (debounce elapses)
         advanceTimeBy(900)
@@ -520,5 +551,113 @@ class ChecklistViewModelTest {
         }
     }
 
+
+
+    // ── Hoisted TextFieldStates ───────────────────────────────────────────────
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun loadForEditing_seedsHoistedTextStates() = runTest {
+        // GIVEN
+        val items = listOf(item("a", "Buy milk"), item("b", "Buy eggs", isDone = true))
+        val list = checklist(id = 5, title = "Groceries", items = items)
+        coEvery { repository.getLists() } returns flowOf(listOf(list))
+        viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
+
+        // WHEN
+        viewModel.loadForEditing(5)
+        Snapshot.sendApplyNotifications()
+        advanceUntilIdle()
+
+        // THEN — title and every item are seeded into their hoisted states
+        assertEquals("Groceries", viewModel.titleState.text.toString())
+        assertEquals("Buy milk", viewModel.itemTextState("a").text.toString())
+        assertEquals("Buy eggs", viewModel.itemTextState("b").text.toString())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun itemTextState_typingFlowsIntoEditorAndAutosaves() = runTest {
+        // GIVEN
+        viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+        val id = viewModel.addItem()
+
+        // WHEN — type as the row's BasicTextField(state = ...) would
+        viewModel.itemTextState(id).edit { replace(0, length, "Milk") }
+        Snapshot.sendApplyNotifications()
+
+        // THEN — the editor draft is updated...
+        assertEquals("Milk", viewModel.editor.value.items.first { it.id == id }.text)
+
+        // ...and the existing debounced autosave persists it
+        advanceTimeBy(900)
+        coVerify { repository.upsertList(match { it.items.any { i -> i.text == "Milk" } }) }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun closeAndSave_persistsEditsNotYetObservedByCollectors() = runTest {
+        // GIVEN
+        viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+        val id = viewModel.addItem()
+
+        // WHEN — type WITHOUT sendApplyNotifications: the snapshotFlow collectors
+        // have not run yet (back pressed in the same frame as the last keystroke)
+        viewModel.titleState.edit { replace(0, length, "Groceries") }
+        viewModel.itemTextState(id).edit { replace(0, length, "Milk") }
+        viewModel.closeAndSave()
+        advanceUntilIdle()
+
+        // THEN — closeAndSave reads the states directly, nothing is lost
+        coVerify {
+            repository.upsertList(match { list ->
+                list.title == "Groceries" && list.items.any { it.text == "Milk" }
+            })
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun removeItem_stopsItsCollector() = runTest {
+        // GIVEN
+        viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+        val id = viewModel.addItem()
+        val state = viewModel.itemTextState(id)
+        state.edit { replace(0, length, "Before") }
+        Snapshot.sendApplyNotifications()
+
+        // WHEN — remove the item, then keep editing its old state reference
+        viewModel.removeItem(id)
+        state.edit { replace(0, length, "After") }
+        Snapshot.sendApplyNotifications()
+        advanceUntilIdle()
+
+        // THEN — the removed item is not resurrected
+        assertTrue(viewModel.editor.value.items.isEmpty())
+    }
+
+    @Test
+    fun openNew_resetsHoistedTextStates() = runTest {
+        // GIVEN — an editor with typed title and item
+        viewModel = CheckListViewModel(repository, categoryRepository, userPreferencesRepository)
+        viewModel.openNew()
+        typeTitle("Old list")
+        val id = viewModel.addItem()
+        viewModel.itemTextState(id).edit { replace(0, length, "Old item") }
+        Snapshot.sendApplyNotifications()
+
+        // WHEN
+        viewModel.openNew()
+        Snapshot.sendApplyNotifications()
+
+        // THEN — hoisted states are fresh
+        assertEquals("", viewModel.titleState.text.toString())
+        assertTrue(viewModel.editor.value.items.isEmpty())
+        val newId = viewModel.addItem()
+        assertEquals("", viewModel.itemTextState(newId).text.toString())
+    }
 
 }
