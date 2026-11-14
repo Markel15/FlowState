@@ -66,8 +66,9 @@ fun DateSelector(
     )
 
     if (showDatePicker) {
+        val initialMillis = dueDate ?: LocalDate.now().atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = dueDate ?: System.currentTimeMillis(),
+            initialSelectedDateMillis = initialMillis,
             initialDisplayMode = if (isLandscape) DisplayMode.Input else DisplayMode.Picker
         )
         DatePickerDialog(

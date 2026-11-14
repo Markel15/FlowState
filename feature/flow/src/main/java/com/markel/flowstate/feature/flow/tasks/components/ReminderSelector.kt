@@ -91,7 +91,10 @@ fun ReminderSelector(
 
     // ── Step 1: Date picker ───────────────────────────────────────────────────
     if (showDatePicker) {
-        val initialMillis = reminderTime ?: System.currentTimeMillis()
+        val initialDate = reminderTime?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+        } ?: LocalDate.now()
+        val initialMillis = initialDate.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
 
         val selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
