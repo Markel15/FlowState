@@ -68,7 +68,7 @@ class CalendarViewModel @Inject constructor(
                     }
                     task.isDone && task.completedAt != null -> {
                         Instant.ofEpochMilli(task.completedAt!!)
-                            .atZone(ZoneId.of("UTC"))
+                            .atZone(ZoneId.systemDefault())
                             .toLocalDate()
                     }
                     else -> null

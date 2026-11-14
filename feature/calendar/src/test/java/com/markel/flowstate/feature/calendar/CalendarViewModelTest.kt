@@ -15,7 +15,9 @@ import org.junit.Assert
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.TimeZone
 
 class CalendarViewModelTest {
 
@@ -27,9 +29,14 @@ class CalendarViewModelTest {
     private val reminderScheduler: ReminderScheduler = mockk(relaxed = true)
     private lateinit var viewModel: CalendarViewModel
 
-    // Helper to create timestamps (milliseconds) from a LocalDate
-    private fun LocalDate.toMillis(): Long {
+    // DatePicker stores dueDate as midnight UTC of the selected calendar day
+    private fun LocalDate.toDueDateMillis(): Long {
         return this.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+    }
+
+    // ToggleTaskUseCase stores completedAt as an instant (System.currentTimeMillis())
+    private fun LocalDateTime.toCompletedMillis(zone: ZoneId = ZoneId.systemDefault()): Long {
+        return this.atZone(zone).toInstant().toEpochMilli()
     }
 
     @Test
@@ -43,14 +50,14 @@ class CalendarViewModelTest {
         // 1. Task with a Due Date (Should go to 'tomorrow')
         val taskWithDueDate = Task(
             id = 1, title = "Due Task", isDone = false,
-            dueDate = tomorrow.toMillis()
+            dueDate = tomorrow.toDueDateMillis()
         )
 
         // 2. Completed Task without a due date (Should go to 'today' which is when it was completed)
         val taskCompleted = Task(
             id = 2, title = "Done Task", isDone = true,
             dueDate = null,
-            completedAt = today.toMillis()
+            completedAt = today.atTime(12, 0).toCompletedMillis()
         )
 
         // 3. Task without date and not done (Should NOT appear in the calendar)
@@ -62,8 +69,8 @@ class CalendarViewModelTest {
         // 4. Task with both dates (According to the logic, DueDate has preference)
         val taskHybrid = Task(
             id = 4, title = "Hybrid Task", isDone = true,
-            dueDate = tomorrow.toMillis(),
-            completedAt = today.toMillis()
+            dueDate = tomorrow.toDueDateMillis(),
+            completedAt = today.atTime(12, 0).toCompletedMillis()
         )
 
         coEvery { repository.getTasks() } returns flowOf(
@@ -136,5 +143,52 @@ class CalendarViewModelTest {
 
         coVerify { toggleTaskUseCase(task) }
         coVerify { reminderScheduler.cancel(1) }
+    }
+
+    @Test
+    fun uiState_completedAfterMidnightInPositiveUtcOffset_groupsUnderLocalDate() = runTest {
+        val previousTimeZone = TimeZone.getDefault()
+        val madrid = ZoneId.of("Europe/Madrid")
+        TimeZone.setDefault(TimeZone.getTimeZone(madrid))
+        try {
+            // Winter (UTC+1): 2026-11-14 00:20 local == 2026-11-13 23:20 UTC
+            val winterLocalDate = LocalDate.of(2026, 11, 14)
+            val winterTask = Task(
+                id = 10,
+                title = "Night task (winter)",
+                isDone = true,
+                dueDate = null,
+                completedAt = LocalDateTime.of(2026, 11, 14, 0, 20).toCompletedMillis(madrid)
+            )
+
+            // Summer (UTC+2): 2026-07-15 01:30 local == 2026-07-14 23:30 UTC
+            val summerLocalDate = LocalDate.of(2026, 7, 15)
+            val summerTask = Task(
+                id = 11,
+                title = "Night task (summer)",
+                isDone = true,
+                dueDate = null,
+                completedAt = LocalDateTime.of(2026, 7, 15, 1, 30).toCompletedMillis(madrid)
+            )
+
+            coEvery { repository.getTasks() } returns flowOf(listOf(winterTask, summerTask))
+            viewModel = CalendarViewModel(repository, toggleTaskUseCase, reminderScheduler)
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                val success = if (state is CalendarUiState.Loading) {
+                    awaitItem() as CalendarUiState.Success
+                } else {
+                    state as CalendarUiState.Success
+                }
+
+                Assert.assertEquals(listOf(winterTask), success.tasksByDate[winterLocalDate])
+                Assert.assertNull(success.tasksByDate[winterLocalDate.minusDays(1)])
+                Assert.assertEquals(listOf(summerTask), success.tasksByDate[summerLocalDate])
+                Assert.assertNull(success.tasksByDate[summerLocalDate.minusDays(1)])
+            }
+        } finally {
+            TimeZone.setDefault(previousTimeZone)
+        }
     }
 }
