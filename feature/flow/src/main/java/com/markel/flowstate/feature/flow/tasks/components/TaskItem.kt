@@ -66,6 +66,7 @@ import com.markel.flowstate.core.domain.Task
 import com.markel.flowstate.feature.tasks.R
 import com.markel.flowstate.feature.flow.tasks.util.asColor
 import kotlinx.coroutines.delay
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,7 +75,8 @@ fun AnimatableTaskItem(
     shape: Shape,
     onDelete: () -> Unit,
     onComplete: () -> Unit,
-    onContentClick: () -> Unit
+    onContentClick: () -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     var isCheckedLocally by remember { mutableStateOf(task.isDone) }
 
@@ -100,6 +102,7 @@ fun AnimatableTaskItem(
             dueDate = task.dueDate,
             reminderTime = task.reminderTime,
             shape = shape,
+            today = today,
             onClicked = onContentClick,
             onCheckClicked = {
                 isCheckedLocally = true
@@ -207,7 +210,8 @@ fun TaskItemContent(
     reminderTime: Long? = null,
     shape: Shape,
     onClicked: () -> Unit,
-    onCheckClicked: () -> Unit
+    onCheckClicked: () -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     val priorityColor = priority.asColor()
     Column(
@@ -348,7 +352,7 @@ fun TaskItemContent(
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
                                     tint = dueDate.let { date ->
-                                        if (isDateOverdue(date)) {
+                                        if (isDateOverdue(date, today)) {
                                             MaterialTheme.colorScheme.error
                                         } else {
                                             MaterialTheme.colorScheme.primary
@@ -357,10 +361,10 @@ fun TaskItemContent(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = formatDate(dueDate),
+                                    text = formatDate(dueDate, today),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = dueDate.let { date ->
-                                        if (isDateOverdue(date)) {
+                                        if (isDateOverdue(date, today)) {
                                             MaterialTheme.colorScheme.error
                                         } else {
                                             MaterialTheme.colorScheme.primary
@@ -385,7 +389,7 @@ fun TaskItemContent(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = formatReminderDateTime(reminderTime),
+                                    text = formatReminderDateTime(reminderTime, today),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.tertiary
                                 )

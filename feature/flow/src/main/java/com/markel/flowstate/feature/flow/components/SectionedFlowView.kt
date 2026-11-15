@@ -61,6 +61,7 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.ReorderableLazyStaggeredGridState
 import sh.calvin.reorderable.rememberReorderableLazyStaggeredGridState
+import java.time.LocalDate
 
 /** Minimum card width. ~390dp screens → 2 columns; tablets/landscape → 3–4. */
 private const val GRID_MIN_COLUMN_DP = 170
@@ -240,6 +241,7 @@ fun SectionedFlowView(
                             onDraggedSectionChanged = { draggedSection = it },
                             task = item.task,
                             shape = taskRowShape(taskIndex, uiState.tasks.size),
+                            today = uiState.today,
                             onDelete = { onTaskDelete(item.task) },
                             onComplete = { onTaskToggle(item.task) },
                             onContentClick = { onTaskClick(item.task) },
@@ -364,6 +366,7 @@ private fun LazyStaggeredGridItemScope.TaskRowContent(
     onDraggedSectionChanged: (FlowItem.Section?) -> Unit,
     task: Task,
     shape: RoundedCornerShape,
+    today: LocalDate,
     onDelete: () -> Unit,
     onComplete: () -> Unit,
     onContentClick: () -> Unit,
@@ -384,6 +387,7 @@ private fun LazyStaggeredGridItemScope.TaskRowContent(
             AnimatableTaskItem(
                 task = task,
                 shape = shape,
+                today = today,
                 onDelete = onDelete,
                 onComplete = onComplete,
                 onContentClick = onContentClick,

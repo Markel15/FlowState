@@ -181,18 +181,16 @@ fun DateSelector(
     }
 }
 
-fun isDateOverdue(timestamp: Long): Boolean {
+fun isDateOverdue(timestamp: Long, today: LocalDate = LocalDate.now()): Boolean {
     val date = Instant.ofEpochMilli(timestamp)
         .atZone(ZoneId.of("UTC"))
         .toLocalDate()
-    val today = LocalDate.now()
     return date.isBefore(today)
 }
 @Composable
-fun formatDate(timestamp: Long?): String {
+fun formatDate(timestamp: Long?, today: LocalDate = LocalDate.now()): String {
     if (timestamp == null) return ""
     val date = Instant.ofEpochMilli(timestamp).atZone(ZoneId.of("UTC")).toLocalDate()
-    val today = LocalDate.now()
 
     return when(date) {
         today -> stringResource(R.string.today)

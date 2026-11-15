@@ -331,11 +331,10 @@ fun ReminderSelector(
  * Examples: "Today 09:00", "Tomorrow 14:30", "15 Jun 08:00"
  */
 @Composable
-fun formatReminderDateTime(timestamp: Long): String {
+fun formatReminderDateTime(timestamp: Long, today: LocalDate = LocalDate.now()): String {
     val zdt = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())
     val date = zdt.toLocalDate()
     val time = zdt.toLocalTime()
-    val today = LocalDate.now()
 
     val is24Hour = DateFormat.is24HourFormat(LocalContext.current)
     val timePattern = if (is24Hour) "HH:mm" else "h:mm a"
