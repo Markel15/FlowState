@@ -35,8 +35,10 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.text.font.FontStyle
 
 @Composable
-fun DynamicHeader(isMinimized: Boolean)
-{
+fun DynamicHeader(
+    isMinimized: Boolean,
+    today: LocalDate = LocalDate.now()
+) {
     val greeting = when (LocalTime.now().hour) {
         in 5..12 -> R.string.good_morning
         in 13..20 -> R.string.good_evening
@@ -44,7 +46,7 @@ fun DynamicHeader(isMinimized: Boolean)
     }
 
     val dateText = DateTimeFormatter.ofPattern("EEEE, d MMM", LocalLocale.current.platformLocale)
-        .format(LocalDate.now())
+        .format(today)
         .uppercase()
 
     val headerHeight by animateDpAsState(

@@ -4,6 +4,7 @@ import com.markel.flowstate.core.domain.Category
 import com.markel.flowstate.core.domain.CheckList
 import com.markel.flowstate.core.domain.Idea
 import com.markel.flowstate.core.domain.Task
+import java.time.LocalDate
 
 sealed interface FlowUiState {
     data object Loading : FlowUiState
@@ -14,7 +15,8 @@ sealed interface FlowUiState {
         val categories: List<Category> = emptyList(),
         val selectedCategoryId: Int? = Category.GENERAL_ID,
         val categoriesEnabled: Boolean = false,
-        val pendingTaskCounts: Map<Int?, Int> = emptyMap()
+        val pendingTaskCounts: Map<Int?, Int> = emptyMap(),
+        val today: LocalDate = LocalDate.now()
     ) : FlowUiState {
 
         /**

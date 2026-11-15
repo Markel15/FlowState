@@ -28,6 +28,7 @@ import com.markel.flowstate.feature.flow.tasks.TaskViewModel
 import com.markel.flowstate.feature.flow.tasks.components.TaskCreationSheetContent
 import com.markel.flowstate.feature.flow.tasks.util.HandleSystemBars
 import com.markel.flowstate.feature.flow.components.SectionedFlowView
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +66,7 @@ fun FlowScreen(
     val selectedCategoryId = (flowUiState as? FlowUiState.Success)?.selectedCategoryId
     val generalCategoryName by flowViewModel.generalCategoryName.collectAsStateWithLifecycle()
     val pendingTaskCounts = (flowUiState as? FlowUiState.Success)?.pendingTaskCounts ?: emptyMap()
+    val today = (flowUiState as? FlowUiState.Success)?.today ?: LocalDate.now()
 
     // ── Tab state ──────────────────────────────────────────────────
     // Saveable state independent for each tabId.
@@ -92,7 +94,7 @@ fun FlowScreen(
             contentWindowInsets = WindowInsets(0.dp),  // To avoid big gaps of surface at the top & bottom
         ) { paddingValues ->
             Column(modifier = Modifier.padding(paddingValues)) {
-                DynamicHeader(isMinimized = isHeaderMinimized)
+                DynamicHeader(isMinimized = isHeaderMinimized, today = today)
 
                 // ── Category tabs (only when enabled) ───────────────
                 if (categoriesEnabled && categories.isNotEmpty()) {

@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -60,6 +61,7 @@ class FlowViewModel @Inject constructor(
 ) : ViewModel(), DefaultLifecycleObserver {
 
     // ── Optimistic local state ─────────────────────────────────
+    private val _today = MutableStateFlow(LocalDate.now())
     private val _uiState = MutableStateFlow<FlowUiState>(FlowUiState.Loading)
     val uiState: StateFlow<FlowUiState> = _uiState
 
@@ -147,10 +149,11 @@ class FlowViewModel @Inject constructor(
                 taskRepository.getTasks(),
                 ideaRepository.getIdeas(),
                 checkListRepository.getLists(),
-                categoryRepository.getCategories()
-            ) { tasks, ideas, lists, categories ->
+                categoryRepository.getCategories(),
+                _today
+            ) { tasks, ideas, lists, categories, today ->
                 // Combine these into a temporary data class
-                CoreData(tasks, ideas, lists, categories)
+                CoreData(tasks, ideas, lists, categories, today)
             }
             // Combine like this to not lose type-safe navigation
             combine(
@@ -237,7 +240,8 @@ class FlowViewModel @Inject constructor(
                     categories = coreData.categories,
                     selectedCategoryId = effectiveSelectedId,
                     categoriesEnabled = categoriesEnabled,
-                    pendingTaskCounts = pendingTaskCounts
+                    pendingTaskCounts = pendingTaskCounts,
+                    today = coreData.today
                 )
             }.collect { state ->
                 _uiState.value = state
@@ -347,6 +351,8 @@ class FlowViewModel @Inject constructor(
     // ── Lifecycle: called every time the app comes to the foreground ──────────
 
     override fun onResume(owner: LifecycleOwner) {
+        refreshTodayIfNeeded()
+
         val permissionNowGranted = reminderScheduler.canScheduleExactAlarms()
 
         if (wasPermissionMissing && permissionNowGranted) {
@@ -358,6 +364,15 @@ class FlowViewModel @Inject constructor(
             }
         }
         refreshBanner()
+    }
+
+    /**
+     * Re-evaluates the current date when returning to the foreground.
+     * Because [_today] is a [MutableStateFlow], assigning the same [LocalDate]
+     * is a no-op and only triggers a re-emission when midnight has passed.
+     */
+    fun refreshTodayIfNeeded(now: LocalDate = LocalDate.now()) {
+        _today.value = now
     }
 
     // ── Reorder ────────────────────────────────────────────────────────
@@ -484,5 +499,6 @@ data class CoreData(
     val tasks: List<Task>,
     val ideas: List<Idea>,
     val lists: List<CheckList>,
-    val categories: List<Category>
+    val categories: List<Category>,
+    val today: LocalDate = LocalDate.now()
 )

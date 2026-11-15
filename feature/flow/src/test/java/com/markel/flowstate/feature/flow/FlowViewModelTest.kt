@@ -988,6 +988,27 @@ class FlowViewModelTest {
         }
     }
 
+    // ── Midnight rollover ─────────────────────────────────────────────────────
+
+    @Test
+    fun refreshTodayIfNeeded_whenDayChanges_updatesTodayInUiState() = runTest {
+        viewModel = createViewModel()
+
+        viewModel.uiState.test {
+            val initial = awaitSuccess()
+            val tomorrow = initial.today.plusDays(1)
+
+            // Resuming on the same calendar day is a no-op
+            viewModel.refreshTodayIfNeeded(initial.today)
+            expectNoEvents()
+
+            // Returning after midnight emits the new date
+            viewModel.refreshTodayIfNeeded(tomorrow)
+            val updated = awaitItem() as FlowUiState.Success
+            assertEquals(tomorrow, updated.today)
+        }
+    }
+
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
