@@ -57,8 +57,9 @@ fun CalendarContent(
     // Hoisted from CalendarScreen so that the screen can derive
     // FAB visibility from the same LazyListState that drives this list.
     listState: LazyListState,
+    today: java.time.LocalDate = java.time.LocalDate.now(),
 ) {
-    val currentMonth = remember { YearMonth.now() }
+    val currentMonth = remember { YearMonth.from(today) }
     val startMonth = remember { currentMonth.minusMonths(100) }
     val endMonth = remember { currentMonth.plusMonths(100) }
     val firstDayOfWeek = remember { firstDayOfWeekFromLocale() }
@@ -176,8 +177,9 @@ fun CalendarContent(
             monthState = monthState,
             weekState = weekState,
             selectedDate = selectedDate,
+            today = today,
             onTodayClick = {
-                onDateSelected(java.time.LocalDate.now())
+                onDateSelected(today)
                 scrollTrigger = System.currentTimeMillis()
             },
             onDateSelected = onDateSelected
@@ -194,6 +196,7 @@ fun CalendarContent(
             weekState = weekState,
             tasksByDate = tasksByDate,
             selectedDate = selectedDate,
+            today = today,
             onDateSelected = { date ->
                 // If we select a date that is already selected, force the scroll only when the date is not visible
                 if (date == selectedDate && isExpanded) {
@@ -213,6 +216,7 @@ fun CalendarContent(
             startDate = selectedDate,
             tasksByDate = tasksByDate,
             listState = listState,
+            today = today,
             onTaskToggle = onTaskToggle
         )
     }

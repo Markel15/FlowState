@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.markel.flowstate.core.designsystem.R
 import com.markel.flowstate.core.designsystem.components.AnimatedUndoFab
@@ -31,6 +32,12 @@ fun CalendarScreen(
     viewModel: CalendarViewModel,
     taskViewModel: TaskViewModel = hiltViewModel()
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.addObserver(viewModel)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(viewModel) }
+    }
+
     val uiState by viewModel.uiState.collectAsState()
     val draft by taskViewModel.draft.collectAsStateWithLifecycle()
 
@@ -100,6 +107,7 @@ fun CalendarScreen(
                         CalendarContent(
                             tasksByDate = state.tasksByDate,
                             selectedDate = state.selectedDate,
+                            today = state.today,
                             onDateSelected = viewModel::onDateSelected,
                             onTaskToggle = { task ->
                                 val isTaskDisappearing = task.dueDate == null && task.isDone

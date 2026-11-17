@@ -57,7 +57,8 @@ private val ACCENT_WIDTH = 3.dp
 @Composable
 fun InteractiveTaskRow(
     task: Task,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     val priorityColor: Color? = if (task.priority == Priority.NOTHING) null
     else task.priority.asColor()
@@ -199,7 +200,7 @@ fun InteractiveTaskRow(
                              )
                              Spacer(modifier = Modifier.width(4.dp))
                              Text(
-                                 text = formatCalendarReminderTime(task.reminderTime),
+                                 text = formatCalendarReminderTime(task.reminderTime, today),
                                  style = MaterialTheme.typography.labelSmall,
                                  color = MaterialTheme.colorScheme.tertiary
                              )
@@ -212,13 +213,12 @@ fun InteractiveTaskRow(
 }
 
 @Composable
-private fun formatCalendarReminderTime(timestamp: Long?): String {
+private fun formatCalendarReminderTime(timestamp: Long?, today: LocalDate = LocalDate.now()): String {
     if (timestamp == null) return ""
     val context = LocalContext.current
     val zdt = Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())
     val date = zdt.toLocalDate()
     val time = zdt.toLocalTime()
-    val today = LocalDate.now()
 
     val is24Hour = DateFormat.is24HourFormat(context)
     val timePattern = if (is24Hour) "HH:mm" else "h:mm a"

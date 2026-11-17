@@ -20,7 +20,8 @@ fun ExpandableCalendarView(
     weekState: WeekCalendarState,
     tasksByDate: Map<LocalDate, List<Task>>,
     selectedDate: LocalDate,
-    onDateSelected: (LocalDate) -> Unit
+    onDateSelected: (LocalDate) -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     AnimatedVisibility(
         visible = isExpanded,
@@ -43,7 +44,7 @@ fun ExpandableCalendarView(
                     day = day,
                     isSelected = isSelected,
                     hasTasks = tasksForDay.isNotEmpty(),
-                    isToday = day.date == java.time.LocalDate.now(),
+                    isToday = day.date == today,
                     onClick = { onDateSelected(day.date) }
                 )
             }
@@ -70,7 +71,7 @@ fun ExpandableCalendarView(
                     day = day,
                     isSelected = isSelected,
                     hasTasks = tasksForDay.isNotEmpty(),
-                    isToday = day.date == java.time.LocalDate.now(),
+                    isToday = day.date == today,
                     onClick = { onDateSelected(day.date) }
                 )
             }

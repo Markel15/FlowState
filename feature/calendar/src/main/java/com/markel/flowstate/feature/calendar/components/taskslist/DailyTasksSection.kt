@@ -58,7 +58,8 @@ fun DailyTasksSection(
     startDate: LocalDate,
     tasksByDate: Map<LocalDate, List<Task>>,
     listState: LazyListState,
-    onTaskToggle: (Task) -> Unit
+    onTaskToggle: (Task) -> Unit,
+    today: LocalDate = LocalDate.now()
 ) {
     val weeks = remember(startDate, tasksByDate) {
         buildWeekBlocks(startDate, tasksByDate)
@@ -76,7 +77,7 @@ fun DailyTasksSection(
     ) {
         weeks.forEach { week ->
             item(key = "week_${week.weekKey}") {
-                WeekSection(week = week, onTaskToggle = onTaskToggle)
+                WeekSection(week = week, today = today, onTaskToggle = onTaskToggle)
             }
         }
     }
@@ -87,6 +88,7 @@ fun DailyTasksSection(
 @Composable
 private fun WeekSection(
     week: WeekBlock,
+    today: LocalDate,
     onTaskToggle: (Task) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -109,7 +111,7 @@ private fun WeekSection(
             }
 
             if (day.tasks.isNotEmpty()) {
-                DayRow(day = day, onTaskToggle = onTaskToggle)
+                DayRow(day = day, today = today, onTaskToggle = onTaskToggle)
             }
         }
         Spacer(modifier = Modifier.height(4.5.dp))
@@ -122,9 +124,10 @@ private fun WeekSection(
 @Composable
 private fun DayRow(
     day: DayBlock,
+    today: LocalDate,
     onTaskToggle: (Task) -> Unit
 ) {
-    val isToday = day.date == LocalDate.now()
+    val isToday = day.date == today
 
     Row(
         modifier = Modifier
@@ -178,6 +181,7 @@ private fun DayRow(
             day.tasks.forEach { task ->
                 InteractiveTaskRow(
                     task = task,
+                    today = today,
                     onToggle = { onTaskToggle(task) }
                 )
             }

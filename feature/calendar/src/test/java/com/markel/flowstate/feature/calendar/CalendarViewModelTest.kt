@@ -191,4 +191,50 @@ class CalendarViewModelTest {
             TimeZone.setDefault(previousTimeZone)
         }
     }
+
+    @Test
+    fun refreshTodayIfNeeded_whenDayChanges_updatesTodayAndAdvancesDefaultSelectedDate() = runTest {
+        coEvery { repository.getTasks() } returns flowOf(emptyList())
+        viewModel = CalendarViewModel(repository, toggleTaskUseCase, reminderScheduler)
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let {
+                if (it is CalendarUiState.Loading) awaitItem() else it
+            } as CalendarUiState.Success
+            val tomorrow = initial.today.plusDays(1)
+
+            // Same day is a no-op
+            viewModel.refreshTodayIfNeeded(initial.today)
+            expectNoEvents()
+
+            // Midnight rollover advances both today and selectedDate (when still on previous today)
+            viewModel.refreshTodayIfNeeded(tomorrow)
+            val updated = awaitItem() as CalendarUiState.Success
+            Assert.assertEquals(tomorrow, updated.today)
+            Assert.assertEquals(tomorrow, updated.selectedDate)
+        }
+    }
+
+    @Test
+    fun refreshTodayIfNeeded_whenUserSelectedCustomDate_preservesSelectedDate() = runTest {
+        coEvery { repository.getTasks() } returns flowOf(emptyList())
+        viewModel = CalendarViewModel(repository, toggleTaskUseCase, reminderScheduler)
+
+        viewModel.uiState.test {
+            val initial = awaitItem().let {
+                if (it is CalendarUiState.Loading) awaitItem() else it
+            } as CalendarUiState.Success
+            val customDate = initial.today.plusDays(5)
+            val tomorrow = initial.today.plusDays(1)
+
+            viewModel.onDateSelected(customDate)
+            val afterSelect = awaitItem() as CalendarUiState.Success
+            Assert.assertEquals(customDate, afterSelect.selectedDate)
+
+            viewModel.refreshTodayIfNeeded(tomorrow)
+            val afterMidnight = awaitItem() as CalendarUiState.Success
+            Assert.assertEquals(tomorrow, afterMidnight.today)
+            Assert.assertEquals(customDate, afterMidnight.selectedDate)
+        }
+    }
 }

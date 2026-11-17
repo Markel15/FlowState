@@ -1,5 +1,7 @@
 package com.markel.flowstate.feature.calendar
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.markel.flowstate.core.domain.Task
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -24,7 +27,8 @@ sealed interface CalendarUiState {
     data object Loading : CalendarUiState
     data class Success(
         val tasksByDate: Map<LocalDate, List<Task>>,
-        val selectedDate: LocalDate = LocalDate.now()
+        val selectedDate: LocalDate = LocalDate.now(),
+        val today: LocalDate = LocalDate.now()
     ) : CalendarUiState
 }
 
@@ -33,18 +37,24 @@ class CalendarViewModel @Inject constructor(
     private val repository: TaskRepository,
     private val toggleTaskUseCase: ToggleTaskUseCase,
     private val reminderScheduler: ReminderScheduler
-) : ViewModel() {
+) : ViewModel(), DefaultLifecycleObserver {
 
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
+    private data class DateState(
+        val today: LocalDate = LocalDate.now(),
+        val selectedDate: LocalDate = today
+    )
 
-    // Combine both flows
+    private val _dateState = MutableStateFlow(DateState())
+
+    // Combine flows
     val uiState: StateFlow<CalendarUiState> = combine(
         repository.getTasks(),
-        _selectedDate
-    ) { tasks, selectedDate ->
+        _dateState
+    ) { tasks, dateState ->
         CalendarUiState.Success(
             tasksByDate = groupTasksByDate(tasks),
-            selectedDate = selectedDate
+            selectedDate = dateState.selectedDate,
+            today = dateState.today
         )
     }.stateIn(
         scope = viewModelScope,
@@ -52,8 +62,31 @@ class CalendarViewModel @Inject constructor(
         initialValue = CalendarUiState.Loading
     )
 
+    override fun onResume(owner: LifecycleOwner) {
+        refreshTodayIfNeeded()
+    }
+
+    /**
+     * Re-evaluates the current date when returning to the foreground.
+     * Updating [today] and [selectedDate] inside a single [_dateState] avoids
+     * emitting an intermediate frame where [today] has advanced while
+     * [selectedDate] is still on the previous day.
+     */
+    fun refreshTodayIfNeeded(now: LocalDate = LocalDate.now()) {
+        _dateState.update { state ->
+            if (now == state.today) {
+                state
+            } else {
+                state.copy(
+                    today = now,
+                    selectedDate = if (state.selectedDate == state.today) now else state.selectedDate
+                )
+            }
+        }
+    }
+
     fun onDateSelected(date: LocalDate) {
-        _selectedDate.value = date
+        _dateState.update { it.copy(selectedDate = date) }
         // the combine() will automatically emit a new state every time a new date is selected
     }
 

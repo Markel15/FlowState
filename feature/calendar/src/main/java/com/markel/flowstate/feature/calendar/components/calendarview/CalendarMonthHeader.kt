@@ -47,7 +47,8 @@ fun CalendarMonthHeader(
     weekState: WeekCalendarState,
     selectedDate: java.time.LocalDate,
     onTodayClick: () -> Unit,
-    onDateSelected: (java.time.LocalDate) -> Unit
+    onDateSelected: (java.time.LocalDate) -> Unit,
+    today: java.time.LocalDate = java.time.LocalDate.now()
     ) {
 
     var isPickerExpanded by remember { mutableStateOf(false) }
@@ -117,7 +118,7 @@ fun CalendarMonthHeader(
             // Today button to center the selected day in the calendar to today
             IconButton(
                 onClick = {
-                    scrollTriggerMonth = YearMonth.from(java.time.LocalDate.now())
+                    scrollTriggerMonth = YearMonth.from(today)
                     scrollTriggerStamp = System.currentTimeMillis()
                     onTodayClick()
                 }
